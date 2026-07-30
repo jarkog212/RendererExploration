@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <windows.h>
+#include "Utils.h"
 
 constexpr wchar_t CLASS_NAME[] = L"BaseWindowClass";
 constexpr wchar_t WINDOW_TITLE[] = L"Base Window";
@@ -27,7 +28,7 @@ int WINAPI wWinMain(
 
     if (!RegisterClassExW(&wc))
     {
-        MessageBoxW(nullptr, L"Window class registration failed.", L"Error", MB_ICONERROR);
+        DISPLAY_ERROR(L"Window class registration failed.")
         return 0;
     }
 
@@ -46,7 +47,7 @@ int WINAPI wWinMain(
 
     if (!hwnd)
     {
-        MessageBoxW(nullptr, L"Window creation failed.", L"Error", MB_ICONERROR);
+        DISPLAY_ERROR(L"Window creation failed.")
         return 0;
     }
 

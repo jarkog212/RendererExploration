@@ -2,19 +2,100 @@
 //
 
 #include <iostream>
+#include <windows.h>
 
-int main()
+constexpr wchar_t CLASS_NAME[] = L"BaseWindowClass";
+constexpr wchar_t WINDOW_TITLE[] = L"Base Window";
+
+LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+
+int WINAPI wWinMain(
+    HINSTANCE hInstance,
+    HINSTANCE /*hPrevInstance*/,
+    PWSTR /*pCmdLine*/,
+    int nCmdShow)
 {
-    std::cout << "Hello World!\n";
+    WNDCLASSEXW wc = {};
+    wc.cbSize = sizeof(WNDCLASSEXW);
+    wc.style = CS_HREDRAW | CS_VREDRAW;
+    wc.lpfnWndProc = WindowProc;
+    wc.hInstance = hInstance;
+    wc.hIcon = LoadIconW(nullptr, IDI_APPLICATION);
+    wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
+    wc.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
+    wc.lpszClassName = CLASS_NAME;
+
+    if (!RegisterClassExW(&wc))
+    {
+        MessageBoxW(nullptr, L"Window class registration failed.", L"Error", MB_ICONERROR);
+        return 0;
+    }
+
+    HWND hwnd = CreateWindowExW(
+        0,                                  
+        CLASS_NAME,                         
+        WINDOW_TITLE,                       
+        WS_OVERLAPPEDWINDOW,                
+        CW_USEDEFAULT, CW_USEDEFAULT,       
+        800, 600,                           
+        nullptr,                            
+        nullptr,                            
+        hInstance,                          
+        nullptr                             
+    );
+
+    if (!hwnd)
+    {
+        MessageBoxW(nullptr, L"Window creation failed.", L"Error", MB_ICONERROR);
+        return 0;
+    }
+
+    ShowWindow(hwnd, nCmdShow);
+    UpdateWindow(hwnd);
+
+    MSG msg = {};
+    while (GetMessageW(&msg, nullptr, 0, 0) > 0)
+    {
+        TranslateMessage(&msg);
+        DispatchMessageW(&msg);
+    }
+
+    return static_cast<int>(msg.wParam);
 }
 
-// Run program: Ctrl + F5 or Debug > Start Without Debugging menu
-// Debug program: F5 or Debug > Start Debugging menu
+LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+{
+   //switch (uMsg)
+   //{
+   //case WM_DESTROY:
+   //    PostQuitMessage(0);
+   //    return 0;
+   //
+   //case WM_CLOSE:
+   //    DestroyWindow(hwnd);
+   //    return 0;
+   //
+   //case WM_PAINT:
+   //{
+   //    PAINTSTRUCT ps;
+   //    HDC hdc = BeginPaint(hwnd, &ps);
+   //    FillRect(hdc, &ps.rcPaint, reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1));
+   //    EndPaint(hwnd, &ps);
+   //    return 0;
+   //}
+   //
+   //case WM_SIZE:
+   //    // handle resize here if needed (width = LOWORD(lParam), height = HIWORD(lParam))
+   //    return 0;
+   //
+   //case WM_KEYDOWN:
+   //    if (wParam == VK_ESCAPE)
+   //        DestroyWindow(hwnd);
+   //    return 0;
+   //
+   //    default:
+   //        return DefWindowProcW(hwnd, uMsg, wParam, lParam);
+   //}
 
-// Tips for Getting Started: 
-//   1. Use the Solution Explorer window to add/manage files
-//   2. Use the Team Explorer window to connect to source control
-//   3. Use the Output window to see build output and other messages
-//   4. Use the Error List window to view errors
-//   5. Go to Project > Add New Item to create new code files, or Project > Add Existing Item to add existing code files to the project
-//   6. In the future, to open this project again, go to File > Open > Project and select the .sln file
+   return DefWindowProcW(hwnd, uMsg, wParam, lParam);
+}

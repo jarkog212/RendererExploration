@@ -17,6 +17,15 @@
 	}\
 }
 
+#define HRESULT_CHECKED_FALLBACK(instruction, fallback, format, ...) {\
+	HRESULT hr = ##instruction;\
+	if (FAILED(hr))\
+	{\
+		DISPLAY_ERROR(L"[%u]"##format, hr, __VA_ARGS__)\
+		##fallback;\
+	}\
+}
+
 namespace Utils
 {
 	namespace COM

@@ -7,6 +7,8 @@
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3d12.lib")
 
+#include "Utils.h"
+
 namespace DX12
 {
 	static constexpr unsigned int k_frameBuffers = 3;
@@ -19,45 +21,68 @@ namespace DX12
 
 	IDXGIAdapter4* GetDxgiAdapter();
 
+	class DX12Command* GetDx12Command();
+
+	void Render();
+
 	void ResetAll();
 
 	class DX12Command
 	{
+	public:
+
 		explicit DX12Command(D3D12_COMMAND_LIST_TYPE type);
+		~DX12Command();
+
+		NO_COPY(DX12Command)
+		NO_MOVE(DX12Command)
 
 		void PreRender();
 
 		void PostRender();
 
+		ID3D12CommandQueue* GetCommandQueue() const { return _commandQueue.Get(); };
+
+		ID3D12GraphicsCommandList6* GetCommandList() const { return _commandList.Get(); };
+
+		constexpr unsigned int GetCurrentFrame() const { return _currentFrame; };
+
 	private:
 
-		void WaitForGPU() {};
+		void Flush();
+
+		void Release();
+
+		void SafeRelease();
+
+		class DX12CommandFrame
+		{
+		public:
+
+			DX12CommandFrame() = default;
+
+			bool Setup(D3D12_COMMAND_LIST_TYPE type, int index = -1);
+
+			void Reset();
+
+			void IssueFenceValue(int value) { _fenceValue = value; };
+
+			void WaitForGPU(HANDLE fenceEvent, ID3D12Fence1* fence);
+
+			ID3D12CommandAllocator* GetAllocator() { return _allocator.Get(); };
+
+		private:
+
+			Microsoft::WRL::ComPtr<ID3D12CommandAllocator> _allocator = nullptr;
+			unsigned int _fenceValue = 0;
+		};
 
 		Microsoft::WRL::ComPtr<ID3D12CommandQueue> _commandQueue = nullptr;
 		Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList6> _commandList = nullptr;
-		Microsoft::WRL::ComPtr<ID3D12CommandAllocator> _commandAllocators[k_frameBuffers];
+		DX12CommandFrame _frame[k_frameBuffers];
+		Microsoft::WRL::ComPtr<ID3D12Fence1> _fence = nullptr;
+		HANDLE _fenceEvent = 0;
 		unsigned int _currentFrame = 0;
-	};
-
-	class DX12Renderer
-	{
-	public:
-
-		static DX12Renderer& Get()
-		{
-			static DX12Renderer instance;
-			return instance;
-		}
-
-		void Render();
-
-	private:
-
-		DX12Renderer() = default;
-		~DX12Renderer() {};
-
-		void PreRender();
-		void PostRender() {};
-
+		unsigned int _issuableFenceValue = 0;
 	};
 };

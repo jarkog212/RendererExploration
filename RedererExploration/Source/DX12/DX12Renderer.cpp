@@ -1,7 +1,7 @@
 #include "DX12Renderer.h"
 
-#include "Utils.h"
 #include <cstdio>
+#include <memory>
 
 namespace
 {
@@ -10,6 +10,8 @@ namespace
 	static Microsoft::WRL::ComPtr<IDXGIFactory7> COMDxgiFactory = nullptr;
 
 	static Microsoft::WRL::ComPtr<IDXGIAdapter4> COMDxgiAdapter = nullptr;
+
+	static std::unique_ptr<DX12::DX12Command> MainCommand = nullptr;
 }
 
 ID3D12Device8* DX12::GetRendererDevice()
@@ -125,15 +127,35 @@ IDXGIAdapter4* DX12::GetDxgiAdapter()
 	return adapter;
 }
 
+DX12::DX12Command* DX12::GetDx12Command()
+{
+	if (::MainCommand)
+		return ::MainCommand.get();
+
+	::MainCommand = std::make_unique<DX12Command>(D3D12_COMMAND_LIST_TYPE_DIRECT);
+	return ::MainCommand.get();
+}
+
+void DX12::Render()
+{
+	DX12Command* command = GetDx12Command();
+	command->PreRender();
+
+	ID3D12GraphicsCommandList6* clist = command->GetCommandList();
+
+	command->PostRender();
+}
+
 void DX12::ResetAll()
 {
 	auto cleaner = []()
 		{
+			::MainCommand.reset();
 			::COMDxgiFactory.Reset();
 			::COMRendererDevice.Reset();
 			::COMDxgiAdapter.Reset();
 		};
-
+			
 #ifdef _DEBUG
 	{
 		Microsoft::WRL::ComPtr<ID3D12InfoQueue> infoQueueInterface = nullptr;
@@ -162,69 +184,59 @@ DX12::DX12Command::DX12Command(D3D12_COMMAND_LIST_TYPE type)
 	cq.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
 	cq.Type = type;
 
+	const wchar_t* commandQueueName = type == D3D12_COMMAND_LIST_TYPE_DIRECT ? L"GFX Command Queue" :
+		type == D3D12_COMMAND_LIST_TYPE_COMPUTE ? L"GFX Compute Queue" :
+		L"Command Queue";
+
+	const wchar_t* commandListName = type == D3D12_COMMAND_LIST_TYPE_DIRECT ? L"GFX Command List" :
+		type == D3D12_COMMAND_LIST_TYPE_COMPUTE ? L"GFX Compute List" :
+		L"Command List";
+
 	HRESULT_CHECKED_FALLBACK(
 		GetRendererDevice()->CreateCommandQueue(&cq, __uuidof(ID3D12CommandQueue), (void**)_commandQueue.GetAddressOf()),
 		goto _error,
 		"Could not create command queue.");
 
 	for (int i = 0; i < k_frameBuffers; i++)
-	{
-		HRESULT_CHECKED_FALLBACK(
-			GetRendererDevice()->CreateCommandAllocator(type, _uuidof(ID3D12CommandAllocator), (void**)_commandAllocators[i].GetAddressOf()),
-			goto _error,
-			"Could not create command allocator.");
-
-		wchar_t buffer[1000];
-		swprintf(buffer, 1000, L"Command Allocator %u", i);
-		HRESULT_CHECKED_FALLBACK(_commandAllocators[i]->SetName(buffer), , "Could not set name (%ls) to command buffer.", buffer)
-	}
+		_frame[i].Setup(type, i);
 
 	HRESULT_CHECKED_FALLBACK(
-		GetRendererDevice()->CreateCommandList(0, type, _commandAllocators[0].Get(), nullptr, __uuidof(ID3D12GraphicsCommandList6), (void**)_commandList.GetAddressOf()),
+		GetRendererDevice()->CreateCommandList(0, type, _frame[0].GetAllocator(), nullptr, __uuidof(ID3D12GraphicsCommandList6), (void**)_commandList.GetAddressOf()),
 		goto _error,
 		"Could not create command list.");
 
-	switch (type)
-	{
-		case D3D12_COMMAND_LIST_TYPE_DIRECT:
-		{
-			constexpr wchar_t name[] = L"GFX Command Queue";
-			HRESULT_CHECKED_FALLBACK(_commandQueue->SetName(name), , "Could not set (%ls) to command queue.", name);
-			HRESULT_CHECKED_FALLBACK(_commandList->SetName(name), , "Could not set (%ls) to command list.", name);
-			break;
-		}
-		case D3D12_COMMAND_LIST_TYPE_COMPUTE:
-		{
-			constexpr wchar_t name[] = L"GFX Compute Queue";
-			HRESULT_CHECKED_FALLBACK(_commandQueue->SetName(name), , "Could not set (%ls) to command queue.", name);
-			HRESULT_CHECKED_FALLBACK(_commandList->SetName(name), , "Could not set (%ls) to command list.", name);
-			break;
-		}
-		default:
-		{
-			constexpr wchar_t name[] = L"Command Queue";
-			HRESULT_CHECKED_FALLBACK(_commandQueue->SetName(name), , "Could not set (%ls) to command queue.", name);
-			HRESULT_CHECKED_FALLBACK(_commandList->SetName(name), , "Could not set (%ls) to command list.", name);
-			break;
-		}
-	}
+	HRESULT_CHECKED_FALLBACK(_commandQueue->SetName(commandQueueName), , "Could not set (%ls) to command queue.", commandQueueName);
+	HRESULT_CHECKED_FALLBACK(_commandList->SetName(commandListName), , "Could not set (%ls) to command list.", commandListName);
+
+	HRESULT_CHECKED_FALLBACK(
+		GetRendererDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, __uuidof(ID3D12Fence1), (void**)_fence.GetAddressOf()),
+		goto _error,
+		"Could not create fence.");
+
+	HRESULT_CHECKED_FALLBACK(_commandList->SetName(L"D3D12 Fence"), , "Could not set (%ls) to command list.", commandListName);
+
+	_fenceEvent = CreateEventEx(nullptr, nullptr, 0, EVENT_ALL_ACCESS);
+	if(!_fenceEvent)
+		DISPLAY_ERROR(L"Could not create fence event.");
 
 	return;
 
 _error:
 
-	_commandList.Reset();
-	_commandQueue.Reset();
-	for (int i = 0; i < k_frameBuffers; i++)
-		_commandAllocators[i].Reset();
+	Release();
+}
+
+DX12::DX12Command::~DX12Command()
+{
+	Release();
 }
 
 void DX12::DX12Command::PreRender()
 {
-	ID3D12CommandAllocator* currentAllocator = _commandAllocators[_currentFrame].Get();
-	WaitForGPU();
-	HRESULT_CHECKED(currentAllocator->Reset(), "Could not clear/reset commandAllocator");
-	HRESULT_CHECKED(_commandList->Reset(currentAllocator, nullptr), "Could not reset command list.");
+	DX12CommandFrame& currentFrame = _frame[_currentFrame];
+	currentFrame.WaitForGPU(_fenceEvent, _fence.Get());
+	HRESULT_CHECKED(currentFrame.GetAllocator()->Reset(), "Could not clear/reset commandAllocator");
+	HRESULT_CHECKED(_commandList->Reset(currentFrame.GetAllocator(), nullptr), "Could not reset command list.");
 }
 
 void DX12::DX12Command::PostRender()
@@ -232,20 +244,73 @@ void DX12::DX12Command::PostRender()
 	_commandList->Close();
 	ID3D12CommandList* const lists[] = { _commandList.Get() };
 	_commandQueue->ExecuteCommandLists(_countof(lists), lists);
+
+	_issuableFenceValue++;
+	_frame[_currentFrame].IssueFenceValue(_issuableFenceValue);
+	_commandQueue->Signal(_fence.Get(), _issuableFenceValue);
+
 	_currentFrame = ++_currentFrame % k_frameBuffers;
 }
 
-void DX12::DX12Renderer::Render()
+void DX12::DX12Command::Flush()
 {
-	PreRender();
+	for (int i = 0; i < k_frameBuffers; i++)
+		_frame[i].WaitForGPU(_fenceEvent, _fence.Get());
 
-
-
-	PostRender();
+	_issuableFenceValue = 0;
 }
 
-void DX12::DX12Renderer::PreRender()
+void DX12::DX12Command::Release()
 {
+	_fence.Reset();
+	if (_fenceEvent)
+	{
+		CloseHandle(_fenceEvent);
+		_fenceEvent = 0;
+	}
+
+	_commandList.Reset();
+	_commandQueue.Reset();
+	for (int i = 0; i < k_frameBuffers; i++)
+		_frame[i].Reset();
+
+	_currentFrame = 0;
 }
 
+void DX12::DX12Command::SafeRelease()
+{
+	Flush();
+	Release();
+}
 
+bool DX12::DX12Command::DX12CommandFrame::Setup(D3D12_COMMAND_LIST_TYPE type, int index)
+{
+	HRESULT_CHECKED_FALLBACK(
+		GetRendererDevice()->CreateCommandAllocator(type, _uuidof(ID3D12CommandAllocator), (void**)_allocator.GetAddressOf()),
+		return false,
+		"Could not create command allocator.");
+
+	wchar_t buffer[250];
+	swprintf(buffer, 250, L"Command Allocator %u", index);
+	HRESULT_CHECKED_FALLBACK(_allocator->SetName(buffer), , "Could not set name (%ls) to command buffer.", buffer);
+
+	return true;
+}
+
+void DX12::DX12Command::DX12CommandFrame::Reset()
+{
+	_allocator.Reset();
+	_fenceValue = 0;
+}
+
+void DX12::DX12Command::DX12CommandFrame::WaitForGPU(HANDLE fenceEvent, ID3D12Fence1* fence)
+{
+	assert(fenceEvent && fence);
+
+	if (fence->GetCompletedValue() >= _fenceValue)
+		return;
+	
+	HRESULT_CHECKED(fence->SetEventOnCompletion(_fenceValue, fenceEvent), "Could not assign fence signal to event handle.");
+
+	WaitForSingleObject(fenceEvent, INFINITE);
+}

@@ -1,17 +1,30 @@
 #include "DX12Renderer.h"
+#include "DX12Resources.h"
 
 #include <cstdio>
 #include <memory>
+#include <mutex>
 
 namespace
 {
 	static Microsoft::WRL::ComPtr<ID3D12Device8> COMRendererDevice = nullptr;
-
 	static Microsoft::WRL::ComPtr<IDXGIFactory7> COMDxgiFactory = nullptr;
-
 	static Microsoft::WRL::ComPtr<IDXGIAdapter4> COMDxgiAdapter = nullptr;
 
-	static std::unique_ptr<DX12::DX12Command> MainCommand = nullptr;
+	static int DeferredResourceFreeingFlag = 0;
+	static_assert(sizeof(DeferredResourceFreeingFlag) * sizeof(char) > DX12::k_frameBuffers, "Flag bit-buffer needs to be wide enough for frame buffer count.");
+
+	static void PendingResourceFreeingRoutine() 
+	{
+		static std::mutex mutex;
+		
+		if (!(bool)(::DeferredResourceFreeingFlag & (1ull << DX12::GetDx12MainRenderCommand()->GetCurrentFrame())))
+			return;
+		
+		std::lock_guard lock(mutex);
+
+		::DeferredResourceFreeingFlag &= ~(1ull << DX12::GetDx12MainRenderCommand()->GetCurrentFrame());
+	};
 }
 
 ID3D12Device8* DX12::GetRendererDevice()
@@ -127,30 +140,85 @@ IDXGIAdapter4* DX12::GetDxgiAdapter()
 	return adapter;
 }
 
-DX12::DX12Command* DX12::GetDx12Command()
+DX12::DX12Command* DX12::GetDx12MainRenderCommand()
 {
-	if (::MainCommand)
-		return ::MainCommand.get();
+	static DX12::DX12Command instance(D3D12_COMMAND_LIST_TYPE_DIRECT);
+	return &instance;
+}
 
-	::MainCommand = std::make_unique<DX12Command>(D3D12_COMMAND_LIST_TYPE_DIRECT);
-	return ::MainCommand.get();
+DX12::DX12DescriptorHeap* DX12::GetRTVHeap()
+{
+	static DX12::DX12DescriptorHeap instance(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	return &instance;
+}
+
+DX12::DX12DescriptorHeap* DX12::GetDSVHeap()
+{
+	static DX12::DX12DescriptorHeap instance(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
+	return &instance;
+}
+
+DX12::DX12DescriptorHeap* DX12::GetSRVHeap()
+{
+	static DX12::DX12DescriptorHeap instance(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	return &instance;
+}
+
+DX12::DX12DescriptorHeap* DX12::GetUAVHeap()
+{
+	static DX12::DX12DescriptorHeap instance(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	return &instance;
+}
+
+void DX12::SetPendingResourceFreeingFlag()
+{
+	::DeferredResourceFreeingFlag |= 1ull << DX12::GetDx12MainRenderCommand()->GetCurrentFrame();
+}
+
+void DX12::Initialize()
+{
+	bool result = true;
+
+	DX12::DX12DescriptorHeap* heap = GetRTVHeap();
+	result |= heap->Setup(512, false);
+	HRESULT_CHECKED_FALLBACK(heap->GetHeap()->SetName(L"RTV Heap"), , "Could not name RTV Heap.");
+
+	heap = GetDSVHeap();
+	result |= heap->Setup(512, false);
+	HRESULT_CHECKED_FALLBACK(heap->GetHeap()->SetName(L"DSV Heap"), , "Could not name DSV Heap.");
+
+	heap = GetDSVHeap();
+	result |= heap->Setup(4096, true);
+	HRESULT_CHECKED_FALLBACK(heap->GetHeap()->SetName(L"SRV Heap"), , "Could not name SRV Heap.");
+
+	heap = GetDSVHeap();
+	result |= heap->Setup(512, false);
+	HRESULT_CHECKED_FALLBACK(heap->GetHeap()->SetName(L"UAV Heap"), , "Could not name UAV Heap.");
 }
 
 void DX12::Render()
 {
-	DX12Command* command = GetDx12Command();
+	DX12Command* command = GetDx12MainRenderCommand();
 	command->PreRender();
 
 	ID3D12GraphicsCommandList6* clist = command->GetCommandList();
+	
+	::PendingResourceFreeingRoutine();
+
 
 	command->PostRender();
 }
 
-void DX12::ResetAll()
+void DX12::Cleanup()
 {
+	// intended to be called only once at shutdown, reinit is not possible due to static nature of things?
 	auto cleaner = []()
 		{
-			::MainCommand.reset();
+			GetDx12MainRenderCommand()->Release();
+			GetRTVHeap()->Release();
+			GetDSVHeap()->Release();
+			GetSRVHeap()->Release();
+			GetUAVHeap()->Release();
 			::COMDxgiFactory.Reset();
 			::COMRendererDevice.Reset();
 			::COMDxgiAdapter.Reset();
@@ -226,11 +294,6 @@ _error:
 	Release();
 }
 
-DX12::DX12Command::~DX12Command()
-{
-	Release();
-}
-
 void DX12::DX12Command::PreRender()
 {
 	DX12CommandFrame& currentFrame = _frame[_currentFrame];
@@ -262,6 +325,8 @@ void DX12::DX12Command::Flush()
 
 void DX12::DX12Command::Release()
 {
+	Flush();
+
 	_fence.Reset();
 	if (_fenceEvent)
 	{
@@ -275,12 +340,6 @@ void DX12::DX12Command::Release()
 		_frame[i].Reset();
 
 	_currentFrame = 0;
-}
-
-void DX12::DX12Command::SafeRelease()
-{
-	Flush();
-	Release();
 }
 
 bool DX12::DX12Command::DX12CommandFrame::Setup(D3D12_COMMAND_LIST_TYPE type, int index)

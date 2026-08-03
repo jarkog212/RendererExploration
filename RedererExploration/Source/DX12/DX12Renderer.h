@@ -12,48 +12,46 @@
 namespace DX12
 {
 	static constexpr unsigned int k_frameBuffers = 3;
-
 	static D3D_FEATURE_LEVEL g_expectedMinimumFeatureLevel{ D3D_FEATURE_LEVEL_11_0 };
 
 	ID3D12Device8* GetRendererDevice();
-
 	IDXGIFactory7* GetDxgiFactory();
-
 	IDXGIAdapter4* GetDxgiAdapter();
+	class DX12Command* GetDx12MainRenderCommand();
+	class DX12DescriptorHeap* GetRTVHeap();
+	class DX12DescriptorHeap* GetDSVHeap();
+	class DX12DescriptorHeap* GetSRVHeap();
+	class DX12DescriptorHeap* GetUAVHeap();
 
-	class DX12Command* GetDx12Command();
+	void SetPendingResourceFreeingFlag();
 
+	void Initialize();
 	void Render();
-
-	void ResetAll();
+	void Cleanup();
 
 	class DX12Command
 	{
 	public:
 
-		explicit DX12Command(D3D12_COMMAND_LIST_TYPE type);
-		~DX12Command();
+		DX12Command() = default;
 
-		NO_COPY(DX12Command)
-		NO_MOVE(DX12Command)
+		explicit DX12Command(D3D12_COMMAND_LIST_TYPE type);
+
+		NO_COPY(DX12Command);
+		NO_MOVE(DX12Command);
 
 		void PreRender();
-
 		void PostRender();
 
 		ID3D12CommandQueue* GetCommandQueue() const { return _commandQueue.Get(); };
-
 		ID3D12GraphicsCommandList6* GetCommandList() const { return _commandList.Get(); };
-
 		constexpr unsigned int GetCurrentFrame() const { return _currentFrame; };
+
+		void Release();
 
 	private:
 
 		void Flush();
-
-		void Release();
-
-		void SafeRelease();
 
 		class DX12CommandFrame
 		{
@@ -62,13 +60,11 @@ namespace DX12
 			DX12CommandFrame() = default;
 
 			bool Setup(D3D12_COMMAND_LIST_TYPE type, int index = -1);
-
 			void Reset();
-
-			void IssueFenceValue(int value) { _fenceValue = value; };
 
 			void WaitForGPU(HANDLE fenceEvent, ID3D12Fence1* fence);
 
+			void IssueFenceValue(int value) { _fenceValue = value; };
 			ID3D12CommandAllocator* GetAllocator() { return _allocator.Get(); };
 
 		private:

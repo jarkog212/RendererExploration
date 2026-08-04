@@ -34,17 +34,36 @@
 	T(T&&) = delete; \
 	T& operator=(T&&) = delete;
 
+namespace UtilsImpl
+{
+	// implement these within appropriate places
+	namespace COM
+	{
+		void DeferredRelease(IUnknown* resource);
+	}
+}
+
 namespace Utils
 {
 	namespace COM
 	{
-		template<typename T> 
+		template<typename T>
 		void SafeRelease(T*& resource)
 		{
 			if (!resource)
 				return;
 
 			resource->Release();
+			resource = nullptr;
+		}
+
+		template<typename T>
+		void SafeDeferredRelease(T*& resource)
+		{
+			if (!resource)
+				return;
+
+			UtilsImpl::COM::DeferredRelease(resource);
 			resource = nullptr;
 		}
 	}

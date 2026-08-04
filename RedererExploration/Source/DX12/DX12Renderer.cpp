@@ -11,20 +11,47 @@ namespace
 	static Microsoft::WRL::ComPtr<IDXGIFactory7> COMDxgiFactory = nullptr;
 	static Microsoft::WRL::ComPtr<IDXGIAdapter4> COMDxgiAdapter = nullptr;
 
+	static std::unique_ptr<DX12::DX12Command> MainRenderCommand = nullptr;
+
 	static int DeferredResourceFreeingFlag = 0;
 	static_assert(sizeof(DeferredResourceFreeingFlag) * sizeof(char) > DX12::k_frameBuffers, "Flag bit-buffer needs to be wide enough for frame buffer count.");
 
-	static void PendingResourceFreeingRoutine() 
+	static std::vector<IUnknown*> DeferredCOMReleases[DX12::k_frameBuffers];
+
+	static void FreePendingResources(const int currentFrame = DX12::k_allPending)
 	{
 		static std::mutex mutex;
-		
-		if (!(bool)(::DeferredResourceFreeingFlag & (1ull << DX12::GetDx12MainRenderCommand()->GetCurrentFrame())))
-			return;
-		
 		std::lock_guard lock(mutex);
 
-		::DeferredResourceFreeingFlag &= ~(1ull << DX12::GetDx12MainRenderCommand()->GetCurrentFrame());
-	};
+		::DeferredResourceFreeingFlag &= ~(1ull << currentFrame);
+
+		DX12::GetDSVHeap()->ProcessPendingResourceFreeing(currentFrame);
+		DX12::GetRTVHeap()->ProcessPendingResourceFreeing(currentFrame);
+		DX12::GetSRVHeap()->ProcessPendingResourceFreeing(currentFrame);
+		DX12::GetUAVHeap()->ProcessPendingResourceFreeing(currentFrame);
+
+		static auto cleaner = [](const unsigned int frame)
+			{
+				std::vector<IUnknown*>& pendingCOMList = DeferredCOMReleases[frame];
+				for (auto& comObj : pendingCOMList)
+					Utils::COM::SafeRelease(comObj);
+
+				pendingCOMList.clear();
+			};
+
+		if (currentFrame == DX12::k_allPending)
+			for (int i = 0; i < DX12::k_frameBuffers; i++)
+				cleaner(i);
+		else
+			cleaner(currentFrame);
+	}
+}
+
+// function defined here due to acccess to static anon namespace
+void UtilsImpl::COM::DeferredRelease(IUnknown* resource)
+{
+	unsigned int currentFrame = DX12::GetMainRenderCommand()->GetCurrentFrame();
+	DeferredCOMReleases[currentFrame].push_back(resource);
 }
 
 ID3D12Device8* DX12::GetRendererDevice()
@@ -140,10 +167,13 @@ IDXGIAdapter4* DX12::GetDxgiAdapter()
 	return adapter;
 }
 
-DX12::DX12Command* DX12::GetDx12MainRenderCommand()
+DX12::DX12Command* DX12::GetMainRenderCommand()
 {
-	static DX12::DX12Command instance(D3D12_COMMAND_LIST_TYPE_DIRECT);
-	return &instance;
+	if (MainRenderCommand)
+		return MainRenderCommand.get();
+
+	MainRenderCommand = std::make_unique<DX12Command>(D3D12_COMMAND_LIST_TYPE_DIRECT);
+	return MainRenderCommand.get();
 }
 
 DX12::DX12DescriptorHeap* DX12::GetRTVHeap()
@@ -172,10 +202,15 @@ DX12::DX12DescriptorHeap* DX12::GetUAVHeap()
 
 void DX12::SetPendingResourceFreeingFlag()
 {
-	::DeferredResourceFreeingFlag |= 1ull << DX12::GetDx12MainRenderCommand()->GetCurrentFrame();
+	::DeferredResourceFreeingFlag |= 1ull << DX12::GetMainRenderCommand()->GetCurrentFrame();
 }
 
-void DX12::Initialize()
+bool DX12::TestPendingResourceFreeingFlag(const unsigned int frame)
+{
+	return (bool)(::DeferredResourceFreeingFlag & (1ull << frame));
+}
+
+bool DX12::Initialize()
 {
 	bool result = true;
 
@@ -194,17 +229,20 @@ void DX12::Initialize()
 	heap = GetDSVHeap();
 	result |= heap->Setup(512, false);
 	HRESULT_CHECKED_FALLBACK(heap->GetHeap()->SetName(L"UAV Heap"), , "Could not name UAV Heap.");
+
+	return result;
 }
 
 void DX12::Render()
 {
-	DX12Command* command = GetDx12MainRenderCommand();
+	DX12Command* command = GetMainRenderCommand();
 	command->PreRender();
 
 	ID3D12GraphicsCommandList6* clist = command->GetCommandList();
 	
-	::PendingResourceFreeingRoutine();
-
+	const unsigned int currentFrame = DX12::GetMainRenderCommand()->GetCurrentFrame();
+	if (TestPendingResourceFreeingFlag(currentFrame))
+		FreePendingResources(currentFrame);
 
 	command->PostRender();
 }
@@ -212,13 +250,20 @@ void DX12::Render()
 void DX12::Cleanup()
 {
 	// intended to be called only once at shutdown, reinit is not possible due to static nature of things?
-	auto cleaner = []()
+	static auto cleaner = []()
 		{
-			GetDx12MainRenderCommand()->Release();
+			::MainRenderCommand.reset();
+
+			::FreePendingResources(k_allPending);
+
 			GetRTVHeap()->Release();
 			GetDSVHeap()->Release();
 			GetSRVHeap()->Release();
 			GetUAVHeap()->Release();
+
+			// Heap releases add to the deferred pile
+			::FreePendingResources(k_allPending);
+
 			::COMDxgiFactory.Reset();
 			::COMRendererDevice.Reset();
 			::COMDxgiAdapter.Reset();

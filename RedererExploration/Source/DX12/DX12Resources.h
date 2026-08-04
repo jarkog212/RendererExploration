@@ -12,6 +12,7 @@ namespace DX12
 	public:
 
 		DX12DescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type) : _type(type) {};
+		~DX12DescriptorHeap();
 
 		NO_COPY(DX12DescriptorHeap);
 		NO_MOVE(DX12DescriptorHeap);
@@ -38,11 +39,12 @@ namespace DX12
 
 		[[nodiscard]] DX12DescriptorHandle Allocate();
 		void Free(DX12DescriptorHandle& handle);
+		void ProcessPendingResourceFreeing(const int currentFrame = k_allPending);
 
 		constexpr D3D12_DESCRIPTOR_HEAP_TYPE GetType() const { return _type; }
 		constexpr D3D12_CPU_DESCRIPTOR_HANDLE GetCpuPtr() const { return _mainHandles._cpu; }
 		constexpr D3D12_GPU_DESCRIPTOR_HANDLE GetGpuPtr() const { return _mainHandles._gpu; }
-		ID3D12DescriptorHeap* GetHeap() const { return _heap.Get(); }
+		ID3D12DescriptorHeap* GetHeap() const { return _heap; }
 		constexpr unsigned int GetCapacity() const { return _capacity; }
 		constexpr unsigned int GetSize() const { return _size; }
 		constexpr unsigned int GetDescriptorSize() const { return _descriptorSize; }
@@ -51,7 +53,7 @@ namespace DX12
 
 	private:
 
-		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> _heap = nullptr;
+		ID3D12DescriptorHeap* _heap = nullptr; // Release needs to be explicitly invoked, implicit destructor wont manage this.
 		DX12DescriptorHandle _mainHandles;
 		std::unique_ptr<unsigned int[]> _freeHandles = nullptr;
 		unsigned int _capacity = 0;

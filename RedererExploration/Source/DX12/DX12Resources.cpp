@@ -1,5 +1,14 @@
 #include "DX12Resources.h" 
 
+DX12::DX12DescriptorHeap::~DX12DescriptorHeap()
+{
+	if (_heap)
+	{
+		DISPLAY_ERROR(L"Heap was not released explicitly before the descriptor destruction.")
+		assert(false);
+	}
+}
+
 bool DX12::DX12DescriptorHeap::Setup(unsigned int capacity, bool isShaderVisible)
 {
 	if (capacity == 0 
@@ -25,7 +34,7 @@ bool DX12::DX12DescriptorHeap::Setup(unsigned int capacity, bool isShaderVisible
 		desc.NodeMask = 0;
 
 		HRESULT_CHECKED_FALLBACK(
-			device->CreateDescriptorHeap(&desc, __uuidof(ID3D12DescriptorHeap), (void**)_heap.GetAddressOf()),
+			device->CreateDescriptorHeap(&desc, __uuidof(ID3D12DescriptorHeap), (void**)&_heap),
 			return false,
 			"Failed to create a descriptor heap.");
 
@@ -47,6 +56,13 @@ bool DX12::DX12DescriptorHeap::Setup(unsigned int capacity, bool isShaderVisible
 
 void DX12::DX12DescriptorHeap::Release()
 {
+	if (_size > 0)
+	{
+		DISPLAY_ERROR(L"Trying to free a non empty heap.");
+		assert(false);
+	}
+
+	Utils::COM::SafeDeferredRelease(_heap);
 }
 
 DX12::DX12DescriptorHeap::DX12DescriptorHandle DX12::DX12DescriptorHeap::Allocate()
@@ -131,10 +147,40 @@ void DX12::DX12DescriptorHeap::Free(DX12DescriptorHandle& handle)
 		}
 #endif
 
-		const int currentFrame = DX12::GetDx12MainRenderCommand()->GetCurrentFrame();
+		const int currentFrame = DX12::GetMainRenderCommand()->GetCurrentFrame();
 		_deferredResourceFreeing[currentFrame].push_back(index);
 		DX12::SetPendingResourceFreeingFlag();
 
 		handle = {};
 	}
+}
+
+void DX12::DX12DescriptorHeap::ProcessPendingResourceFreeing(const int currentFrame)
+{
+	std::lock_guard lock(_mutex);
+
+	auto cleaner = [&](const unsigned int frame)
+		{
+			std::vector<unsigned int>& indeces = _deferredResourceFreeing[frame];
+			if (indeces.empty())
+				return;
+
+			for (auto it : indeces)
+			{
+				--_size;
+				_freeHandles[_size] = it;
+			}
+
+			indeces.clear();
+		};
+
+	if (currentFrame == k_allPending)
+	{
+		for (int i = 0; i < k_frameBuffers; i++)
+			cleaner(i);
+
+		return;
+	}
+
+	cleaner(currentFrame);
 }

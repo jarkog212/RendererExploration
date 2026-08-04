@@ -12,20 +12,22 @@
 namespace DX12
 {
 	static constexpr unsigned int k_frameBuffers = 3;
+	static constexpr int k_allPending = -1;
 	static D3D_FEATURE_LEVEL g_expectedMinimumFeatureLevel{ D3D_FEATURE_LEVEL_11_0 };
 
 	ID3D12Device8* GetRendererDevice();
 	IDXGIFactory7* GetDxgiFactory();
 	IDXGIAdapter4* GetDxgiAdapter();
-	class DX12Command* GetDx12MainRenderCommand();
+	class DX12Command* GetMainRenderCommand();
 	class DX12DescriptorHeap* GetRTVHeap();
 	class DX12DescriptorHeap* GetDSVHeap();
 	class DX12DescriptorHeap* GetSRVHeap();
 	class DX12DescriptorHeap* GetUAVHeap();
 
 	void SetPendingResourceFreeingFlag();
+	bool TestPendingResourceFreeingFlag(const unsigned int frame);
 
-	void Initialize();
+	bool Initialize();
 	void Render();
 	void Cleanup();
 
@@ -33,9 +35,8 @@ namespace DX12
 	{
 	public:
 
-		DX12Command() = default;
-
 		explicit DX12Command(D3D12_COMMAND_LIST_TYPE type);
+		~DX12Command() { Release(); };
 
 		NO_COPY(DX12Command);
 		NO_MOVE(DX12Command);

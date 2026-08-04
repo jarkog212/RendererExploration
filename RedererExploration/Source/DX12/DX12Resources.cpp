@@ -219,9 +219,7 @@ DX12::RenderSurface::RenderSurface(const HWND window, DXGI_FORMAT format, ID3D12
 	_currentBackBufferIndex = _swapChain->GetCurrentBackBufferIndex();
 
 	for (int i = 0; i < DX12::k_frameBuffers; i++)
-	{
 		_renderTargetData[i]._handle = DX12::GetRTVHeap()->Allocate();
-	}
 
 	Finalize();
 }

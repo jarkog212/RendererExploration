@@ -18,13 +18,14 @@ namespace DX12
 {
 	static constexpr unsigned int k_frameBuffers = 3;
 	static constexpr int k_allPending = -1;
+	static constexpr DXGI_FORMAT k_defaultRenderTargetFormat = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
 
 	class DescriptorHeap
 	{
 	public:
 
-		DescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type) : _type(type) {};
-		~DescriptorHeap();
+		DescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type, unsigned int capacity, bool isShaderVisible);
+		~DescriptorHeap() { Release(); };
 
 		NO_COPY(DescriptorHeap);
 		NO_MOVE(DescriptorHeap);
@@ -46,7 +47,6 @@ namespace DX12
 #endif
 		};
 
-		bool Setup(unsigned int capacity, bool isShaderVisible);
 		void Release();
 
 		[[nodiscard]] DescriptorHandle Allocate();
@@ -65,7 +65,7 @@ namespace DX12
 
 	private:
 
-		ID3D12DescriptorHeap* _heap = nullptr; // Release needs to be explicitly invoked, implicit destructor wont manage this.
+		ID3D12DescriptorHeap* _heap = nullptr; // non-tied lifetime (deferred free), hence raw
 		DescriptorHandle _mainHandles;
 		std::unique_ptr<unsigned int[]> _freeHandles = nullptr;
 		unsigned int _capacity = 0;
@@ -81,23 +81,43 @@ namespace DX12
 	
 	public:
 
-		static constexpr int k_invalidId = -1;
+		RenderSurface(const HWND window, DXGI_FORMAT format, ID3D12CommandQueue1* commandQueue);
+		~RenderSurface() { Release(); }
 
-		RenderSurface() = default;
-		RenderSurface(const int id) : _id(id) {};
+		NO_MOVE(RenderSurface);
+		NO_COPY(RenderSurface);
 
 		void Resize() {};
-		void Render() {};
+		void Present() const;
 
-		constexpr int GetId() const { return _id; }
-		int GetWidth() const {};
-		int GetHeight() const {};
+		constexpr HWND GetWindow() const { return _window; }
+		RECT GetWindowDimensions() const;
+		constexpr unsigned int GetWidth() const { return _viewport.Width; }
+		constexpr unsigned int GetHeight() const { return _viewport.Height; }
+		ID3D12Resource* GetBackbuffer() const { return _renderTargetData[_currentBackBufferIndex]._resource.Get(); }
+		constexpr D3D12_CPU_DESCRIPTOR_HANDLE GetBackbufferCPUHandle() const { return _renderTargetData[_currentBackBufferIndex]._handle._cpu;  }
+		constexpr const D3D12_VIEWPORT& GetViewport() const { return _viewport; }
+		constexpr const D3D12_RECT& GetScissor() const { return _scissorRect; }
 
-		constexpr bool IsValid() const { return _id != k_invalidId; }
-	
 	private:
 
-		int _id = k_invalidId;
-	
+		void Release();
+		void Finalize();
+		
+		Microsoft::WRL::ComPtr<IDXGISwapChain4> _swapChain = nullptr;
+		HWND _window = NULL;
+		mutable unsigned int _currentBackBufferIndex = 0;
+		D3D12_VIEWPORT _viewport;
+		D3D12_RECT _scissorRect;
+
+		struct RenderTargetData
+		{
+			Microsoft::WRL::ComPtr<ID3D12Resource> _resource = nullptr;
+			DX12::DescriptorHeap::DescriptorHandle _handle;
+
+			void Release();
+		};
+
+		RenderTargetData _renderTargetData[DX12::k_frameBuffers];
 	};
 }

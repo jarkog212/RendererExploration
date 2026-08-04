@@ -10,8 +10,6 @@ namespace
 	static Microsoft::WRL::ComPtr<IDXGIFactory7> COMDxgiFactory = nullptr;
 	static Microsoft::WRL::ComPtr<IDXGIAdapter4> COMDxgiAdapter = nullptr;
 
-	static std::unique_ptr<DX12::GfxCommand> MainRenderCommand = nullptr;
-
 	static int DeferredResourceFreeingFlag = 0;
 	static_assert(sizeof(DeferredResourceFreeingFlag) * sizeof(char) > DX12::k_frameBuffers, "Flag bit-buffer needs to be wide enough for frame buffer count.");
 
@@ -168,34 +166,31 @@ IDXGIAdapter4* DX12::GetDxgiAdapter()
 
 DX12::GfxCommand* DX12::GetMainRenderCommand()
 {
-	if (MainRenderCommand)
-		return MainRenderCommand.get();
-
-	MainRenderCommand = std::make_unique<DX12::GfxCommand>(D3D12_COMMAND_LIST_TYPE_DIRECT);
-	return MainRenderCommand.get();
+	static DX12::GfxCommand instance(D3D12_COMMAND_LIST_TYPE_DIRECT);
+	return &instance;
 }
 
 DX12::DescriptorHeap* DX12::GetRTVHeap()
 {
-	static DX12::DescriptorHeap instance(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	static DX12::DescriptorHeap instance(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 512, false);
 	return &instance;
 }
 
 DX12::DescriptorHeap* DX12::GetDSVHeap()
 {
-	static DX12::DescriptorHeap instance(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
+	static DX12::DescriptorHeap instance(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 512, false);
 	return &instance;
 }
 
 DX12::DescriptorHeap* DX12::GetSRVHeap()
 {
-	static DX12::DescriptorHeap instance(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	static DX12::DescriptorHeap instance(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 4096, true);
 	return &instance;
 }
 
 DX12::DescriptorHeap* DX12::GetUAVHeap()
 {
-	static DX12::DescriptorHeap instance(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	static DX12::DescriptorHeap instance(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 512, false);
 	return &instance;
 }
 
@@ -213,23 +208,12 @@ bool DX12::Initialize()
 {
 	bool result = true;
 
-	DX12::DescriptorHeap* heap = DX12::GetRTVHeap();
-	result |= heap->Setup(512, false);
-	HRESULT_CHECKED_FALLBACK(heap->GetHeap()->SetName(L"RTV Heap"), , "Could not name RTV Heap.");
+	HRESULT_CHECKED_FALLBACK(DX12::GetRTVHeap()->GetHeap()->SetName(L"RTV Heap"), , "Could not name RTV Heap.");
+	HRESULT_CHECKED_FALLBACK(DX12::GetDSVHeap()->GetHeap()->SetName(L"DSV Heap"), , "Could not name DSV Heap.");
+	HRESULT_CHECKED_FALLBACK(DX12::GetDSVHeap()->GetHeap()->SetName(L"SRV Heap"), , "Could not name SRV Heap.");
+	HRESULT_CHECKED_FALLBACK(DX12::GetDSVHeap()->GetHeap()->SetName(L"UAV Heap"), , "Could not name UAV Heap.");
 
-	heap = DX12::GetDSVHeap();
-	result |= heap->Setup(512, false);
-	HRESULT_CHECKED_FALLBACK(heap->GetHeap()->SetName(L"DSV Heap"), , "Could not name DSV Heap.");
-
-	heap = DX12::GetDSVHeap();
-	result |= heap->Setup(4096, true);
-	HRESULT_CHECKED_FALLBACK(heap->GetHeap()->SetName(L"SRV Heap"), , "Could not name SRV Heap.");
-
-	heap = DX12::GetDSVHeap();
-	result |= heap->Setup(512, false);
-	HRESULT_CHECKED_FALLBACK(heap->GetHeap()->SetName(L"UAV Heap"), , "Could not name UAV Heap.");
-
-	return result;
+	return true;
 }
 
 void DX12::Render()
@@ -251,7 +235,7 @@ void DX12::Cleanup()
 	// intended to be called only once at shutdown, reinit is not possible due to static nature of things?
 	static auto cleaner = []()
 		{
-			::MainRenderCommand.reset();
+			DX12::GetMainRenderCommand()->Release();
 
 			::FreePendingResources(k_allPending);
 
@@ -369,13 +353,15 @@ void DX12::GfxCommand::Flush()
 
 void DX12::GfxCommand::Release()
 {
-	Flush();
-
-	_fence.Reset();
-	if (_fenceEvent)
+	if (_fence)
 	{
-		CloseHandle(_fenceEvent);
-		_fenceEvent = 0;
+		Flush();
+		_fence.Reset();
+		if (_fenceEvent)
+		{
+			CloseHandle(_fenceEvent);
+			_fenceEvent = 0;
+		}
 	}
 
 	_commandList.Reset();

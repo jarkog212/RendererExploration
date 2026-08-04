@@ -1,19 +1,10 @@
 #include "DX12Resources.h"
 #include "DX12Renderer.h" 
 
-DX12::DescriptorHeap::~DescriptorHeap()
+DX12::DescriptorHeap::DescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type, unsigned int capacity, bool isShaderVisible) : _type(type)
 {
-	if (_heap)
-	{
-		DISPLAY_ERROR(L"Heap was not released explicitly before the descriptor destruction.")
-		assert(false);
-	}
-}
-
-bool DX12::DescriptorHeap::Setup(unsigned int capacity, bool isShaderVisible)
-{
-	if (capacity == 0 
-		|| capacity > D3D12_MAX_SHADER_VISIBLE_DESCRIPTOR_HEAP_SIZE_TIER_2 
+	if (capacity == 0
+		|| capacity > D3D12_MAX_SHADER_VISIBLE_DESCRIPTOR_HEAP_SIZE_TIER_2
 		|| (_type == D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER && capacity > D3D12_MAX_SHADER_VISIBLE_SAMPLER_HEAP_SIZE))
 	{
 		DISPLAY_ERROR(L"Bad capacity for a heap.");
@@ -21,7 +12,7 @@ bool DX12::DescriptorHeap::Setup(unsigned int capacity, bool isShaderVisible)
 	}
 
 	isShaderVisible &= (_type == D3D12_DESCRIPTOR_HEAP_TYPE_DSV || _type == D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-	
+
 	{
 		std::lock_guard lock(_mutex);
 
@@ -36,7 +27,7 @@ bool DX12::DescriptorHeap::Setup(unsigned int capacity, bool isShaderVisible)
 
 		HRESULT_CHECKED_FALLBACK(
 			device->CreateDescriptorHeap(&desc, __uuidof(ID3D12DescriptorHeap), (void**)&_heap),
-			return false,
+			assert(false),
 			"Failed to create a descriptor heap.");
 
 		_freeHandles = std::make_unique<unsigned int[]>(capacity);
@@ -50,8 +41,6 @@ bool DX12::DescriptorHeap::Setup(unsigned int capacity, bool isShaderVisible)
 
 		if (isShaderVisible)
 			_mainHandles._gpu = _heap->GetGPUDescriptorHandleForHeapStart();
-
-		return true;
 	}
 }
 
@@ -184,4 +173,132 @@ void DX12::DescriptorHeap::ProcessPendingResourceFreeing(const int currentFrame)
 	}
 
 	cleaner(currentFrame);
+}
+
+DX12::RenderSurface::RenderSurface(const HWND window, DXGI_FORMAT format, ID3D12CommandQueue1* commandQueue) 
+	: _window(window)
+{
+	RECT windowDimensions = GetWindowDimensions();
+	const int width = windowDimensions.right - windowDimensions.left;
+	const int height = windowDimensions.bottom - windowDimensions.top;
+
+	DXGI_SWAP_CHAIN_DESC1 desc;
+	desc.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
+	desc.BufferCount = DX12::k_frameBuffers;
+	desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+	desc.Flags = 0;
+	desc.Format = format == DXGI_FORMAT_R8G8B8A8_UNORM_SRGB ?
+		DXGI_FORMAT_R8G8B8A8_UNORM :
+		format;
+	desc.Height = height;
+	desc.Width = width;
+	desc.SampleDesc.Count = 1;
+	desc.SampleDesc.Quality = 0;
+	desc.Scaling = DXGI_SCALING_STRETCH;
+	desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+	desc.Stereo = false;
+
+	IDXGIFactory7* factory = DX12::GetDxgiFactory();
+	IDXGISwapChain1* swapChain = nullptr;
+	HRESULT_CHECKED_FALLBACK(
+		factory->CreateSwapChainForHwnd(commandQueue, _window, &desc, nullptr, nullptr, &swapChain),
+		assert(false),
+		"Could not create a swap chain.");
+
+	HRESULT_CHECKED_FALLBACK(
+		factory->MakeWindowAssociation(_window, DXGI_MWA_NO_ALT_ENTER),
+		assert(false),
+		"Could not restirct fullscreen on swapchain.");
+
+	HRESULT_CHECKED_FALLBACK(
+		swapChain->QueryInterface<IDXGISwapChain4>(_swapChain.GetAddressOf()),
+		assert(false),
+		"Could not get newer swap chain interface.");
+
+	Utils::COM::SafeRelease(swapChain);
+	_currentBackBufferIndex = _swapChain->GetCurrentBackBufferIndex();
+
+	for (int i = 0; i < DX12::k_frameBuffers; i++)
+	{
+		_renderTargetData[i]._handle = DX12::GetRTVHeap()->Allocate();
+	}
+
+	Finalize();
+}
+
+void DX12::RenderSurface::Present() const
+{
+	if (!_swapChain)
+	{
+		DISPLAY_ERROR(L"Trying to present an invalid swapchain.");
+		assert(false);
+	}
+
+	_swapChain->Present(0, 0);
+	_currentBackBufferIndex = _swapChain->GetCurrentBackBufferIndex();
+}
+
+RECT DX12::RenderSurface::GetWindowDimensions() const
+{
+	RECT rect;
+	if (!GetWindowRect(_window, &rect))
+		DISPLAY_ERROR(L"Error getting window dimensions.");
+
+	return rect;
+}
+
+void DX12::RenderSurface::Release()
+{
+	for (int i = 0; i < DX12::k_frameBuffers; i++)
+		_renderTargetData[i].Release();
+
+	_swapChain.Reset();
+}
+
+void DX12::RenderSurface::Finalize()
+{
+	for (int i = 0; i < DX12::k_frameBuffers; i++)
+	{
+		RenderTargetData& data = _renderTargetData[i];
+		HRESULT_CHECKED(
+			_swapChain->GetBuffer(i, __uuidof(ID3D12Resource), (void**)data._resource.GetAddressOf()),
+			"Could not get a hold of the swap chain internal buffer.");
+
+		D3D12_RENDER_TARGET_VIEW_DESC desc;
+		desc.Format = DX12::k_defaultRenderTargetFormat;
+		desc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+
+		DX12::GetRendererDevice()->CreateRenderTargetView(data._resource.Get(), &desc, data._handle._cpu);
+	}
+
+	DXGI_SWAP_CHAIN_DESC desc;
+	HRESULT_CHECKED(_swapChain->GetDesc(&desc), "Could not get swap chain descriptor object.");
+
+	const unsigned int height = desc.BufferDesc.Height;
+	const unsigned int width = desc.BufferDesc.Width;
+
+	RECT windowDimensions = GetWindowDimensions();
+	int winWidth = windowDimensions.right - windowDimensions.left;
+	int winHeight = windowDimensions.bottom - windowDimensions.top;
+
+	if (height != winHeight || width != winWidth)
+	{
+		DISPLAY_ERROR(L"Dimensions of the swap chain buffers and the window do not match.");
+		assert(false);
+	}
+
+	_viewport.TopLeftX = 0.f;
+	_viewport.TopLeftY = 0.f;
+	_viewport.Width = (float)width;
+	_viewport.Height = (float)height;
+	_viewport.MinDepth = 0.f;
+	_viewport.MaxDepth = 1.f;
+
+	_scissorRect = { 0,0, (long)width, (long)height };
+}
+
+void DX12::RenderSurface::RenderTargetData::Release()
+{
+	_resource.Reset();
+	DX12::GetRTVHeap()->Free(_handle);
 }

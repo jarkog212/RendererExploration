@@ -1,6 +1,7 @@
-#include "DX12Resources.h" 
+#include "DX12Resources.h"
+#include "DX12Renderer.h" 
 
-DX12::DX12DescriptorHeap::~DX12DescriptorHeap()
+DX12::DescriptorHeap::~DescriptorHeap()
 {
 	if (_heap)
 	{
@@ -9,7 +10,7 @@ DX12::DX12DescriptorHeap::~DX12DescriptorHeap()
 	}
 }
 
-bool DX12::DX12DescriptorHeap::Setup(unsigned int capacity, bool isShaderVisible)
+bool DX12::DescriptorHeap::Setup(unsigned int capacity, bool isShaderVisible)
 {
 	if (capacity == 0 
 		|| capacity > D3D12_MAX_SHADER_VISIBLE_DESCRIPTOR_HEAP_SIZE_TIER_2 
@@ -54,7 +55,7 @@ bool DX12::DX12DescriptorHeap::Setup(unsigned int capacity, bool isShaderVisible
 	}
 }
 
-void DX12::DX12DescriptorHeap::Release()
+void DX12::DescriptorHeap::Release()
 {
 	if (_size > 0)
 	{
@@ -65,7 +66,7 @@ void DX12::DX12DescriptorHeap::Release()
 	Utils::COM::SafeDeferredRelease(_heap);
 }
 
-DX12::DX12DescriptorHeap::DX12DescriptorHandle DX12::DX12DescriptorHeap::Allocate()
+DX12::DescriptorHeap::DescriptorHandle DX12::DescriptorHeap::Allocate()
 {
 	std::lock_guard lock(_mutex);
 
@@ -85,7 +86,7 @@ DX12::DX12DescriptorHeap::DX12DescriptorHandle DX12::DX12DescriptorHeap::Allocat
 	int offset = index * _descriptorSize;
 	_size++;
 
-	DX12DescriptorHandle out;
+	DX12::DescriptorHeap::DescriptorHandle out;
 	out._cpu.ptr = _mainHandles._cpu.ptr + offset;
 
 	if (IsShaderVisible())
@@ -101,7 +102,7 @@ DX12::DX12DescriptorHeap::DX12DescriptorHandle DX12::DX12DescriptorHeap::Allocat
 	return out;
 }
 
-void DX12::DX12DescriptorHeap::Free(DX12DescriptorHandle& handle)
+void DX12::DescriptorHeap::Free(DescriptorHandle& handle)
 {
 	if (!handle.IsValid())
 		return;
@@ -155,7 +156,7 @@ void DX12::DX12DescriptorHeap::Free(DX12DescriptorHandle& handle)
 	}
 }
 
-void DX12::DX12DescriptorHeap::ProcessPendingResourceFreeing(const int currentFrame)
+void DX12::DescriptorHeap::ProcessPendingResourceFreeing(const int currentFrame)
 {
 	std::lock_guard lock(_mutex);
 

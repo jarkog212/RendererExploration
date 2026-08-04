@@ -1,31 +1,21 @@
 #pragma once
 
-#include <dxgi1_6.h>
-#include <d3d12.h>
-#include <wrl.h>
-
-#pragma comment(lib, "dxgi.lib")
-#pragma comment(lib, "d3d12.lib")
-
-#include "Utils.h"
+#include "DX12Resources.h"
 
 namespace DX12
 {
-	class DX12Command;
-	class DX12DescriptorHeap;
+	class GfxCommand;
 
-	static constexpr unsigned int k_frameBuffers = 3;
-	static constexpr int k_allPending = -1;
 	static D3D_FEATURE_LEVEL g_expectedMinimumFeatureLevel{ D3D_FEATURE_LEVEL_11_0 };
 
 	ID3D12Device8* GetRendererDevice();
 	IDXGIFactory7* GetDxgiFactory();
 	IDXGIAdapter4* GetDxgiAdapter();
-	DX12Command* GetMainRenderCommand();
-	DX12DescriptorHeap* GetRTVHeap();
-	DX12DescriptorHeap* GetDSVHeap();
-	DX12DescriptorHeap* GetSRVHeap();
-	DX12DescriptorHeap* GetUAVHeap();
+	DX12::GfxCommand* GetMainRenderCommand();
+	DX12::DescriptorHeap* GetRTVHeap();
+	DX12::DescriptorHeap* GetDSVHeap();
+	DX12::DescriptorHeap* GetSRVHeap();
+	DX12::DescriptorHeap* GetUAVHeap();
 
 	void SetPendingResourceFreeingFlag();
 	bool TestPendingResourceFreeingFlag(const unsigned int frame);
@@ -34,15 +24,15 @@ namespace DX12
 	void Render();
 	void Cleanup();
 
-	class DX12Command
+	class GfxCommand
 	{
 	public:
 
-		explicit DX12Command(D3D12_COMMAND_LIST_TYPE type);
-		~DX12Command() { Release(); };
+		explicit GfxCommand(D3D12_COMMAND_LIST_TYPE type);
+		~GfxCommand() { Release(); };
 
-		NO_COPY(DX12Command);
-		NO_MOVE(DX12Command);
+		NO_COPY(GfxCommand);
+		NO_MOVE(GfxCommand);
 
 		void PreRender();
 		void PostRender();
@@ -57,11 +47,11 @@ namespace DX12
 
 		void Flush();
 
-		class DX12CommandFrame
+		class GfxCommandFrame
 		{
 		public:
 
-			DX12CommandFrame() = default;
+			GfxCommandFrame() = default;
 
 			bool Setup(D3D12_COMMAND_LIST_TYPE type, int index = -1);
 			void Reset();
@@ -79,7 +69,7 @@ namespace DX12
 
 		Microsoft::WRL::ComPtr<ID3D12CommandQueue> _commandQueue = nullptr;
 		Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList6> _commandList = nullptr;
-		DX12CommandFrame _frame[k_frameBuffers];
+		GfxCommandFrame _frame[k_frameBuffers];
 		Microsoft::WRL::ComPtr<ID3D12Fence1> _fence = nullptr;
 		HANDLE _fenceEvent = 0;
 		unsigned int _currentFrame = 0;

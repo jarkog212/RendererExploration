@@ -11,6 +11,9 @@
 
 namespace DX12
 {
+	class DX12Command;
+	class DX12DescriptorHeap;
+
 	static constexpr unsigned int k_frameBuffers = 3;
 	static constexpr int k_allPending = -1;
 	static D3D_FEATURE_LEVEL g_expectedMinimumFeatureLevel{ D3D_FEATURE_LEVEL_11_0 };
@@ -18,11 +21,11 @@ namespace DX12
 	ID3D12Device8* GetRendererDevice();
 	IDXGIFactory7* GetDxgiFactory();
 	IDXGIAdapter4* GetDxgiAdapter();
-	class DX12Command* GetMainRenderCommand();
-	class DX12DescriptorHeap* GetRTVHeap();
-	class DX12DescriptorHeap* GetDSVHeap();
-	class DX12DescriptorHeap* GetSRVHeap();
-	class DX12DescriptorHeap* GetUAVHeap();
+	DX12Command* GetMainRenderCommand();
+	DX12DescriptorHeap* GetRTVHeap();
+	DX12DescriptorHeap* GetDSVHeap();
+	DX12DescriptorHeap* GetSRVHeap();
+	DX12DescriptorHeap* GetUAVHeap();
 
 	void SetPendingResourceFreeingFlag();
 	bool TestPendingResourceFreeingFlag(const unsigned int frame);

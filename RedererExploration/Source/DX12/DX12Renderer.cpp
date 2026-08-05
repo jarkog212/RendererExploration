@@ -51,7 +51,7 @@ void UtilsImpl::COM::Release(IUnknown* resource)
 	resource->Release();
 }
 
-void UtilsImpl::COM::DeferredRelease(IUnknown* resource)
+void UtilsImpl::COM::DeferredRenderThreadRelease(IUnknown* resource)
 {
 	unsigned int currentFrame = DX12::GetMainRenderCommand()->GetCurrentFrame();
 	DeferredCOMReleases[currentFrame].push_back(resource);

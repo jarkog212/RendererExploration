@@ -82,6 +82,8 @@ namespace DX12
 
 		RenderSurface(const HWND window, DXGI_FORMAT format, ID3D12CommandQueue* commandQueue);
 		~RenderSurface() { Release(); }
+		RenderSurface(RenderSurface&& other) noexcept { MoveImpl(std::move(other)); };
+		void operator=(RenderSurface&& other) noexcept { MoveImpl(std::move(other)); };
 
 		NO_COPY(RenderSurface)
 
@@ -99,6 +101,8 @@ namespace DX12
 
 	private:
 
+		void MoveImpl(RenderSurface&& other);
+
 		void Release();
 		void Finalize(DXGI_FORMAT format);
 		
@@ -107,13 +111,25 @@ namespace DX12
 		mutable unsigned int _currentBackBufferIndex = 0;
 		D3D12_VIEWPORT _viewport;
 		D3D12_RECT _scissorRect;
+		unsigned int _presentFlags = 0;
+		unsigned int _allowTearing = 0;
 
 		struct RenderTargetData
 		{
 			Microsoft::WRL::ComPtr<ID3D12Resource> _resource = nullptr;
 			DX12::DescriptorHeap::DescriptorHandle _handle;
 
+			RenderTargetData() = default;
+			RenderTargetData(RenderTargetData&& other) noexcept { MoveImpl(std::move(other)); }
+			void operator=(RenderTargetData&& other) noexcept { MoveImpl(std::move(other)); }
+
+			NO_COPY(RenderTargetData)
+
 			void Release();
+
+		private:
+
+			void MoveImpl(RenderTargetData&& other);
 		};
 
 		RenderTargetData _renderTargetData[DX12::k_frameBuffers];

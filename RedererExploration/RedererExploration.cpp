@@ -3,6 +3,8 @@
 
 #include <iostream>
 #include <windows.h>
+#include <chrono>
+
 #include "Utils.h"
 #include "DX12/DX12Renderer.h"
 
@@ -12,6 +14,7 @@ namespace
     static WNDCLASSEXW g_winClass;
     static HWND g_mainWindow = NULL;
     static bool g_running = true;
+    static float g_fps = 0.f;
 
     void Close(HWND hwnd)
     {
@@ -61,6 +64,7 @@ int WINAPI wWinMain(
 
     while (::g_running)
     {
+        const std::chrono::time_point preLoopTimePoint = std::chrono::high_resolution_clock::now();
         MSG msg = {};
         if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE) > 0)
         {
@@ -69,8 +73,14 @@ int WINAPI wWinMain(
         }
 
         DX12::Render();
-    }
 
+        // conversion to float also changes units to seconds
+        const std::chrono::duration<float> frameTime = std::chrono::high_resolution_clock::now() - preLoopTimePoint;
+        ::g_fps = 1.f / frameTime.count();
+
+        DISPLAY_RAW_OUTPUT("Current recorded FPS: %f", Utils::GetFPS());
+    }
+     
     return static_cast<int>(0);
 }
 
@@ -132,4 +142,9 @@ HWND UtilsImpl::CreateWindowsWindow(
         wc->hInstance,
         nullptr
     );
+}
+
+float UtilsImpl::GetFps() 
+{
+    return ::g_fps;
 }

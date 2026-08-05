@@ -178,6 +178,15 @@ void DX12::DescriptorHeap::ProcessPendingResourceFreeing(const int currentFrame)
 DX12::RenderSurface::RenderSurface(const HWND window, DXGI_FORMAT format, ID3D12CommandQueue* commandQueue) 
 	: _window(window)
 {
+	IDXGIFactory7* factory = DX12::GetDxgiFactory();
+
+	HRESULT_CHECKED(
+		factory->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING, &_allowTearing, sizeof(_allowTearing)),
+		"Could not test for tearing support.");
+
+	if ((bool)_allowTearing)
+		_presentFlags = DXGI_PRESENT_ALLOW_TEARING;
+
 	RECT windowDimensions = GetWindowDimensions();
 	const int width = windowDimensions.right - windowDimensions.left;
 	const int height = windowDimensions.bottom - windowDimensions.top;
@@ -186,7 +195,7 @@ DX12::RenderSurface::RenderSurface(const HWND window, DXGI_FORMAT format, ID3D12
 	desc.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
 	desc.BufferCount = DX12::k_frameBuffers;
 	desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-	desc.Flags = 0;
+	desc.Flags = (bool)_allowTearing ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
 	desc.Format = format == DXGI_FORMAT_R8G8B8A8_UNORM_SRGB ?
 		DXGI_FORMAT_R8G8B8A8_UNORM :
 		format;
@@ -198,7 +207,6 @@ DX12::RenderSurface::RenderSurface(const HWND window, DXGI_FORMAT format, ID3D12
 	desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 	desc.Stereo = false;
 
-	IDXGIFactory7* factory = DX12::GetDxgiFactory();
 	IDXGISwapChain1* swapChain = nullptr;
 	HRESULT_CHECKED_FALLBACK(
 		factory->CreateSwapChainForHwnd(commandQueue, _window, &desc, nullptr, nullptr, &swapChain),
@@ -239,7 +247,7 @@ void DX12::RenderSurface::Present() const
 		assert(false);
 	}
 
-	_swapChain->Present(0, 0);
+	_swapChain->Present(0, _presentFlags);
 	_currentBackBufferIndex = _swapChain->GetCurrentBackBufferIndex();
 }
 
@@ -252,8 +260,33 @@ RECT DX12::RenderSurface::GetWindowDimensions() const
 	return rect;
 }
 
+void DX12::RenderSurface::MoveImpl(RenderSurface&& other)
+{
+	assert(this != &other);
+
+	_window = other._window;
+	_currentBackBufferIndex = other._currentBackBufferIndex;
+	_viewport = other._viewport;
+	_scissorRect = other._scissorRect;
+	_presentFlags = other._presentFlags;
+	_allowTearing = other._allowTearing;
+
+	for (int i = 0; i < DX12::k_frameBuffers; i++)
+		_renderTargetData[i] = std::move(other._renderTargetData[i]);
+
+	// clean non-move specified data
+	other._window = NULL;
+	other._currentBackBufferIndex = 0;
+	other._viewport = D3D12_VIEWPORT();
+	other._scissorRect = D3D12_RECT();
+	other._presentFlags = 0;
+	other._allowTearing = 0;
+}
+
 void DX12::RenderSurface::Release()
 {
+	DX12::GetMainRenderCommand()->Flush();
+
 	for (int i = 0; i < DX12::k_frameBuffers; i++)
 		_renderTargetData[i].Release();
 
@@ -306,4 +339,13 @@ void DX12::RenderSurface::RenderTargetData::Release()
 {
 	_resource.Reset();
 	DX12::GetRTVHeap()->Free(_handle);
+}
+
+void DX12::RenderSurface::RenderTargetData::MoveImpl(RenderTargetData&& other)
+{
+	assert(this != &other);
+
+	_resource = std::move(other._resource);
+	_handle = other._handle;
+	other._handle = DX12::DescriptorHeap::DescriptorHandle();
 }

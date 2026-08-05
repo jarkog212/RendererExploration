@@ -3,16 +3,22 @@
 #include <assert.h>
 
 #define DISPLAY_ERROR(format, ...) {\
-	wchar_t buffer[1000] = L"";\
-	swprintf(buffer, 1000, format, __VA_ARGS__);\
+	wchar_t buffer[1024] = L"";\
+	swprintf(buffer, 1024, format, __VA_ARGS__);\
 	MessageBoxW(nullptr, buffer, L"Error", MB_ICONERROR);\
+}
+
+#define DISPLAY_RAW_OUTPUT(format, ...) {\
+	char buffer[1024] = "";\
+	sprintf_s(buffer, 1024, format##"\n", __VA_ARGS__);\
+	OutputDebugStringA(buffer);\
 }
 
 #define HRESULT_CHECKED(instruction, format, ...) {\
 	HRESULT hr = ##instruction;\
 	if (FAILED(hr))\
 	{\
-		DISPLAY_ERROR(L"[%u]"##format, hr, __VA_ARGS__)\
+		DISPLAY_ERROR(L"[%x] "##format, hr, __VA_ARGS__)\
 		assert(false);\
 	}\
 }
@@ -21,7 +27,7 @@
 	HRESULT hr = ##instruction;\
 	if (FAILED(hr))\
 	{\
-		DISPLAY_ERROR(L"[%u]"##format, hr, __VA_ARGS__)\
+		DISPLAY_ERROR(L"[%x] "##format, hr, __VA_ARGS__)\
 		##fallback;\
 	}\
 }
@@ -41,7 +47,7 @@ namespace UtilsImpl
 	{
 		void Release(IUnknown* resource);
 
-		void DeferredRelease(IUnknown* resource);
+		void DeferredRenderThreadRelease(IUnknown* resource);
 	}
 
 	HWND CreateWindowsWindow(
@@ -49,6 +55,8 @@ namespace UtilsImpl
 		const unsigned int width,
 		const unsigned int height,
 		WNDCLASSEXW* wc);
+
+	float GetFps();
 }
 
 namespace Utils
@@ -71,7 +79,7 @@ namespace Utils
 			if (!resource)
 				return;
 
-			UtilsImpl::COM::DeferredRelease(resource);
+			UtilsImpl::COM::DeferredRenderThreadRelease(resource);
 			resource = nullptr;
 		}
 	}
@@ -83,5 +91,10 @@ namespace Utils
 		WNDCLASSEXW* wc)
 	{
 		return UtilsImpl::CreateWindowsWindow(title, width, height, wc); 
+	}
+
+	inline float GetFPS() 
+	{
+		return UtilsImpl::GetFps();
 	}
 }

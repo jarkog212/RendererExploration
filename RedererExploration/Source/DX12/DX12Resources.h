@@ -17,7 +17,7 @@ namespace DX12
 {
 	static constexpr unsigned int k_frameBuffers = 3;
 	static constexpr int k_allPending = -1;
-	static constexpr DXGI_FORMAT k_defaultRenderTargetFormat = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+	static constexpr DXGI_FORMAT k_defaultRenderTargetFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
 
 	class DescriptorHeap
 	{
@@ -80,13 +80,12 @@ namespace DX12
 	
 	public:
 
-		RenderSurface(const HWND window, DXGI_FORMAT format, ID3D12CommandQueue1* commandQueue);
+		RenderSurface(const HWND window, DXGI_FORMAT format, ID3D12CommandQueue* commandQueue);
 		~RenderSurface() { Release(); }
 
-		NO_MOVE(RenderSurface);
-		NO_COPY(RenderSurface);
+		NO_COPY(RenderSurface)
 
-		void Resize() {};
+		void Resize();
 		void Present() const;
 
 		constexpr HWND GetWindow() const { return _window; }
@@ -101,7 +100,7 @@ namespace DX12
 	private:
 
 		void Release();
-		void Finalize();
+		void Finalize(DXGI_FORMAT format);
 		
 		Microsoft::WRL::ComPtr<IDXGISwapChain4> _swapChain = nullptr;
 		HWND _window = NULL;

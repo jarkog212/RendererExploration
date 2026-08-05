@@ -34,13 +34,21 @@
 	T(T&&) = delete; \
 	T& operator=(T&&) = delete;
 
+// implement these within appropriate places
 namespace UtilsImpl
 {
-	// implement these within appropriate places
 	namespace COM
 	{
+		void Release(IUnknown* resource);
+
 		void DeferredRelease(IUnknown* resource);
 	}
+
+	HWND CreateWindowsWindow(
+		const wchar_t* title,
+		const unsigned int width,
+		const unsigned int height,
+		WNDCLASSEXW* wc);
 }
 
 namespace Utils
@@ -53,7 +61,7 @@ namespace Utils
 			if (!resource)
 				return;
 
-			resource->Release();
+			UtilsImpl::COM::Release(resource);
 			resource = nullptr;
 		}
 
@@ -66,5 +74,14 @@ namespace Utils
 			UtilsImpl::COM::DeferredRelease(resource);
 			resource = nullptr;
 		}
+	}
+
+	inline HWND CreateWindowsWindow(
+		const wchar_t* title,
+		const unsigned int width,
+		const unsigned int height,
+		WNDCLASSEXW* wc)
+	{
+		return UtilsImpl::CreateWindowsWindow(title, width, height, wc); 
 	}
 }

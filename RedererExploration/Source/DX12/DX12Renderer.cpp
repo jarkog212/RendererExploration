@@ -10,6 +10,8 @@ namespace
 	static Microsoft::WRL::ComPtr<IDXGIFactory7> COMDxgiFactory = nullptr;
 	static Microsoft::WRL::ComPtr<IDXGIAdapter4> COMDxgiAdapter = nullptr;
 
+	static std::unique_ptr<DX12::RenderSurface> MainRenderSurface = nullptr;
+
 	static int DeferredResourceFreeingFlag = 0;
 	static_assert(sizeof(DeferredResourceFreeingFlag) * sizeof(char) > DX12::k_frameBuffers, "Flag bit-buffer needs to be wide enough for frame buffer count.");
 
@@ -44,7 +46,11 @@ namespace
 	}
 }
 
-// function defined here due to acccess to static anon namespace
+void UtilsImpl::COM::Release(IUnknown* resource)
+{
+	resource->Release();
+}
+
 void UtilsImpl::COM::DeferredRelease(IUnknown* resource)
 {
 	unsigned int currentFrame = DX12::GetMainRenderCommand()->GetCurrentFrame();
@@ -58,7 +64,7 @@ ID3D12Device8* DX12::GetRendererDevice()
 		return device;
 
 	HRESULT_CHECKED(
-		D3D12CreateDevice(GetDxgiAdapter(), g_expectedMinimumFeatureLevel, __uuidof(ID3D12Device), (void**)device),
+		D3D12CreateDevice(GetDxgiAdapter(), g_expectedMinimumFeatureLevel, __uuidof(ID3D12Device), (void**)&device),
 		"Could not create Dx12 device with selected adapter.")
 
 	// Technically adapter interface is no longer needed
@@ -69,7 +75,7 @@ ID3D12Device8* DX12::GetRendererDevice()
 #ifdef _DEBUG
 	{
 		Microsoft::WRL::ComPtr<ID3D12InfoQueue> infoQueueInterface = nullptr;
-		HRESULT_CHECKED(device->QueryInterface(__uuidof(ID3D12InfoQueue), (void**)infoQueueInterface.GetAddressOf()), "Couldn't gather queue interface.");
+		HRESULT_CHECKED(device->QueryInterface(IID_PPV_ARGS(&infoQueueInterface)), "Couldn't gather queue interface.");
 		infoQueueInterface->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true);
 		infoQueueInterface->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, true);
 		infoQueueInterface->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);
@@ -91,14 +97,14 @@ IDXGIFactory7* DX12::GetDxgiFactory()
 #ifdef _DEBUG
 	{
 		Microsoft::WRL::ComPtr<ID3D12Debug6> debugInterface = nullptr;
-		HRESULT_CHECKED(D3D12GetDebugInterface(__uuidof(ID3D12Debug6), (void**)debugInterface.GetAddressOf()), "Failed to get debug interface.");
+		HRESULT_CHECKED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugInterface)), "Failed to get debug interface.");
 		debugInterface->EnableDebugLayer();
 
 		flags |= DXGI_CREATE_FACTORY_DEBUG;
 	}
 #endif
 
-	HRESULT_CHECKED(CreateDXGIFactory2(flags, __uuidof(IDXGIFactory7), (void**)&factory), "DXGI Factory issue.");
+	HRESULT_CHECKED(CreateDXGIFactory2(flags, IID_PPV_ARGS(&factory)), "DXGI Factory issue.");
 
 	::COMDxgiFactory.Attach(factory);
 	return factory;
@@ -145,7 +151,7 @@ IDXGIAdapter4* DX12::GetDxgiAdapter()
 
 	Microsoft::WRL::ComPtr<ID3D12Device> device;
 	HRESULT_CHECKED(
-		D3D12CreateDevice(adapter, g_expectedMinimumFeatureLevel, __uuidof(ID3D12Device), (void**)device.GetAddressOf()),
+		D3D12CreateDevice(adapter, g_expectedMinimumFeatureLevel, IID_PPV_ARGS(&device)),
 		"Could not create Dx12 device with selected adapter.");
 	
 	HRESULT_CHECKED(
@@ -162,6 +168,24 @@ IDXGIAdapter4* DX12::GetDxgiAdapter()
 	g_expectedMinimumFeatureLevel = featureLevelsData.MaxSupportedFeatureLevel;
 	::COMDxgiAdapter.Attach(adapter);
 	return adapter;
+}
+
+DX12::RenderSurface* DX12::GetMainRenderSurface(
+	HWND window,
+	DXGI_FORMAT format,
+	ID3D12CommandQueue* commandQueue)
+{
+	if (::MainRenderSurface)
+		return ::MainRenderSurface.get();
+
+	if (window == NULL || !commandQueue)
+	{
+		DISPLAY_ERROR(L"Uninitialized render surface requires legitimate arguments so it can be initialized.");
+		assert(false);
+	}
+
+	::MainRenderSurface = std::make_unique<DX12::RenderSurface>(window, format, commandQueue);
+	return ::MainRenderSurface.get();
 }
 
 DX12::GfxCommand* DX12::GetMainRenderCommand()
@@ -204,9 +228,14 @@ bool DX12::TestPendingResourceFreeingFlag(const unsigned int frame)
 	return (bool)(::DeferredResourceFreeingFlag & (1ull << frame));
 }
 
-bool DX12::Initialize()
+bool DX12::Initialize(HWND hwnd)
 {
 	bool result = true;
+
+	DX12::GetMainRenderSurface(
+		hwnd,
+		DX12::k_defaultRenderTargetFormat,
+		DX12::GetMainRenderCommand()->GetCommandQueue());
 
 	HRESULT_CHECKED_FALLBACK(DX12::GetRTVHeap()->GetHeap()->SetName(L"RTV Heap"), , "Could not name RTV Heap.");
 	HRESULT_CHECKED_FALLBACK(DX12::GetDSVHeap()->GetHeap()->SetName(L"DSV Heap"), , "Could not name DSV Heap.");
@@ -216,9 +245,8 @@ bool DX12::Initialize()
 	return true;
 }
 
-void DX12::Render()
+void DX12::Render(DX12::GfxCommand* command, DX12::RenderSurface* surface)
 {
-	DX12::GfxCommand* command = DX12::GetMainRenderCommand();
 	command->PreRender();
 
 	ID3D12GraphicsCommandList6* clist = command->GetCommandList();
@@ -227,7 +255,16 @@ void DX12::Render()
 	if (TestPendingResourceFreeingFlag(currentFrame))
 		FreePendingResources(currentFrame);
 
+	surface->Present();
+
 	command->PostRender();
+}
+
+void DX12::Render()
+{
+	DX12::Render(
+		DX12::GetMainRenderCommand(),
+		DX12::GetMainRenderSurface());
 }
 
 void DX12::Cleanup()
@@ -235,6 +272,8 @@ void DX12::Cleanup()
 	// intended to be called only once at shutdown, reinit is not possible due to static nature of things?
 	static auto cleaner = []()
 		{
+			::MainRenderSurface.reset();
+
 			DX12::GetMainRenderCommand()->Release();
 
 			::FreePendingResources(k_allPending);
@@ -255,13 +294,13 @@ void DX12::Cleanup()
 #ifdef _DEBUG
 	{
 		Microsoft::WRL::ComPtr<ID3D12InfoQueue> infoQueueInterface = nullptr;
-		HRESULT_CHECKED(::COMRendererDevice->QueryInterface(__uuidof(ID3D12InfoQueue), (void**)infoQueueInterface.GetAddressOf()), "Couldn't gather info queue interface.");
+		HRESULT_CHECKED(::COMRendererDevice->QueryInterface(IID_PPV_ARGS(&infoQueueInterface)), "Couldn't gather info queue interface.");
 		infoQueueInterface->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, false);
 		infoQueueInterface->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, false);
 		infoQueueInterface->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, false);
 
 		Microsoft::WRL::ComPtr<ID3D12DebugDevice2> debugInterface = nullptr;
-		HRESULT_CHECKED(::COMRendererDevice->QueryInterface(__uuidof(ID3D12DebugDevice2), (void**)debugInterface.GetAddressOf()), "Couldn't gather debug device interface.");
+		HRESULT_CHECKED(::COMRendererDevice->QueryInterface(IID_PPV_ARGS(&debugInterface)), "Couldn't gather debug device interface.");
 
 		cleaner();
 
@@ -289,7 +328,7 @@ DX12::GfxCommand::GfxCommand(D3D12_COMMAND_LIST_TYPE type)
 		L"Command List";
 
 	HRESULT_CHECKED_FALLBACK(
-		DX12::GetRendererDevice()->CreateCommandQueue(&cq, __uuidof(ID3D12CommandQueue), (void**)_commandQueue.GetAddressOf()),
+		DX12::GetRendererDevice()->CreateCommandQueue(&cq, IID_PPV_ARGS(&_commandQueue)),
 		goto _error,
 		"Could not create command queue.");
 
@@ -297,15 +336,20 @@ DX12::GfxCommand::GfxCommand(D3D12_COMMAND_LIST_TYPE type)
 		_frame[i].Setup(type, i);
 
 	HRESULT_CHECKED_FALLBACK(
-		DX12::GetRendererDevice()->CreateCommandList(0, type, _frame[0].GetAllocator(), nullptr, __uuidof(ID3D12GraphicsCommandList6), (void**)_commandList.GetAddressOf()),
+		DX12::GetRendererDevice()->CreateCommandList(0, type, _frame[0].GetAllocator(), nullptr, IID_PPV_ARGS(&_commandList)),
 		goto _error,
 		"Could not create command list.");
+
+	HRESULT_CHECKED_FALLBACK(
+		_commandList->Close(),
+		goto _error,
+		"Could not close the command list.")
 
 	HRESULT_CHECKED_FALLBACK(_commandQueue->SetName(commandQueueName), , "Could not set (%ls) to command queue.", commandQueueName);
 	HRESULT_CHECKED_FALLBACK(_commandList->SetName(commandListName), , "Could not set (%ls) to command list.", commandListName);
 
 	HRESULT_CHECKED_FALLBACK(
-		DX12::GetRendererDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, __uuidof(ID3D12Fence1), (void**)_fence.GetAddressOf()),
+		DX12::GetRendererDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&_fence)),
 		goto _error,
 		"Could not create fence.");
 
@@ -375,7 +419,7 @@ void DX12::GfxCommand::Release()
 bool DX12::GfxCommand::GfxCommandFrame::Setup(D3D12_COMMAND_LIST_TYPE type, int index)
 {
 	HRESULT_CHECKED_FALLBACK(
-		GetRendererDevice()->CreateCommandAllocator(type, _uuidof(ID3D12CommandAllocator), (void**)_allocator.GetAddressOf()),
+		GetRendererDevice()->CreateCommandAllocator(type, IID_PPV_ARGS(&_allocator)),
 		return false,
 		"Could not create command allocator.");
 

@@ -19,7 +19,7 @@ DX12::DescriptorHeap::DescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type, unsigned i
 		Release();
 		ID3D12Device8* device = DX12::GetRendererDevice();
 
-		D3D12_DESCRIPTOR_HEAP_DESC desc;
+		D3D12_DESCRIPTOR_HEAP_DESC desc{};
 		desc.Flags = isShaderVisible ? D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE : D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 		desc.NumDescriptors = capacity;
 		desc.Type = _type;
@@ -119,7 +119,7 @@ void DX12::DescriptorHeap::Free(DescriptorHandle& handle)
 			assert(false);
 		}
 
-		if ((handle._cpu.ptr - _mainHandles._cpu.ptr) % _descriptorSize == 0)
+		if ((handle._cpu.ptr - _mainHandles._cpu.ptr) % _descriptorSize != 0)
 		{
 			DISPLAY_ERROR(L"Called Free for handle whose addresses are not aligned correctly.");
 			assert(false);
@@ -129,7 +129,7 @@ void DX12::DescriptorHeap::Free(DescriptorHandle& handle)
 
 #ifdef _DEBUG
 		{
-			if (index == handle._index)
+			if (index != handle._index)
 			{
 				DISPLAY_ERROR(L"Called Free for handle whose index is not matching what it got initialised with.");
 				assert(false);
@@ -175,14 +175,14 @@ void DX12::DescriptorHeap::ProcessPendingResourceFreeing(const int currentFrame)
 	cleaner(currentFrame);
 }
 
-DX12::RenderSurface::RenderSurface(const HWND window, DXGI_FORMAT format, ID3D12CommandQueue1* commandQueue) 
+DX12::RenderSurface::RenderSurface(const HWND window, DXGI_FORMAT format, ID3D12CommandQueue* commandQueue) 
 	: _window(window)
 {
 	RECT windowDimensions = GetWindowDimensions();
 	const int width = windowDimensions.right - windowDimensions.left;
 	const int height = windowDimensions.bottom - windowDimensions.top;
 
-	DXGI_SWAP_CHAIN_DESC1 desc;
+	DXGI_SWAP_CHAIN_DESC1 desc{};
 	desc.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
 	desc.BufferCount = DX12::k_frameBuffers;
 	desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
@@ -211,7 +211,7 @@ DX12::RenderSurface::RenderSurface(const HWND window, DXGI_FORMAT format, ID3D12
 		"Could not restirct fullscreen on swapchain.");
 
 	HRESULT_CHECKED_FALLBACK(
-		swapChain->QueryInterface<IDXGISwapChain4>(_swapChain.GetAddressOf()),
+		swapChain->QueryInterface(IID_PPV_ARGS(&_swapChain)),
 		assert(false),
 		"Could not get newer swap chain interface.");
 
@@ -221,7 +221,14 @@ DX12::RenderSurface::RenderSurface(const HWND window, DXGI_FORMAT format, ID3D12
 	for (int i = 0; i < DX12::k_frameBuffers; i++)
 		_renderTargetData[i]._handle = DX12::GetRTVHeap()->Allocate();
 
-	Finalize();
+	Finalize(format);
+}
+
+void DX12::RenderSurface::Resize()
+{
+	DX12::GetMainRenderCommand()->Flush();
+
+	// body
 }
 
 void DX12::RenderSurface::Present() const
@@ -253,23 +260,23 @@ void DX12::RenderSurface::Release()
 	_swapChain.Reset();
 }
 
-void DX12::RenderSurface::Finalize()
+void DX12::RenderSurface::Finalize(DXGI_FORMAT format)
 {
 	for (int i = 0; i < DX12::k_frameBuffers; i++)
 	{
 		RenderTargetData& data = _renderTargetData[i];
 		HRESULT_CHECKED(
-			_swapChain->GetBuffer(i, __uuidof(ID3D12Resource), (void**)data._resource.GetAddressOf()),
+			_swapChain->GetBuffer(i, IID_PPV_ARGS(&data._resource)),
 			"Could not get a hold of the swap chain internal buffer.");
 
-		D3D12_RENDER_TARGET_VIEW_DESC desc;
-		desc.Format = DX12::k_defaultRenderTargetFormat;
+		D3D12_RENDER_TARGET_VIEW_DESC desc{};
+		desc.Format = format;
 		desc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
 
 		DX12::GetRendererDevice()->CreateRenderTargetView(data._resource.Get(), &desc, data._handle._cpu);
 	}
 
-	DXGI_SWAP_CHAIN_DESC desc;
+	DXGI_SWAP_CHAIN_DESC desc{};
 	HRESULT_CHECKED(_swapChain->GetDesc(&desc), "Could not get swap chain descriptor object.");
 
 	const unsigned int height = desc.BufferDesc.Height;

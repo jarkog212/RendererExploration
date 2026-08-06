@@ -1,5 +1,6 @@
 #include "DX12Resources.h"
 #include "DX12Renderer.h" 
+#include "DX12CommonDescriptors.h"
 
 DX12::DescriptorHeap::DescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type, unsigned int capacity, bool isShaderVisible) : _type(type)
 {
@@ -44,6 +45,25 @@ DX12::DescriptorHeap::DescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type, unsigned i
 	}
 }
 
+void DX12::DescriptorHeap::DescriptorHandle::MoveImpl(DescriptorHandle&& other)
+{
+	_cpu = other._cpu;
+	_gpu = other._gpu;
+
+	other._cpu = { 0 };
+	other._gpu = { 0 };
+
+#ifdef _DEBUG
+	{ 
+		_owner = other._owner;
+		_index = other._index;
+
+		other._owner = nullptr;
+		other._index = 0;
+	}
+#endif
+}
+
 void DX12::DescriptorHeap::Release()
 {
 	if (_size > 0)
@@ -52,7 +72,7 @@ void DX12::DescriptorHeap::Release()
 		assert(false);
 	}
 
-	Utils::COM::SafeDeferredRelease(_heap);
+	Utils::COM::SafeDeferredRenderThreadRelease(_heap);
 }
 
 DX12::DescriptorHeap::DescriptorHandle DX12::DescriptorHeap::Allocate()
@@ -166,7 +186,7 @@ void DX12::DescriptorHeap::ProcessPendingResourceFreeing(const int currentFrame)
 
 	if (currentFrame == k_allPending)
 	{
-		for (int i = 0; i < k_frameBuffers; i++)
+		for (int i = 0; i < DX12::CC::k_frameBuffers; i++)
 			cleaner(i);
 
 		return;
@@ -193,7 +213,7 @@ DX12::RenderSurface::RenderSurface(const HWND window, DXGI_FORMAT format, ID3D12
 
 	DXGI_SWAP_CHAIN_DESC1 desc{};
 	desc.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
-	desc.BufferCount = DX12::k_frameBuffers;
+	desc.BufferCount = _swapChainBuffers;
 	desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	desc.Flags = (bool)_allowTearing ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
 	desc.Format = format == DXGI_FORMAT_R8G8B8A8_UNORM_SRGB ?
@@ -226,8 +246,8 @@ DX12::RenderSurface::RenderSurface(const HWND window, DXGI_FORMAT format, ID3D12
 	Utils::COM::SafeRelease(swapChain);
 	_currentBackBufferIndex = _swapChain->GetCurrentBackBufferIndex();
 
-	for (int i = 0; i < DX12::k_frameBuffers; i++)
-		_renderTargetData[i]._handle = DX12::GetRTVHeap()->Allocate();
+	for (int i = 0; i < _swapChainBuffers; i++)
+		_renderTargetData[i]._rtvHandle = DX12::GetRTVHeap()->Allocate();
 
 	Finalize(format);
 }
@@ -271,7 +291,7 @@ void DX12::RenderSurface::MoveImpl(RenderSurface&& other)
 	_presentFlags = other._presentFlags;
 	_allowTearing = other._allowTearing;
 
-	for (int i = 0; i < DX12::k_frameBuffers; i++)
+	for (int i = 0; i < _swapChainBuffers; i++)
 		_renderTargetData[i] = std::move(other._renderTargetData[i]);
 
 	// clean non-move specified data
@@ -287,7 +307,7 @@ void DX12::RenderSurface::Release()
 {
 	DX12::GetMainRenderCommand()->Flush();
 
-	for (int i = 0; i < DX12::k_frameBuffers; i++)
+	for (int i = 0; i < _swapChainBuffers; i++)
 		_renderTargetData[i].Release();
 
 	_swapChain.Reset();
@@ -295,7 +315,7 @@ void DX12::RenderSurface::Release()
 
 void DX12::RenderSurface::Finalize(DXGI_FORMAT format)
 {
-	for (int i = 0; i < DX12::k_frameBuffers; i++)
+	for (int i = 0; i < _swapChainBuffers; i++)
 	{
 		RenderTargetData& data = _renderTargetData[i];
 		HRESULT_CHECKED(
@@ -306,7 +326,7 @@ void DX12::RenderSurface::Finalize(DXGI_FORMAT format)
 		desc.Format = format;
 		desc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
 
-		DX12::GetRendererDevice()->CreateRenderTargetView(data._resource.Get(), &desc, data._handle._cpu);
+		DX12::GetRendererDevice()->CreateRenderTargetView(data._resource.Get(), &desc, data._rtvHandle._cpu);
 	}
 
 	DXGI_SWAP_CHAIN_DESC desc{};
@@ -338,7 +358,7 @@ void DX12::RenderSurface::Finalize(DXGI_FORMAT format)
 void DX12::RenderSurface::RenderTargetData::Release()
 {
 	_resource.Reset();
-	DX12::GetRTVHeap()->Free(_handle);
+	DX12::GetRTVHeap()->Free(_rtvHandle);
 }
 
 void DX12::RenderSurface::RenderTargetData::MoveImpl(RenderTargetData&& other)
@@ -346,6 +366,82 @@ void DX12::RenderSurface::RenderTargetData::MoveImpl(RenderTargetData&& other)
 	assert(this != &other);
 
 	_resource = std::move(other._resource);
-	_handle = other._handle;
-	other._handle = DX12::DescriptorHeap::DescriptorHandle();
+	_rtvHandle = std::move(other._rtvHandle);
 }
+
+DX12::Texture::Texture(TextureSpecs& specs)
+{
+	if (!specs._resourceDesc)
+	{
+		DISPLAY_ERROR(L"Cannot create texture without valid resource descriptor.");
+		assert(false);
+	}
+
+	if (!specs._srvDesc)
+	{
+		DISPLAY_ERROR(L"Cannot create texture without valid SRV descriptor.");
+		assert(false);
+	}
+
+	ID3D12Device8* device = DX12::GetRendererDevice();
+	D3D12_CLEAR_VALUE* clearValue = nullptr;
+	if (specs._resourceDesc->Flags & D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET
+		|| specs._resourceDesc->Flags & D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)
+	{
+		clearValue = &specs._clearValue;
+	}
+
+	if (specs._resource)
+	{
+		_resource = specs._resource;
+		specs._resource = nullptr;
+	}
+	else if (specs._heap)
+	{
+		
+		HRESULT_CHECKED_FALLBACK(
+			device->CreatePlacedResource(
+				specs._heap,
+				specs._allocationInfo.Offset,
+				specs._resourceDesc,
+				specs._initialState,
+				clearValue,
+				IID_PPV_ARGS(&_resource)),
+			assert(false),
+			"Could not create a placed texture resource.");
+	}
+	else
+	{
+		HRESULT_CHECKED_FALLBACK(
+			device->CreateCommittedResource(
+				&DX12::CC::Desc::k_defaultHeapProperties,
+				D3D12_HEAP_FLAG_NONE,
+				specs._resourceDesc,
+				specs._initialState,
+				clearValue,
+				IID_PPV_ARGS(&_resource)),
+			assert(false),
+			"Could not create a committed texture resource.");
+	}
+
+	_srvHandle = DX12::GetSRVHeap()->Allocate();
+	device->CreateShaderResourceView(_resource, specs._srvDesc, _srvHandle._cpu);
+}
+
+void DX12::Texture::Release()
+{
+	DX12::GetSRVHeap()->Free(_srvHandle);
+	Utils::COM::SafeDeferredRenderThreadRelease(_resource);
+}
+
+void DX12::Texture::MoveImpl(Texture&& other)
+{
+	assert(this != &other);
+
+	_resource = other._resource;
+	_srvHandle = std::move(other._srvHandle);
+
+	other._resource = nullptr;
+}
+
+

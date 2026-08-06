@@ -1,10 +1,13 @@
 #pragma once
 
-#include "DX12Resources.h"
+#include "DX12CommonConstants.h"
+#include "Utils.h"
 
 namespace DX12
 {
 	class GfxCommand;
+	class RenderSurface;
+	class DescriptorHeap;
 
 	static D3D_FEATURE_LEVEL g_expectedMinimumFeatureLevel{ D3D_FEATURE_LEVEL_11_0 };
 
@@ -14,7 +17,7 @@ namespace DX12
 
 	DX12::RenderSurface* GetMainRenderSurface(
 		HWND window = NULL,
-		DXGI_FORMAT format = DX12::k_defaultRenderTargetFormat,
+		DXGI_FORMAT format = DX12::CC::k_defaultRenderTargetFormat,
 		ID3D12CommandQueue* commandQueue = nullptr);
 
 	DX12::GfxCommand* GetMainRenderCommand();
@@ -76,7 +79,7 @@ namespace DX12
 
 		Microsoft::WRL::ComPtr<ID3D12CommandQueue> _commandQueue = nullptr;
 		Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList6> _commandList = nullptr;
-		GfxCommandFrame _frame[k_frameBuffers];
+		GfxCommandFrame _frame[DX12::CC::k_frameBuffers];
 		Microsoft::WRL::ComPtr<ID3D12Fence1> _fence = nullptr;
 		HANDLE _fenceEvent = 0;
 		unsigned int _currentFrame = 0;

@@ -37,5 +37,14 @@
     <ClInclude Include="Source\DX12\DX12Resources.h">
       <Filter>Source Files\DX12</Filter>
     </ClInclude>
+    <ClInclude Include="Source\DX12\DX12CommonConstants.h">
+      <Filter>Source Files\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\DX12\DX12Core.h">
+      <Filter>Source Files\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\DX12\DX12CommonDescriptors.h">
+      <Filter>Source Files\DX12</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

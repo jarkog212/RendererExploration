@@ -1,8 +1,7 @@
 #include "DX12Renderer.h"
+#include "DX12Resources.h"
 
 #include <cstdio>
-#include <memory>
-#include <mutex>
 
 namespace
 {
@@ -13,9 +12,9 @@ namespace
 	static std::unique_ptr<DX12::RenderSurface> MainRenderSurface = nullptr;
 
 	static int DeferredResourceFreeingFlag = 0;
-	static_assert(sizeof(DeferredResourceFreeingFlag) * sizeof(char) > DX12::k_frameBuffers, "Flag bit-buffer needs to be wide enough for frame buffer count.");
+	static_assert(sizeof(DeferredResourceFreeingFlag) * sizeof(char) > DX12::CC::k_frameBuffers, "Flag bit-buffer needs to be wide enough for frame buffer count.");
 
-	static std::vector<IUnknown*> DeferredCOMReleases[DX12::k_frameBuffers];
+	static std::vector<IUnknown*> DeferredCOMReleases[DX12::CC::k_frameBuffers];
 
 	static void FreePendingResources(const int currentFrame = DX12::k_allPending)
 	{
@@ -39,7 +38,7 @@ namespace
 			};
 
 		if (currentFrame == DX12::k_allPending)
-			for (int i = 0; i < DX12::k_frameBuffers; i++)
+			for (int i = 0; i < DX12::CC::k_frameBuffers; i++)
 				cleaner(i);
 		else
 			cleaner(currentFrame);
@@ -234,7 +233,7 @@ bool DX12::Initialize(HWND hwnd)
 
 	DX12::GetMainRenderSurface(
 		hwnd,
-		DX12::k_defaultRenderTargetFormat,
+		DX12::CC::k_defaultRenderTargetFormat,
 		DX12::GetMainRenderCommand()->GetCommandQueue());
 
 	HRESULT_CHECKED_FALLBACK(DX12::GetRTVHeap()->GetHeap()->SetName(L"RTV Heap"), , "Could not name RTV Heap.");
@@ -332,7 +331,7 @@ DX12::GfxCommand::GfxCommand(D3D12_COMMAND_LIST_TYPE type)
 		goto _error,
 		"Could not create command queue.");
 
-	for (int i = 0; i < k_frameBuffers; i++)
+	for (int i = 0; i < DX12::CC::k_frameBuffers; i++)
 		_frame[i].Setup(type, i);
 
 	HRESULT_CHECKED_FALLBACK(
@@ -384,12 +383,12 @@ void DX12::GfxCommand::PostRender()
 	_frame[_currentFrame].IssueFenceValue(_issuableFenceValue);
 	_commandQueue->Signal(_fence.Get(), _issuableFenceValue);
 
-	_currentFrame = ++_currentFrame % k_frameBuffers;
+	_currentFrame = ++_currentFrame % DX12::CC::k_frameBuffers;
 }
 
 void DX12::GfxCommand::Flush()
 {
-	for (int i = 0; i < k_frameBuffers; i++)
+	for (int i = 0; i < DX12::CC::k_frameBuffers; i++)
 		_frame[i].WaitForGPU(_fenceEvent, _fence.Get());
 
 	_issuableFenceValue = 0;
@@ -410,7 +409,7 @@ void DX12::GfxCommand::Release()
 
 	_commandList.Reset();
 	_commandQueue.Reset();
-	for (int i = 0; i < k_frameBuffers; i++)
+	for (int i = 0; i < DX12::CC::k_frameBuffers; i++)
 		_frame[i].Reset();
 
 	_currentFrame = 0;

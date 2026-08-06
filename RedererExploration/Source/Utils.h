@@ -74,7 +74,7 @@ namespace Utils
 		}
 
 		template<typename T>
-		void SafeDeferredRelease(T*& resource)
+		void SafeDeferredRenderThreadRelease(T*& resource)
 		{
 			if (!resource)
 				return;

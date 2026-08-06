@@ -34,7 +34,8 @@ namespace DX12
 		void Release();
 		void Finalize(DXGI_FORMAT format);
 
-		static constexpr int _swapChainBuffers = 3;
+		static constexpr int _k_swapChainBuffers = 3;
+
 		Microsoft::WRL::ComPtr<IDXGISwapChain4> _swapChain = nullptr;
 		HWND _window = NULL;
 		mutable unsigned int _currentBackBufferIndex = 0;

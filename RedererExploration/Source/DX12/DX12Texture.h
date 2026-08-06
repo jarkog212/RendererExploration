@@ -19,6 +19,11 @@ namespace DX12
 	{
 	public:
 
+		static constexpr unsigned int _k_maxMips = 14;
+
+		// For empty shell static creation.
+		Texture() = default;
+
 		Texture(TextureSpecs& specs);
 		~Texture() { Release(); }
 		Texture(Texture&& other) noexcept { MoveImpl(std::move(other)); };

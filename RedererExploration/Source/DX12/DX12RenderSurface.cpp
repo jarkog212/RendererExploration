@@ -21,7 +21,7 @@ DX12::RenderSurface::RenderSurface(const HWND window, DXGI_FORMAT format, ID3D12
 
 	DXGI_SWAP_CHAIN_DESC1 desc{};
 	desc.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
-	desc.BufferCount = _swapChainBuffers;
+	desc.BufferCount = _k_swapChainBuffers;
 	desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	desc.Flags = (bool)_allowTearing ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
 	desc.Format = format == DXGI_FORMAT_R8G8B8A8_UNORM_SRGB ?
@@ -54,7 +54,7 @@ DX12::RenderSurface::RenderSurface(const HWND window, DXGI_FORMAT format, ID3D12
 	Utils::COM::SafeRelease(swapChain);
 	_currentBackBufferIndex = _swapChain->GetCurrentBackBufferIndex();
 
-	for (int i = 0; i < _swapChainBuffers; i++)
+	for (int i = 0; i < _k_swapChainBuffers; i++)
 		_renderTargetData[i]._rtvHandle = DX12::GetRTVHeap()->Allocate();
 
 	Finalize(format);
@@ -99,7 +99,7 @@ void DX12::RenderSurface::MoveImpl(RenderSurface&& other)
 	_presentFlags = other._presentFlags;
 	_allowTearing = other._allowTearing;
 
-	for (int i = 0; i < _swapChainBuffers; i++)
+	for (int i = 0; i < _k_swapChainBuffers; i++)
 		_renderTargetData[i] = std::move(other._renderTargetData[i]);
 
 	// clean non-move specified data
@@ -115,7 +115,7 @@ void DX12::RenderSurface::Release()
 {
 	DX12::GetMainRenderCommand()->Flush();
 
-	for (int i = 0; i < _swapChainBuffers; i++)
+	for (int i = 0; i < _k_swapChainBuffers; i++)
 		_renderTargetData[i].Release();
 
 	_swapChain.Reset();
@@ -123,7 +123,7 @@ void DX12::RenderSurface::Release()
 
 void DX12::RenderSurface::Finalize(DXGI_FORMAT format)
 {
-	for (int i = 0; i < _swapChainBuffers; i++)
+	for (int i = 0; i < _k_swapChainBuffers; i++)
 	{
 		RenderTargetData& data = _renderTargetData[i];
 		HRESULT_CHECKED(

@@ -32,6 +32,9 @@
     <ClCompile Include="Source\DX12\DX12Texture.cpp">
       <Filter>Source Files\DX12</Filter>
     </ClCompile>
+    <ClCompile Include="Source\DX12\DX12RenderTarget.cpp">
+      <Filter>Source Files\DX12</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
@@ -62,6 +65,9 @@
       <Filter>Source Files\DX12</Filter>
     </ClInclude>
     <ClInclude Include="Source\DX12\DX12Texture.h">
+      <Filter>Source Files\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\DX12\DX12RenderTarget.h">
       <Filter>Source Files\DX12</Filter>
     </ClInclude>
   </ItemGroup>

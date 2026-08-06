@@ -6,7 +6,7 @@
 #include <chrono>
 
 #include "Utils.h"
-#include "DX12/DX12Renderer.h"
+#include "DX12/DX12Core.h"
 
 namespace
 {

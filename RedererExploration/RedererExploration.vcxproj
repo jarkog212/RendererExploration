@@ -137,8 +137,11 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="RedererExploration.cpp" />
+    <ClCompile Include="Source\DX12\DX12DescriptorHeap.cpp" />
     <ClCompile Include="Source\DX12\DX12Renderer.cpp" />
+    <ClCompile Include="Source\DX12\DX12RenderSurface.cpp" />
     <ClCompile Include="Source\DX12\DX12Resources.cpp" />
+    <ClCompile Include="Source\DX12\DX12Texture.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
@@ -147,8 +150,11 @@
     <ClInclude Include="Source\DX12\DX12CommonConstants.h" />
     <ClInclude Include="Source\DX12\DX12CommonDescriptors.h" />
     <ClInclude Include="Source\DX12\DX12Core.h" />
+    <ClInclude Include="Source\DX12\DX12DescriptorHeap.h" />
+    <ClInclude Include="Source\DX12\DX12RenderSurface.h" />
     <ClInclude Include="Source\DX12\DX12Resources.h" />
     <ClInclude Include="Source\DX12\DX12Renderer.h" />
+    <ClInclude Include="Source\DX12\DX12Texture.h" />
     <ClInclude Include="Source\Utils.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

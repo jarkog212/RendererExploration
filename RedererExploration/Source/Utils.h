@@ -1,6 +1,8 @@
 #pragma once
 
 #include <assert.h>
+#include <cstdio>
+#include <windows.h>
 
 #define DISPLAY_ERROR(format, ...) {\
 	wchar_t buffer[1024] = L"";\

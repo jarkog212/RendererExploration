@@ -1,7 +1,6 @@
 #include "DX12Renderer.h"
-#include "DX12Resources.h"
-
-#include <cstdio>
+#include "DX12DescriptorHeap.h"
+#include "DX12RenderSurface.h"
 
 namespace
 {
@@ -11,12 +10,14 @@ namespace
 
 	static std::unique_ptr<DX12::RenderSurface> MainRenderSurface = nullptr;
 
+	static D3D_FEATURE_LEVEL g_expectedMinimumFeatureLevel{ D3D_FEATURE_LEVEL_11_0 };
+
 	static int DeferredResourceFreeingFlag = 0;
 	static_assert(sizeof(DeferredResourceFreeingFlag) * sizeof(char) > DX12::CC::k_frameBuffers, "Flag bit-buffer needs to be wide enough for frame buffer count.");
 
 	static std::vector<IUnknown*> DeferredCOMReleases[DX12::CC::k_frameBuffers];
 
-	static void FreePendingResources(const int currentFrame = DX12::k_allPending)
+	static void FreePendingResources(const int currentFrame = DX12::CC::k_forAllFrames)
 	{
 		static std::mutex mutex;
 		std::lock_guard lock(mutex);
@@ -37,7 +38,7 @@ namespace
 				pendingCOMList.clear();
 			};
 
-		if (currentFrame == DX12::k_allPending)
+		if (currentFrame == DX12::CC::k_forAllFrames)
 			for (int i = 0; i < DX12::CC::k_frameBuffers; i++)
 				cleaner(i);
 		else
@@ -275,7 +276,7 @@ void DX12::Cleanup()
 
 			DX12::GetMainRenderCommand()->Release();
 
-			::FreePendingResources(k_allPending);
+			::FreePendingResources(DX12::CC::k_forAllFrames);
 
 			DX12::GetRTVHeap()->Release();
 			DX12::GetDSVHeap()->Release();
@@ -283,7 +284,7 @@ void DX12::Cleanup()
 			DX12::GetUAVHeap()->Release();
 
 			// Heap releases add to the deferred pile
-			::FreePendingResources(k_allPending);
+			::FreePendingResources(DX12::CC::k_forAllFrames);
 
 			::COMDxgiFactory.Reset();
 			::COMRendererDevice.Reset();

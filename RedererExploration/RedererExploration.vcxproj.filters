@@ -35,6 +35,9 @@
     <ClCompile Include="Source\DX12\DX12RenderTarget.cpp">
       <Filter>Source Files\DX12</Filter>
     </ClCompile>
+    <ClCompile Include="Source\DX12\DX12DepthBuffer.cpp">
+      <Filter>Source Files\DX12</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
@@ -68,6 +71,9 @@
       <Filter>Source Files\DX12</Filter>
     </ClInclude>
     <ClInclude Include="Source\DX12\DX12RenderTarget.h">
+      <Filter>Source Files\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\DX12\DX12DepthBuffer.h">
       <Filter>Source Files\DX12</Filter>
     </ClInclude>
   </ItemGroup>

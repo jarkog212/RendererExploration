@@ -64,7 +64,7 @@ ID3D12Device8* DX12::GetRendererDevice()
 		return device;
 
 	HRESULT_CHECKED(
-		D3D12CreateDevice(GetDxgiAdapter(), g_expectedMinimumFeatureLevel, __uuidof(ID3D12Device), (void**)&device),
+		D3D12CreateDevice(DX12::GetDxgiAdapter(), g_expectedMinimumFeatureLevel, __uuidof(ID3D12Device), (void**)&device),
 		"Could not create Dx12 device with selected adapter.")
 
 	// Technically adapter interface is no longer needed
@@ -116,9 +116,8 @@ IDXGIAdapter4* DX12::GetDxgiAdapter()
 	if (adapter)
 		return adapter;
 
-	IDXGIFactory7* factory = GetDxgiFactory();
 	for (unsigned int i = 0;
-		factory->EnumAdapterByGpuPreference(i, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, __uuidof(IDXGIAdapter4), (void**)&adapter) != DXGI_ERROR_NOT_FOUND;
+		DX12::GetDxgiFactory()->EnumAdapterByGpuPreference(i, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, __uuidof(IDXGIAdapter4), (void**)&adapter) != DXGI_ERROR_NOT_FOUND;
 		++i)
 	{
 		if (SUCCEEDED(D3D12CreateDevice(adapter, g_expectedMinimumFeatureLevel, __uuidof(ID3D12Device), nullptr)))
@@ -131,11 +130,7 @@ IDXGIAdapter4* DX12::GetDxgiAdapter()
 		}
 	}
 
-	if (!adapter)
-	{
-		DISPLAY_ERROR(L"No good GPU adapter.");
-		return nullptr;
-	}
+	FALLBACK_ASSERT(adapter, return nullptr, "No good GPU adapter.");
 
 	constexpr D3D_FEATURE_LEVEL featureLevels[4]
 	{
@@ -151,21 +146,22 @@ IDXGIAdapter4* DX12::GetDxgiAdapter()
 
 	Microsoft::WRL::ComPtr<ID3D12Device> device;
 	HRESULT_CHECKED(
-		D3D12CreateDevice(adapter, g_expectedMinimumFeatureLevel, IID_PPV_ARGS(&device)),
+		D3D12CreateDevice(adapter, ::g_expectedMinimumFeatureLevel, IID_PPV_ARGS(&device)),
 		"Could not create Dx12 device with selected adapter.");
 	
 	HRESULT_CHECKED(
 		device->CheckFeatureSupport(D3D12_FEATURE_FEATURE_LEVELS, &featureLevelsData, sizeof(featureLevelsData)),
 		"Could not access Dx12 device's feature support information.");
 
-	if (featureLevelsData.MaxSupportedFeatureLevel < g_expectedMinimumFeatureLevel)
-	{
-		DISPLAY_ERROR(L"Dx12 device's feature level support is lover than minimum requirement.");
-		Utils::COM::SafeRelease(adapter);
-		return nullptr;
-	}
+	FALLBACK_ASSERT(
+		featureLevelsData.MaxSupportedFeatureLevel >= ::g_expectedMinimumFeatureLevel,
+		{
+			Utils::COM::SafeRelease(adapter);
+			return nullptr;
+		},
+		"Dx12 device's feature level support is lover than minimum requirement.");
 
-	g_expectedMinimumFeatureLevel = featureLevelsData.MaxSupportedFeatureLevel;
+	::g_expectedMinimumFeatureLevel = featureLevelsData.MaxSupportedFeatureLevel;
 	::COMDxgiAdapter.Attach(adapter);
 	return adapter;
 }
@@ -178,11 +174,9 @@ DX12::RenderSurface* DX12::GetMainRenderSurface(
 	if (::MainRenderSurface)
 		return ::MainRenderSurface.get();
 
-	if (window == NULL || !commandQueue)
-	{
-		DISPLAY_ERROR(L"Uninitialized render surface requires legitimate arguments so it can be initialized.");
-		assert(false);
-	}
+	CRITICAL_ASSERT(
+		window != NULL && commandQueue,
+		"Uninitialized render surface requires legitimate arguments so it can be initialized.");
 
 	::MainRenderSurface = std::make_unique<DX12::RenderSurface>(window, format, commandQueue);
 	return ::MainRenderSurface.get();
@@ -327,8 +321,10 @@ DX12::GfxCommand::GfxCommand(D3D12_COMMAND_LIST_TYPE type)
 		type == D3D12_COMMAND_LIST_TYPE_COMPUTE ? L"GFX Compute List" :
 		L"Command List";
 
+	ID3D12Device8* device = DX12::GetRendererDevice();
+
 	HRESULT_CHECKED_FALLBACK(
-		DX12::GetRendererDevice()->CreateCommandQueue(&cq, IID_PPV_ARGS(&_commandQueue)),
+		device->CreateCommandQueue(&cq, IID_PPV_ARGS(&_commandQueue)),
 		goto _error,
 		"Could not create command queue.");
 
@@ -336,7 +332,7 @@ DX12::GfxCommand::GfxCommand(D3D12_COMMAND_LIST_TYPE type)
 		_frame[i].Setup(type, i);
 
 	HRESULT_CHECKED_FALLBACK(
-		DX12::GetRendererDevice()->CreateCommandList(0, type, _frame[0].GetAllocator(), nullptr, IID_PPV_ARGS(&_commandList)),
+		device->CreateCommandList(0, type, _frame[0].GetAllocator(), nullptr, IID_PPV_ARGS(&_commandList)),
 		goto _error,
 		"Could not create command list.");
 
@@ -349,15 +345,14 @@ DX12::GfxCommand::GfxCommand(D3D12_COMMAND_LIST_TYPE type)
 	HRESULT_CHECKED_FALLBACK(_commandList->SetName(commandListName), , "Could not set (%ls) to command list.", commandListName);
 
 	HRESULT_CHECKED_FALLBACK(
-		DX12::GetRendererDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&_fence)),
+		device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&_fence)),
 		goto _error,
 		"Could not create fence.");
 
 	HRESULT_CHECKED_FALLBACK(_commandList->SetName(L"D3D12 Fence"), , "Could not set (%ls) to command list.", commandListName);
 
 	_fenceEvent = CreateEventEx(nullptr, nullptr, 0, EVENT_ALL_ACCESS);
-	if(!_fenceEvent)
-		DISPLAY_ERROR(L"Could not create fence event.");
+	FALLBACK_ASSERT(_fenceEvent,,"Could not create fence event.");
 
 	return;
 
@@ -419,7 +414,7 @@ void DX12::GfxCommand::Release()
 bool DX12::GfxCommand::GfxCommandFrame::Setup(D3D12_COMMAND_LIST_TYPE type, int index)
 {
 	HRESULT_CHECKED_FALLBACK(
-		GetRendererDevice()->CreateCommandAllocator(type, IID_PPV_ARGS(&_allocator)),
+		DX12::GetRendererDevice()->CreateCommandAllocator(type, IID_PPV_ARGS(&_allocator)),
 		return false,
 		"Could not create command allocator.");
 

@@ -4,17 +4,8 @@
 
 DX12::Texture::Texture(TextureSpecs& specs)
 {
-	if (!specs._resourceDesc)
-	{
-		DISPLAY_ERROR(L"Cannot create texture without valid resource descriptor.");
-		assert(false);
-	}
-
-	if (!specs._srvDesc)
-	{
-		DISPLAY_ERROR(L"Cannot create texture without valid SRV descriptor.");
-		assert(false);
-	}
+	CRITICAL_ASSERT(specs._resourceDesc, "Cannot create texture without valid resource descriptor.");
+	CRITICAL_ASSERT(specs._srvDesc, "Cannot create texture without valid SRV descriptor.");
 
 	ID3D12Device8* device = DX12::GetRendererDevice();
 	D3D12_CLEAR_VALUE* clearValue = nullptr;

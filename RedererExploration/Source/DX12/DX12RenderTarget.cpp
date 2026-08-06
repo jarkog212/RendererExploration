@@ -6,40 +6,35 @@ DX12::RenderTargetTexture::RenderTargetTexture(DX12::TextureSpecs& spec)
 {
 	_mipCount = _texture.GetResource()->GetDesc().MipLevels;
 	
-	if (_mipCount > DX12::Texture::_k_maxMips)
-	{
-		DISPLAY_ERROR(L"RTT resource has more MIPs than our declared maximum.");
-		assert(false);
-	}
+	CRITICAL_ASSERT(
+		_mipCount <= DX12::Texture::_k_maxMips,
+		"RTT resource has more MIPs than our declared maximum.");
 
 	D3D12_RENDER_TARGET_VIEW_DESC desc{};
 	desc.Format = spec._resourceDesc->Format;
 	desc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
 
-	ID3D12Device8* device = DX12::GetRendererDevice();
-	DX12::DescriptorHeap* heap = DX12::GetRTVHeap();
-
+	DX12::DescriptorHeap* rtvHeap = DX12::GetRTVHeap();
 	for (int i = 0; i < _mipCount; i++)
 	{
 		desc.Texture2D.MipSlice = i;
-		_rtvHandles[i] = heap->Allocate();
-		device->CreateRenderTargetView(_texture.GetResource(), &desc, _rtvHandles[i]._cpu);
+		_rtvHandles[i] = rtvHeap->Allocate();
+		DX12::GetRendererDevice()->CreateRenderTargetView(_texture.GetResource(), &desc, _rtvHandles[i]._cpu);
 	}
 }
 
 void DX12::RenderTargetTexture::Release()
 {
+	DX12::DescriptorHeap* rtvHeap = DX12::GetRTVHeap();
 	for (int i = 0; i < _mipCount; i++)
-		DX12::GetRTVHeap()->Free(_rtvHandles[i]);
+		rtvHeap->Free(_rtvHandles[i]);
 }
 
-constexpr D3D12_CPU_DESCRIPTOR_HANDLE DX12::RenderTargetTexture::GetRTVCPUHandle(unsigned int mip)
+constexpr D3D12_CPU_DESCRIPTOR_HANDLE DX12::RenderTargetTexture::GetRTVCPUHandle(unsigned int mip) const
 {
-	if (mip >= _mipCount)
-	{
-		DISPLAY_ERROR(L"Trying to get RTT's RTV handle with a out of bounds MIP index.")
-		assert(false);
-	}
+	CRITICAL_ASSERT(
+		mip < _mipCount,
+		"Trying to get RTT's RTV handle with a out of bounds MIP index.");
 
 	return _rtvHandles[mip]._cpu;
 }

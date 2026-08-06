@@ -3,13 +3,11 @@
 
 DX12::DescriptorHeap::DescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type, unsigned int capacity, bool isShaderVisible) : _type(type)
 {
-	if (capacity == 0
-		|| capacity > D3D12_MAX_SHADER_VISIBLE_DESCRIPTOR_HEAP_SIZE_TIER_2
-		|| (_type == D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER && capacity > D3D12_MAX_SHADER_VISIBLE_SAMPLER_HEAP_SIZE))
-	{
-		DISPLAY_ERROR(L"Bad capacity for a heap.");
-		assert(false);
-	}
+	CRITICAL_ASSERT(
+		capacity != 0
+		&& capacity <= D3D12_MAX_SHADER_VISIBLE_DESCRIPTOR_HEAP_SIZE_TIER_2
+		&& (_type != D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER || capacity <= D3D12_MAX_SHADER_VISIBLE_SAMPLER_HEAP_SIZE),
+		"Bad capacity for a heap.");
 
 	isShaderVisible &= (_type == D3D12_DESCRIPTOR_HEAP_TYPE_DSV || _type == D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
@@ -46,11 +44,7 @@ DX12::DescriptorHeap::DescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type, unsigned i
 
 void DX12::DescriptorHeap::Release()
 {
-	if (_size > 0)
-	{
-		DISPLAY_ERROR(L"Trying to free a non empty heap.");
-		assert(false);
-	}
+	CRITICAL_ASSERT(_size <= 0, "Trying to free a non empty heap.");
 
 	Utils::COM::SafeDeferredRenderThreadRelease(_heap);
 }
@@ -59,17 +53,8 @@ DX12::DescriptorHandle DX12::DescriptorHeap::Allocate()
 {
 	std::lock_guard lock(_mutex);
 
-	if (!_heap)
-	{
-		DISPLAY_ERROR(L"Trying to allocate descriptor on invalid heap.");
-		assert(false);
-	}
-
-	if (_size >= _capacity)
-	{
-		DISPLAY_ERROR(L"Trying to allocate descriptor to full heap.")
-			assert(false);
-	}
+	CRITICAL_ASSERT(_heap, "Trying to allocate descriptor on invalid heap.");
+	CRITICAL_ASSERT(_size < _capacity, "Trying to allocate descriptor to full heap.");
 
 	const int index = _freeHandles[_size];
 	int offset = index * _descriptorSize;
@@ -99,42 +84,25 @@ void DX12::DescriptorHeap::Free(DescriptorHandle& handle)
 	{
 		std::lock_guard lock(_mutex);
 
-		if (!_heap || _size == 0)
-		{
-			DISPLAY_ERROR(L"Called Free on an invalid or empty descriptor heap.");
-			assert(false);
-		}
+		CRITICAL_ASSERT(_heap && _size > 0, "Called Free on an invalid or empty descriptor heap.");
 
 		const bool isHandleManagedByUs =
 			handle._cpu.ptr >= _mainHandles._cpu.ptr
 			|| handle._cpu.ptr < (_mainHandles._cpu.ptr + _descriptorSize * _capacity);
 
 #ifdef _DEBUG
-		if (handle._owner != this || !isHandleManagedByUs)
+		CRITICAL_ASSERT(handle._owner == this && isHandleManagedByUs, "Called Free for handle not managed by this heap.");
 #elif
-		if (!isHandleManagedByUs)
+		CRITICAL_ASSERT(isHandleManagedByUs, "Called Free for handle not managed by this heap.");
 #endif
-		{
-			DISPLAY_ERROR(L"Called Free for handle not managed by this heap.");
-			assert(false);
-		}
-
-		if ((handle._cpu.ptr - _mainHandles._cpu.ptr) % _descriptorSize != 0)
-		{
-			DISPLAY_ERROR(L"Called Free for handle whose addresses are not aligned correctly.");
-			assert(false);
-		}
+		CRITICAL_ASSERT(
+			(handle._cpu.ptr - _mainHandles._cpu.ptr) % _descriptorSize == 0,
+			"Called Free for handle whose addresses are not aligned correctly.");
 
 		unsigned int index = (handle._cpu.ptr - _mainHandles._cpu.ptr) / _descriptorSize;
 
 #ifdef _DEBUG
-		{
-			if (index != handle._index)
-			{
-				DISPLAY_ERROR(L"Called Free for handle whose index is not matching what it got initialised with.");
-				assert(false);
-			}
-		}
+		CRITICAL_ASSERT(index == handle._index, "Called Free for handle whose index is not matching what it got initialised with.");
 #endif
 
 		const int currentFrame = DX12::GetMainRenderCommand()->GetCurrentFrame();

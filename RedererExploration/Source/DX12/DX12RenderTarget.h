@@ -15,15 +15,14 @@ namespace DX12
 		
 		NO_COPY(RenderTargetTexture);
 
-		void Release();
-
-		constexpr unsigned int GetMipCount() { return _mipCount; }
-		constexpr D3D12_CPU_DESCRIPTOR_HANDLE GetRTVCPUHandle(unsigned int mip);
-		DX12::DescriptorHandle GetSRVHandle() { return _texture.GetSRVHandle(); }
-		ID3D12Resource* GetResource() { return _texture.GetResource(); }
+		constexpr unsigned int GetMipCount() const { return _mipCount; }
+		constexpr D3D12_CPU_DESCRIPTOR_HANDLE GetRTVCPUHandle(unsigned int mip) const;
+		DX12::DescriptorHandle GetSRVHandle() const { return _texture.GetSRVHandle(); }
+		ID3D12Resource* GetResource() const { return _texture.GetResource(); }
 
 	private:
-
+		
+		void Release();
 		void MoveImpl(RenderTargetTexture&& other);
 
 		DX12::Texture _texture;

@@ -6,8 +6,19 @@
 
 #define DISPLAY_ERROR(format, ...) {\
 	wchar_t buffer[1024] = L"";\
-	swprintf(buffer, 1024, format, __VA_ARGS__);\
+	swprintf(buffer, 1024, L""##format, __VA_ARGS__);\
 	MessageBoxW(nullptr, buffer, L"Error", MB_ICONERROR);\
+}
+
+#define FALLBACK_ASSERT(instruction, fallback, format, ...)\
+if (!(##instruction)) {\
+	DISPLAY_ERROR(format, __VA_ARGS__);\
+	##fallback;\
+}
+#define CRITICAL_ASSERT(instruction, format, ...)\
+if (!(##instruction)) {\
+	DISPLAY_ERROR(format, __VA_ARGS__);\
+	assert(false);\
 }
 
 #define DISPLAY_RAW_OUTPUT(format, ...) {\
@@ -20,7 +31,7 @@
 	HRESULT hr = ##instruction;\
 	if (FAILED(hr))\
 	{\
-		DISPLAY_ERROR(L"[%x] "##format, hr, __VA_ARGS__)\
+		DISPLAY_ERROR("[%x] "##format, hr, __VA_ARGS__)\
 		assert(false);\
 	}\
 }
@@ -29,7 +40,7 @@
 	HRESULT hr = ##instruction;\
 	if (FAILED(hr))\
 	{\
-		DISPLAY_ERROR(L"[%x] "##format, hr, __VA_ARGS__)\
+		DISPLAY_ERROR("[%x] "##format, hr, __VA_ARGS__)\
 		##fallback;\
 	}\
 }

@@ -69,11 +69,7 @@ void DX12::RenderSurface::Resize()
 
 void DX12::RenderSurface::Present() const
 {
-	if (!_swapChain)
-	{
-		DISPLAY_ERROR(L"Trying to present an invalid swapchain.");
-		assert(false);
-	}
+	CRITICAL_ASSERT(_swapChain, "Trying to present an invalid swap chain.");
 
 	_swapChain->Present(0, _presentFlags);
 	_currentBackBufferIndex = _swapChain->GetCurrentBackBufferIndex();
@@ -82,9 +78,7 @@ void DX12::RenderSurface::Present() const
 RECT DX12::RenderSurface::GetWindowDimensions() const
 {
 	RECT rect;
-	if (!GetWindowRect(_window, &rect))
-		DISPLAY_ERROR(L"Error getting window dimensions.");
-
+	FALLBACK_ASSERT(GetWindowRect(_window, &rect), ,"Error getting window dimensions.")
 	return rect;
 }
 
@@ -147,11 +141,9 @@ void DX12::RenderSurface::Finalize(DXGI_FORMAT format)
 	int winWidth = windowDimensions.right - windowDimensions.left;
 	int winHeight = windowDimensions.bottom - windowDimensions.top;
 
-	if (height != winHeight || width != winWidth)
-	{
-		DISPLAY_ERROR(L"Dimensions of the swap chain buffers and the window do not match.");
-		assert(false);
-	}
+	CRITICAL_ASSERT(
+		height == winHeight && width == winWidth,
+		"Dimensions of the swap chain buffers and the window do not match.");
 
 	_viewport.TopLeftX = 0.f;
 	_viewport.TopLeftY = 0.f;

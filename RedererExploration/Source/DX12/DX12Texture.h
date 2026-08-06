@@ -31,13 +31,14 @@ namespace DX12
 
 		NO_COPY(Texture);
 
-		void Release();
+		
 
 		ID3D12Resource* GetResource() const { return _resource; }
-		DX12::DescriptorHandle GetSRVHandle() { return _srvHandle; }
+		DX12::DescriptorHandle GetSRVHandle() const { return _srvHandle; }
 
 	private:
 
+		void Release();
 		void MoveImpl(Texture&& other);
 
 		ID3D12Resource* _resource = nullptr; // non-owning (deferred free) so RAW

@@ -45,18 +45,13 @@ int WINAPI wWinMain(
     ::g_winClass.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
     ::g_winClass.lpszClassName = L"BaseWindowClass";
 
-    if (!RegisterClassExW(&::g_winClass))
-    {
-        DISPLAY_ERROR(L"Window class registration failed.")
-        return 0;
-    }
+    FALLBACK_ASSERT(
+        RegisterClassExW(&::g_winClass),
+        return 0,
+        "Window class registration failed.");
 
     ::g_mainWindow = Utils::CreateWindowsWindow(::k_winTitle, 1920, 1080, &::g_winClass);
-    if (!::g_mainWindow)
-    {
-        DISPLAY_ERROR(L"Window creation failed.")
-        return 0;
-    }
+    FALLBACK_ASSERT(::g_mainWindow, return 0, "Window creation failed.");
 
     ShowWindow(::g_mainWindow, nCmdShow);
     UpdateWindow(::g_mainWindow);

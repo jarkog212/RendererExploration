@@ -29,9 +29,9 @@ namespace DX12
 
 	private:
 
+		void Release();
 		void MoveImpl(RenderSurface&& other);
 
-		void Release();
 		void Finalize(DXGI_FORMAT format);
 
 		static constexpr int _k_swapChainBuffers = 3;

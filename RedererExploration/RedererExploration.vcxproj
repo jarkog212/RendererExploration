@@ -137,6 +137,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="RedererExploration.cpp" />
+    <ClCompile Include="Source\DX12\DX12DepthBuffer.cpp" />
     <ClCompile Include="Source\DX12\DX12DescriptorHeap.cpp" />
     <ClCompile Include="Source\DX12\DX12Renderer.cpp" />
     <ClCompile Include="Source\DX12\DX12RenderSurface.cpp" />
@@ -151,6 +152,7 @@
     <ClInclude Include="Source\DX12\DX12CommonConstants.h" />
     <ClInclude Include="Source\DX12\DX12CommonDescriptors.h" />
     <ClInclude Include="Source\DX12\DX12Core.h" />
+    <ClInclude Include="Source\DX12\DX12DepthBuffer.h" />
     <ClInclude Include="Source\DX12\DX12DescriptorHeap.h" />
     <ClInclude Include="Source\DX12\DX12RenderSurface.h" />
     <ClInclude Include="Source\DX12\DX12RenderTarget.h" />

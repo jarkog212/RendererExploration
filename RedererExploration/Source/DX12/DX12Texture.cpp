@@ -30,7 +30,7 @@ DX12::Texture::Texture(TextureSpecs& specs)
 				specs._resourceDesc,
 				specs._initialState,
 				clearValue,
-				IID_PPV_ARGS(&_resource)),
+				IID_PPV_ARGS(&_resource)),,
 			assert(false),
 			"Could not create a placed texture resource.");
 	}
@@ -43,7 +43,7 @@ DX12::Texture::Texture(TextureSpecs& specs)
 				specs._resourceDesc,
 				specs._initialState,
 				clearValue,
-				IID_PPV_ARGS(&_resource)),
+				IID_PPV_ARGS(&_resource)),,
 			assert(false),
 			"Could not create a committed texture resource.");
 	}
@@ -60,7 +60,7 @@ void DX12::Texture::Release()
 
 void DX12::Texture::MoveImpl(Texture&& other)
 {
-	assert(this != &other);
+	CRITICAL_ASSERT(this != &other, "Moving Texture to itself.");
 
 	_resource = other._resource;
 	_srvHandle = std::move(other._srvHandle);

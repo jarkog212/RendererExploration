@@ -37,17 +37,17 @@ DX12::RenderSurface::RenderSurface(const HWND window, DXGI_FORMAT format, ID3D12
 
 	IDXGISwapChain1* swapChain = nullptr;
 	HRESULT_CHECKED_FALLBACK(
-		factory->CreateSwapChainForHwnd(commandQueue, _window, &desc, nullptr, nullptr, &swapChain),
+		factory->CreateSwapChainForHwnd(commandQueue, _window, &desc, nullptr, nullptr, &swapChain),,
 		assert(false),
 		"Could not create a swap chain.");
 
 	HRESULT_CHECKED_FALLBACK(
-		factory->MakeWindowAssociation(_window, DXGI_MWA_NO_ALT_ENTER),
+		factory->MakeWindowAssociation(_window, DXGI_MWA_NO_ALT_ENTER),,
 		assert(false),
 		"Could not restirct fullscreen on swapchain.");
 
 	HRESULT_CHECKED_FALLBACK(
-		swapChain->QueryInterface(IID_PPV_ARGS(&_swapChain)),
+		swapChain->QueryInterface(IID_PPV_ARGS(&_swapChain)),,
 		assert(false),
 		"Could not get newer swap chain interface.");
 
@@ -62,7 +62,7 @@ DX12::RenderSurface::RenderSurface(const HWND window, DXGI_FORMAT format, ID3D12
 
 void DX12::RenderSurface::Resize()
 {
-	DX12::GetMainRenderCommand()->Flush();
+	DX12::GetMainCommandExecutor()->Flush();
 
 	// body
 }
@@ -84,7 +84,7 @@ RECT DX12::RenderSurface::GetWindowDimensions() const
 
 void DX12::RenderSurface::MoveImpl(RenderSurface&& other)
 {
-	assert(this != &other);
+	CRITICAL_ASSERT(this != &other, "Moving RenderSurface to itself.");
 
 	_window = other._window;
 	_currentBackBufferIndex = other._currentBackBufferIndex;
@@ -107,7 +107,7 @@ void DX12::RenderSurface::MoveImpl(RenderSurface&& other)
 
 void DX12::RenderSurface::Release()
 {
-	DX12::GetMainRenderCommand()->Flush();
+	DX12::GetMainCommandExecutor()->Flush();
 
 	for (int i = 0; i < _k_swapChainBuffers; i++)
 		_renderTargetData[i].Release();

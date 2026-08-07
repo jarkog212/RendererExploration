@@ -31,8 +31,6 @@ namespace DX12
 
 		NO_COPY(Texture);
 
-		
-
 		ID3D12Resource* GetResource() const { return _resource; }
 		DX12::DescriptorHandle GetSRVHandle() const { return _srvHandle; }
 

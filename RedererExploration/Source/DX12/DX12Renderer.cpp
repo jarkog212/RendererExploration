@@ -7,6 +7,7 @@ namespace
 	static Microsoft::WRL::ComPtr<ID3D12Device8> COMRendererDevice = nullptr;
 	static Microsoft::WRL::ComPtr<IDXGIFactory7> COMDxgiFactory = nullptr;
 	static Microsoft::WRL::ComPtr<IDXGIAdapter4> COMDxgiAdapter = nullptr;
+	static Microsoft::WRL::ComPtr<ID3D12RootSignature> COMExampleRenderRootSignature = nullptr;
 
 	static std::unique_ptr<DX12::RenderSurface> MainRenderSurface = nullptr;
 
@@ -53,7 +54,7 @@ void UtilsImpl::COM::Release(IUnknown* resource)
 
 void UtilsImpl::COM::DeferredRenderThreadRelease(IUnknown* resource)
 {
-	unsigned int currentFrame = DX12::GetMainRenderCommand()->GetCurrentFrame();
+	unsigned int currentFrame = DX12::GetMainCommandExecutor()->GetCurrentFrame();
 	DeferredCOMReleases[currentFrame].push_back(resource);
 }
 
@@ -64,13 +65,13 @@ ID3D12Device8* DX12::GetRendererDevice()
 		return device;
 
 	HRESULT_CHECKED(
-		D3D12CreateDevice(DX12::GetDxgiAdapter(), g_expectedMinimumFeatureLevel, __uuidof(ID3D12Device), (void**)&device),
+		D3D12CreateDevice(DX12::GetDxgiAdapter(), g_expectedMinimumFeatureLevel, __uuidof(ID3D12Device8), (void**)&device),
 		"Could not create Dx12 device with selected adapter.")
 
 	// Technically adapter interface is no longer needed
 	//::COMDxgiAdapter.Reset();
 
-	HRESULT_CHECKED_FALLBACK(device->SetName(L"MainDevice"),, "Could not set Dx12 device's name.");
+	HRESULT_CHECKED_FALLBACK(device->SetName(L"MainDevice"),,, "Could not set Dx12 device's name.");
 
 #ifdef _DEBUG
 	{
@@ -182,9 +183,9 @@ DX12::RenderSurface* DX12::GetMainRenderSurface(
 	return ::MainRenderSurface.get();
 }
 
-DX12::GfxCommand* DX12::GetMainRenderCommand()
+DX12::GfxCommandExecutor* DX12::GetMainCommandExecutor()
 {
-	static DX12::GfxCommand instance(D3D12_COMMAND_LIST_TYPE_DIRECT);
+	static DX12::GfxCommandExecutor instance(D3D12_COMMAND_LIST_TYPE_DIRECT);
 	return &instance;
 }
 
@@ -214,7 +215,7 @@ DX12::DescriptorHeap* DX12::GetUAVHeap()
 
 void DX12::SetPendingResourceFreeingFlag()
 {
-	::DeferredResourceFreeingFlag |= 1ull << DX12::GetMainRenderCommand()->GetCurrentFrame();
+	::DeferredResourceFreeingFlag |= 1ull << DX12::GetMainCommandExecutor()->GetCurrentFrame();
 }
 
 bool DX12::TestPendingResourceFreeingFlag(const unsigned int frame)
@@ -229,23 +230,23 @@ bool DX12::Initialize(HWND hwnd)
 	DX12::GetMainRenderSurface(
 		hwnd,
 		DX12::CC::k_defaultRenderTargetFormat,
-		DX12::GetMainRenderCommand()->GetCommandQueue());
+		DX12::GetMainCommandExecutor()->GetCommandQueue());
 
-	HRESULT_CHECKED_FALLBACK(DX12::GetRTVHeap()->GetHeap()->SetName(L"RTV Heap"), , "Could not name RTV Heap.");
-	HRESULT_CHECKED_FALLBACK(DX12::GetDSVHeap()->GetHeap()->SetName(L"DSV Heap"), , "Could not name DSV Heap.");
-	HRESULT_CHECKED_FALLBACK(DX12::GetDSVHeap()->GetHeap()->SetName(L"SRV Heap"), , "Could not name SRV Heap.");
-	HRESULT_CHECKED_FALLBACK(DX12::GetDSVHeap()->GetHeap()->SetName(L"UAV Heap"), , "Could not name UAV Heap.");
+	HRESULT_CHECKED_FALLBACK(DX12::GetRTVHeap()->GetHeap()->SetName(L"RTV Heap"),,, "Could not name RTV Heap.");
+	HRESULT_CHECKED_FALLBACK(DX12::GetDSVHeap()->GetHeap()->SetName(L"DSV Heap"),,, "Could not name DSV Heap.");
+	HRESULT_CHECKED_FALLBACK(DX12::GetDSVHeap()->GetHeap()->SetName(L"SRV Heap"),,, "Could not name SRV Heap.");
+	HRESULT_CHECKED_FALLBACK(DX12::GetDSVHeap()->GetHeap()->SetName(L"UAV Heap"),,, "Could not name UAV Heap.");
 
 	return true;
 }
 
-void DX12::Render(DX12::GfxCommand* command, DX12::RenderSurface* surface)
+void DX12::Render(DX12::GfxCommandExecutor* command, DX12::RenderSurface* surface)
 {
 	command->PreRender();
 
 	ID3D12GraphicsCommandList6* clist = command->GetCommandList();
 	
-	const unsigned int currentFrame = DX12::GetMainRenderCommand()->GetCurrentFrame();
+	const unsigned int currentFrame = DX12::GetMainCommandExecutor()->GetCurrentFrame();
 	if (TestPendingResourceFreeingFlag(currentFrame))
 		FreePendingResources(currentFrame);
 
@@ -257,7 +258,7 @@ void DX12::Render(DX12::GfxCommand* command, DX12::RenderSurface* surface)
 void DX12::Render()
 {
 	DX12::Render(
-		DX12::GetMainRenderCommand(),
+		DX12::GetMainCommandExecutor(),
 		DX12::GetMainRenderSurface());
 }
 
@@ -268,7 +269,7 @@ void DX12::Cleanup()
 		{
 			::MainRenderSurface.reset();
 
-			DX12::GetMainRenderCommand()->Release();
+			DX12::GetMainCommandExecutor()->Release();
 
 			::FreePendingResources(DX12::CC::k_forAllFrames);
 
@@ -280,6 +281,7 @@ void DX12::Cleanup()
 			// Heap releases add to the deferred pile
 			::FreePendingResources(DX12::CC::k_forAllFrames);
 
+			::COMExampleRenderRootSignature.Reset();
 			::COMDxgiFactory.Reset();
 			::COMRendererDevice.Reset();
 			::COMDxgiAdapter.Reset();
@@ -305,7 +307,56 @@ void DX12::Cleanup()
 #endif
 }
 
-DX12::GfxCommand::GfxCommand(D3D12_COMMAND_LIST_TYPE type)
+ID3D12GraphicsCommandList6* DX12::ExampleRenderBuild()
+{
+	DX12::DescriptorHeap* srvHeap = DX12::GetSRVHeap();
+
+	if (!::COMExampleRenderRootSignature)
+	{
+		// Create signature = memory layout for buffers
+		DX12::RootParameter rootParams[2]{};
+		DX12::DescriptorRange descriptorRanges[]{
+			DX12::DescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, srvHeap->GetCapacity(), 0) };
+
+		rootParams[0].AsDescriptorTable(D3D12_SHADER_VISIBILITY_PIXEL, descriptorRanges, 1);
+
+		rootParams[1].AsConstants(2, D3D12_SHADER_VISIBILITY_PIXEL, 0);
+
+		DX12::RootSignatureSpec rootSpec(rootParams, _countof(rootParams));
+		::COMExampleRenderRootSignature = DX12::CreateRootSignature(rootSpec);
+	}
+
+	CRITICAL_ASSERT(::COMExampleRenderRootSignature, "Invalid example root signature for rendering.");
+
+	// Create pipeline state
+
+	struct {
+		DX12::PipelineStream::SubobjectRootSignature rs{ ::COMExampleRenderRootSignature.Get() };
+	}stream;
+
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState = 
+		DX12::CreatePipelineState(&stream, sizeof(stream));
+
+	// Create and supply commands to command list
+
+	ID3D12GraphicsCommandList6* commandList = DX12::GetMainCommandExecutor()->GetCommandList();
+
+	commandList->SetGraphicsRootSignature(::COMExampleRenderRootSignature.Get());
+
+	ID3D12DescriptorHeap* heaps[]{ srvHeap->GetHeap() };
+	commandList->SetDescriptorHeaps(1, heaps);
+
+	commandList->SetGraphicsRootDescriptorTable(0, srvHeap->GetGpuPtr());
+
+	commandList->SetGraphicsRoot32BitConstant(1, (int)Utils::GetFPS(), 0);
+	commandList->SetGraphicsRoot32BitConstant(1, 42, 1);
+	
+	//commandList->SetGraphicsRootConstantBufferView(1,);
+
+	return commandList;
+}
+
+DX12::GfxCommandExecutor::GfxCommandExecutor(D3D12_COMMAND_LIST_TYPE type)
 {
 	D3D12_COMMAND_QUEUE_DESC cq;
 	cq.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
@@ -324,7 +375,7 @@ DX12::GfxCommand::GfxCommand(D3D12_COMMAND_LIST_TYPE type)
 	ID3D12Device8* device = DX12::GetRendererDevice();
 
 	HRESULT_CHECKED_FALLBACK(
-		device->CreateCommandQueue(&cq, IID_PPV_ARGS(&_commandQueue)),
+		device->CreateCommandQueue(&cq, IID_PPV_ARGS(&_commandQueue)),,
 		goto _error,
 		"Could not create command queue.");
 
@@ -332,24 +383,24 @@ DX12::GfxCommand::GfxCommand(D3D12_COMMAND_LIST_TYPE type)
 		_frame[i].Setup(type, i);
 
 	HRESULT_CHECKED_FALLBACK(
-		device->CreateCommandList(0, type, _frame[0].GetAllocator(), nullptr, IID_PPV_ARGS(&_commandList)),
+		device->CreateCommandList(0, type, _frame[0].GetAllocator(), nullptr, IID_PPV_ARGS(&_commandList)),,
 		goto _error,
 		"Could not create command list.");
 
 	HRESULT_CHECKED_FALLBACK(
-		_commandList->Close(),
+		_commandList->Close(),,
 		goto _error,
 		"Could not close the command list.")
 
-	HRESULT_CHECKED_FALLBACK(_commandQueue->SetName(commandQueueName), , "Could not set (%ls) to command queue.", commandQueueName);
-	HRESULT_CHECKED_FALLBACK(_commandList->SetName(commandListName), , "Could not set (%ls) to command list.", commandListName);
+	HRESULT_CHECKED_FALLBACK(_commandQueue->SetName(commandQueueName),,, "Could not set (%ls) to command queue.", commandQueueName);
+	HRESULT_CHECKED_FALLBACK(_commandList->SetName(commandListName),,, "Could not set (%ls) to command list.", commandListName);
 
 	HRESULT_CHECKED_FALLBACK(
-		device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&_fence)),
+		device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&_fence)),,
 		goto _error,
 		"Could not create fence.");
 
-	HRESULT_CHECKED_FALLBACK(_commandList->SetName(L"D3D12 Fence"), , "Could not set (%ls) to command list.", commandListName);
+	HRESULT_CHECKED_FALLBACK(_commandList->SetName(L"D3D12 Fence"),,, "Could not set (%ls) to command list.", commandListName);
 
 	_fenceEvent = CreateEventEx(nullptr, nullptr, 0, EVENT_ALL_ACCESS);
 	FALLBACK_ASSERT(_fenceEvent,,"Could not create fence event.");
@@ -361,15 +412,15 @@ _error:
 	Release();
 }
 
-void DX12::GfxCommand::PreRender()
+void DX12::GfxCommandExecutor::PreRender()
 {
-	DX12::GfxCommand::GfxCommandFrame& currentFrame = _frame[_currentFrame];
+	DX12::GfxCommandExecutor::GfxCommandFrame& currentFrame = _frame[_currentFrame];
 	currentFrame.WaitForGPU(_fenceEvent, _fence.Get());
 	HRESULT_CHECKED(currentFrame.GetAllocator()->Reset(), "Could not clear/reset commandAllocator");
 	HRESULT_CHECKED(_commandList->Reset(currentFrame.GetAllocator(), nullptr), "Could not reset command list.");
 }
 
-void DX12::GfxCommand::PostRender()
+void DX12::GfxCommandExecutor::PostRender()
 {
 	_commandList->Close();
 	ID3D12CommandList* const lists[] = { _commandList.Get() };
@@ -382,7 +433,7 @@ void DX12::GfxCommand::PostRender()
 	_currentFrame = ++_currentFrame % DX12::CC::k_frameBuffers;
 }
 
-void DX12::GfxCommand::Flush()
+void DX12::GfxCommandExecutor::Flush()
 {
 	for (int i = 0; i < DX12::CC::k_frameBuffers; i++)
 		_frame[i].WaitForGPU(_fenceEvent, _fence.Get());
@@ -390,7 +441,7 @@ void DX12::GfxCommand::Flush()
 	_issuableFenceValue = 0;
 }
 
-void DX12::GfxCommand::Release()
+void DX12::GfxCommandExecutor::Release()
 {
 	if (_fence)
 	{
@@ -411,27 +462,27 @@ void DX12::GfxCommand::Release()
 	_currentFrame = 0;
 }
 
-bool DX12::GfxCommand::GfxCommandFrame::Setup(D3D12_COMMAND_LIST_TYPE type, int index)
+bool DX12::GfxCommandExecutor::GfxCommandFrame::Setup(D3D12_COMMAND_LIST_TYPE type, int index)
 {
 	HRESULT_CHECKED_FALLBACK(
-		DX12::GetRendererDevice()->CreateCommandAllocator(type, IID_PPV_ARGS(&_allocator)),
+		DX12::GetRendererDevice()->CreateCommandAllocator(type, IID_PPV_ARGS(&_allocator)),,
 		return false,
 		"Could not create command allocator.");
 
 	wchar_t buffer[250];
 	swprintf(buffer, 250, L"Command Allocator %u", index);
-	HRESULT_CHECKED_FALLBACK(_allocator->SetName(buffer), , "Could not set name (%ls) to command buffer.", buffer);
+	HRESULT_CHECKED_FALLBACK(_allocator->SetName(buffer),,,"Could not set name (%ls) to command buffer.", buffer);
 
 	return true;
 }
 
-void DX12::GfxCommand::GfxCommandFrame::Reset()
+void DX12::GfxCommandExecutor::GfxCommandFrame::Reset()
 {
 	_allocator.Reset();
 	_fenceValue = 0;
 }
 
-void DX12::GfxCommand::GfxCommandFrame::WaitForGPU(HANDLE fenceEvent, ID3D12Fence1* fence)
+void DX12::GfxCommandExecutor::GfxCommandFrame::WaitForGPU(HANDLE fenceEvent, ID3D12Fence1* fence)
 {
 	assert(fenceEvent && fence);
 

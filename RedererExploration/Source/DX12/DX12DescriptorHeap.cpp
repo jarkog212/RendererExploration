@@ -24,7 +24,7 @@ DX12::DescriptorHeap::DescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type, unsigned i
 		desc.NodeMask = 0;
 
 		HRESULT_CHECKED_FALLBACK(
-			device->CreateDescriptorHeap(&desc, __uuidof(ID3D12DescriptorHeap), (void**)&_heap),
+			device->CreateDescriptorHeap(&desc, __uuidof(ID3D12DescriptorHeap), (void**)&_heap),,
 			assert(false),
 			"Failed to create a descriptor heap.");
 
@@ -105,7 +105,7 @@ void DX12::DescriptorHeap::Free(DescriptorHandle& handle)
 		CRITICAL_ASSERT(index == handle._index, "Called Free for handle whose index is not matching what it got initialised with.");
 #endif
 
-		const int currentFrame = DX12::GetMainRenderCommand()->GetCurrentFrame();
+		const int currentFrame = DX12::GetMainCommandExecutor()->GetCurrentFrame();
 		_deferredResourceFreeing[currentFrame].push_back(index);
 		DX12::SetPendingResourceFreeingFlag();
 

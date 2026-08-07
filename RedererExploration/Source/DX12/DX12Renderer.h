@@ -6,15 +6,15 @@
 
 namespace DX12
 {
-	class GfxCommand
+	class GfxCommandExecutor
 	{
 	public:
 
-		explicit GfxCommand(D3D12_COMMAND_LIST_TYPE type);
-		~GfxCommand() { Release(); };
+		explicit GfxCommandExecutor(D3D12_COMMAND_LIST_TYPE type);
+		~GfxCommandExecutor() { Release(); };
 
-		NO_COPY(GfxCommand);
-		NO_MOVE(GfxCommand);
+		NO_COPY(GfxCommandExecutor);
+		NO_MOVE(GfxCommandExecutor);
 
 		void PreRender();
 		void PostRender();

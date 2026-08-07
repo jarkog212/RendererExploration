@@ -5,43 +5,44 @@
 #include <windows.h>
 
 #define DISPLAY_ERROR(format, ...) {\
-	wchar_t buffer[1024] = L"";\
-	swprintf(buffer, 1024, L""##format, __VA_ARGS__);\
-	MessageBoxW(nullptr, buffer, L"Error", MB_ICONERROR);\
+	wchar_t buffer[1024] = L""; \
+	swprintf(buffer, 1024, L""##format, __VA_ARGS__); \
+	MessageBoxW(nullptr, buffer, L"Error", MB_ICONERROR); \
 }
 
 #define FALLBACK_ASSERT(instruction, fallback, format, ...)\
 if (!(##instruction)) {\
-	DISPLAY_ERROR(format, __VA_ARGS__);\
-	##fallback;\
+	DISPLAY_ERROR(format, __VA_ARGS__); \
+	##fallback; \
 }
 #define CRITICAL_ASSERT(instruction, format, ...)\
 if (!(##instruction)) {\
-	DISPLAY_ERROR(format, __VA_ARGS__);\
-	assert(false);\
+	DISPLAY_ERROR(format, __VA_ARGS__); \
+	assert(false); \
 }
 
 #define DISPLAY_RAW_OUTPUT(format, ...) {\
-	char buffer[1024] = "";\
-	sprintf_s(buffer, 1024, format##"\n", __VA_ARGS__);\
-	OutputDebugStringA(buffer);\
+	char buffer[1024] = ""; \
+	sprintf_s(buffer, 1024, format##"\n", __VA_ARGS__); \
+	OutputDebugStringA(buffer); \
 }
 
 #define HRESULT_CHECKED(instruction, format, ...) {\
-	HRESULT hr = ##instruction;\
-	if (FAILED(hr))\
+	HRESULT hr = ##instruction; \
+	if (FAILED(hr)) \
 	{\
-		DISPLAY_ERROR("[%x] "##format, hr, __VA_ARGS__)\
-		assert(false);\
+		DISPLAY_ERROR("[%x] "##format, hr, __VA_ARGS__) \
+		assert(false); \
 	}\
 }
 
-#define HRESULT_CHECKED_FALLBACK(instruction, fallback, format, ...) {\
-	HRESULT hr = ##instruction;\
+#define HRESULT_CHECKED_FALLBACK(instruction, premsg, fallback, format, ...) {\
+	HRESULT hr = ##instruction; \
 	if (FAILED(hr))\
 	{\
-		DISPLAY_ERROR("[%x] "##format, hr, __VA_ARGS__)\
-		##fallback;\
+		##premsg; \
+		DISPLAY_ERROR("[%x] "##format, hr, __VA_ARGS__); \
+		##fallback; \
 	}\
 }
 

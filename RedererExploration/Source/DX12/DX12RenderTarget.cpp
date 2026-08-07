@@ -41,7 +41,7 @@ constexpr D3D12_CPU_DESCRIPTOR_HANDLE DX12::RenderTargetTexture::GetRTVCPUHandle
 
 void DX12::RenderTargetTexture::MoveImpl(RenderTargetTexture&& other)
 {
-	assert(this != &other);
+	CRITICAL_ASSERT(this != &other, "Moving RenderTargetTexture to itself.");
 
 	_texture = std::move(other._texture);
 	_mipCount = other._mipCount;

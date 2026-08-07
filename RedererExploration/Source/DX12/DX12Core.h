@@ -39,8 +39,12 @@ namespace DX12
 	bool Initialize(HWND hwnd);
 	void Render(DX12::GfxCommandExecutor* command, DX12::RenderSurface* surface);
 	void Render();
-	void Cleanup();
+	void Cleanup();	
 
-	// examples
-	ID3D12GraphicsCommandList6* ExampleRenderBuild();
+	namespace Example
+	{
+		ID3D12GraphicsCommandList6* ExampleRenderBuild();
+		ID3D12RootSignature* GetRootSignature();
+		ID3D12PipelineState* GetPipelineState();
+	}
 }

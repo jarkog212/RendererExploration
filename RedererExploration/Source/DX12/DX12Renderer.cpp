@@ -7,7 +7,6 @@ namespace
 	static Microsoft::WRL::ComPtr<ID3D12Device8> COMRendererDevice = nullptr;
 	static Microsoft::WRL::ComPtr<IDXGIFactory7> COMDxgiFactory = nullptr;
 	static Microsoft::WRL::ComPtr<IDXGIAdapter4> COMDxgiAdapter = nullptr;
-	static Microsoft::WRL::ComPtr<ID3D12RootSignature> COMExampleRenderRootSignature = nullptr;
 
 	static std::unique_ptr<DX12::RenderSurface> g_mainRenderSurface = nullptr;
 	static D3D_FEATURE_LEVEL g_expectedMinimumFeatureLevel{ D3D_FEATURE_LEVEL_11_0 };
@@ -41,6 +40,12 @@ namespace
 				cleaner(i);
 		else
 			cleaner(currentFrame);
+	}
+
+	namespace Example 
+	{
+		static Microsoft::WRL::ComPtr<ID3D12RootSignature> COMRenderRootSignature = nullptr;
+		static Microsoft::WRL::ComPtr<ID3D12PipelineState> COMRenderPipelineState = nullptr;
 	}
 }
 
@@ -278,7 +283,9 @@ void DX12::Cleanup()
 			// Heap releases add to the deferred pile
 			::FreePendingResources(DX12::CC::k_forAllFrames);
 
-			::COMExampleRenderRootSignature.Reset();
+			::Example::COMRenderRootSignature.Reset();
+			::Example::COMRenderPipelineState.Reset();
+
 			::COMDxgiFactory.Reset();
 			::COMRendererDevice.Reset();
 			::COMDxgiAdapter.Reset();
@@ -302,55 +309,6 @@ void DX12::Cleanup()
 #else
 	cleaner();
 #endif
-}
-
-ID3D12GraphicsCommandList6* DX12::ExampleRenderBuild()
-{
-	DX12::DescriptorHeap* srvHeap = DX12::GetSRVHeap();
-
-	if (!::COMExampleRenderRootSignature)
-	{
-		// Create signature = memory layout for buffers
-		DX12::RootParameter rootParams[2]{};
-		DX12::DescriptorRange descriptorRanges[]{
-			DX12::DescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, srvHeap->GetCapacity(), 0) };
-
-		rootParams[0].AsDescriptorTable(D3D12_SHADER_VISIBILITY_PIXEL, descriptorRanges, 1);
-
-		rootParams[1].AsConstants(2, D3D12_SHADER_VISIBILITY_PIXEL, 0);
-
-		DX12::RootSignatureSpec rootSpec(rootParams, _countof(rootParams));
-		::COMExampleRenderRootSignature = DX12::CreateRootSignature(rootSpec);
-	}
-
-	CRITICAL_ASSERT(::COMExampleRenderRootSignature, "Invalid example root signature for rendering.");
-
-	// Create pipeline state
-
-	struct {
-		DX12::PipelineStream::SubobjectRootSignature rs{ ::COMExampleRenderRootSignature.Get() };
-	}stream;
-
-	Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState = 
-		DX12::CreatePipelineState(&stream, sizeof(stream));
-
-	// Create and supply commands to command list
-
-	ID3D12GraphicsCommandList6* commandList = DX12::GetMainCommandExecutor()->GetCommandList();
-
-	commandList->SetGraphicsRootSignature(::COMExampleRenderRootSignature.Get());
-
-	ID3D12DescriptorHeap* heaps[]{ srvHeap->GetHeap() };
-	commandList->SetDescriptorHeaps(1, heaps);
-
-	commandList->SetGraphicsRootDescriptorTable(0, srvHeap->GetGpuPtr());
-
-	commandList->SetGraphicsRoot32BitConstant(1, (int)Utils::GetFPS(), 0);
-	commandList->SetGraphicsRoot32BitConstant(1, 42, 1);
-	
-	//commandList->SetGraphicsRootConstantBufferView(1,);
-
-	return commandList;
 }
 
 DX12::GfxCommandExecutor::GfxCommandExecutor(D3D12_COMMAND_LIST_TYPE type)
@@ -489,4 +447,60 @@ void DX12::GfxCommandExecutor::GfxCommandFrame::WaitForGPU(HANDLE fenceEvent, ID
 	HRESULT_CHECKED(fence->SetEventOnCompletion(_fenceValue, fenceEvent), "Could not assign fence signal to event handle.");
 
 	WaitForSingleObject(fenceEvent, INFINITE);
+}
+
+ID3D12GraphicsCommandList6* DX12::Example::ExampleRenderBuild()
+{
+	DX12::DescriptorHeap* srvHeap = DX12::GetSRVHeap();
+
+	ID3D12GraphicsCommandList6* commandList = DX12::GetMainCommandExecutor()->GetCommandList();
+
+	commandList->SetGraphicsRootSignature(DX12::Example::GetRootSignature());
+	commandList->SetPipelineState(DX12::Example::GetPipelineState());
+
+	ID3D12DescriptorHeap* heaps[]{ srvHeap->GetHeap() };
+	commandList->SetDescriptorHeaps(1, heaps);
+
+	commandList->SetGraphicsRootDescriptorTable(0, srvHeap->GetGpuPtr());
+
+	commandList->SetGraphicsRoot32BitConstant(1, (int)Utils::GetFPS(), 0);
+	commandList->SetGraphicsRoot32BitConstant(1, 42, 1);
+
+	//commandList->SetGraphicsRootConstantBufferView(1,);
+
+	return commandList;
+}
+
+ID3D12RootSignature* DX12::Example::GetRootSignature()
+{
+	if (::Example::COMRenderRootSignature)
+		return ::Example::COMRenderRootSignature.Get();
+
+	// Create signature = memory layout for buffers
+	DX12::RootParameter rootParams[2]{};
+	DX12::DescriptorRange descriptorRanges[]{
+		DX12::DescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, DX12::GetSRVHeap()->GetCapacity(), 0) };
+
+	rootParams[0].AsDescriptorTable(D3D12_SHADER_VISIBILITY_PIXEL, descriptorRanges, 1);
+
+	rootParams[1].AsConstants(2, D3D12_SHADER_VISIBILITY_PIXEL, 0);
+
+	DX12::RootSignatureSpec rootSpec(rootParams, _countof(rootParams));
+	::Example::COMRenderRootSignature = DX12::CreateRootSignature(rootSpec);
+
+	return ::Example::COMRenderRootSignature.Get();
+}
+
+ID3D12PipelineState* DX12::Example::GetPipelineState()
+{
+	if (::Example::COMRenderPipelineState)
+		return ::Example::COMRenderPipelineState.Get();
+
+	struct {
+		DX12::PipelineStream::SubobjectRootSignature rs{ DX12::Example::GetRootSignature() };
+	}stream;
+
+	::Example::COMRenderPipelineState = DX12::CreatePipelineState(&stream, sizeof(stream));
+	
+	return ::Example::COMRenderPipelineState.Get();
 }

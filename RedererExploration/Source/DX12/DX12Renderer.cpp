@@ -9,21 +9,18 @@ namespace
 	static Microsoft::WRL::ComPtr<IDXGIAdapter4> COMDxgiAdapter = nullptr;
 	static Microsoft::WRL::ComPtr<ID3D12RootSignature> COMExampleRenderRootSignature = nullptr;
 
-	static std::unique_ptr<DX12::RenderSurface> MainRenderSurface = nullptr;
-
+	static std::unique_ptr<DX12::RenderSurface> g_mainRenderSurface = nullptr;
 	static D3D_FEATURE_LEVEL g_expectedMinimumFeatureLevel{ D3D_FEATURE_LEVEL_11_0 };
-
-	static int DeferredResourceFreeingFlag = 0;
-	static_assert(sizeof(DeferredResourceFreeingFlag) * sizeof(char) > DX12::CC::k_frameBuffers, "Flag bit-buffer needs to be wide enough for frame buffer count.");
-
-	static std::vector<IUnknown*> DeferredCOMReleases[DX12::CC::k_frameBuffers];
+	static int g_deferredResourceFreeingFlag = 0;
+	static_assert(sizeof(g_deferredResourceFreeingFlag) * sizeof(char) > DX12::CC::k_frameBuffers, "Flag bit-buffer needs to be wide enough for frame buffer count.");
+	static std::vector<IUnknown*> g_deferredCOMReleases[DX12::CC::k_frameBuffers];
 
 	static void FreePendingResources(const int currentFrame = DX12::CC::k_forAllFrames)
 	{
 		static std::mutex mutex;
 		std::lock_guard lock(mutex);
 
-		::DeferredResourceFreeingFlag &= ~(1ull << currentFrame);
+		::g_deferredResourceFreeingFlag &= ~(1ull << currentFrame);
 
 		DX12::GetDSVHeap()->ProcessPendingResourceFreeing(currentFrame);
 		DX12::GetRTVHeap()->ProcessPendingResourceFreeing(currentFrame);
@@ -32,7 +29,7 @@ namespace
 
 		static auto cleaner = [](const unsigned int frame)
 			{
-				std::vector<IUnknown*>& pendingCOMList = DeferredCOMReleases[frame];
+				std::vector<IUnknown*>& pendingCOMList = g_deferredCOMReleases[frame];
 				for (auto& comObj : pendingCOMList)
 					Utils::COM::SafeRelease(comObj);
 
@@ -55,7 +52,7 @@ void UtilsImpl::COM::Release(IUnknown* resource)
 void UtilsImpl::COM::DeferredRenderThreadRelease(IUnknown* resource)
 {
 	unsigned int currentFrame = DX12::GetMainCommandExecutor()->GetCurrentFrame();
-	DeferredCOMReleases[currentFrame].push_back(resource);
+	g_deferredCOMReleases[currentFrame].push_back(resource);
 }
 
 ID3D12Device8* DX12::GetRendererDevice()
@@ -160,7 +157,7 @@ IDXGIAdapter4* DX12::GetDxgiAdapter()
 			Utils::COM::SafeRelease(adapter);
 			return nullptr;
 		},
-		"Dx12 device's feature level support is lover than minimum requirement.");
+		"Dx12 device's feature level support is lower than minimum requirement.");
 
 	::g_expectedMinimumFeatureLevel = featureLevelsData.MaxSupportedFeatureLevel;
 	::COMDxgiAdapter.Attach(adapter);
@@ -172,15 +169,15 @@ DX12::RenderSurface* DX12::GetMainRenderSurface(
 	DXGI_FORMAT format,
 	ID3D12CommandQueue* commandQueue)
 {
-	if (::MainRenderSurface)
-		return ::MainRenderSurface.get();
+	if (::g_mainRenderSurface)
+		return ::g_mainRenderSurface.get();
 
 	CRITICAL_ASSERT(
 		window != NULL && commandQueue,
 		"Uninitialized render surface requires legitimate arguments so it can be initialized.");
 
-	::MainRenderSurface = std::make_unique<DX12::RenderSurface>(window, format, commandQueue);
-	return ::MainRenderSurface.get();
+	::g_mainRenderSurface = std::make_unique<DX12::RenderSurface>(window, format, commandQueue);
+	return ::g_mainRenderSurface.get();
 }
 
 DX12::GfxCommandExecutor* DX12::GetMainCommandExecutor()
@@ -215,12 +212,12 @@ DX12::DescriptorHeap* DX12::GetUAVHeap()
 
 void DX12::SetPendingResourceFreeingFlag()
 {
-	::DeferredResourceFreeingFlag |= 1ull << DX12::GetMainCommandExecutor()->GetCurrentFrame();
+	::g_deferredResourceFreeingFlag |= 1ull << DX12::GetMainCommandExecutor()->GetCurrentFrame();
 }
 
 bool DX12::TestPendingResourceFreeingFlag(const unsigned int frame)
 {
-	return (bool)(::DeferredResourceFreeingFlag & (1ull << frame));
+	return (bool)(::g_deferredResourceFreeingFlag & (1ull << frame));
 }
 
 bool DX12::Initialize(HWND hwnd)
@@ -267,7 +264,7 @@ void DX12::Cleanup()
 	// intended to be called only once at shutdown, reinit is not possible due to static nature of things?
 	static auto cleaner = []()
 		{
-			::MainRenderSurface.reset();
+			::g_mainRenderSurface.reset();
 
 			DX12::GetMainCommandExecutor()->Release();
 

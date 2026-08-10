@@ -92,21 +92,21 @@ ID3D12RootSignature* DX12::CreateRootSignature(const DX12::RootSignatureSpec& de
 	Microsoft::WRL::ComPtr<ID3DBlob> errorBlob = nullptr;
 
 #ifdef _DEBUG
-	HRESULT_CHECKED_FALLBACK(
+	HRESULT_CHECK_FALLBACK(
 		D3D12SerializeVersionedRootSignature(&versionedDesc, &rootSignatureBlob, &errorBlob),
 		const char* errorMsg = { errorBlob ? (const char*)errorBlob->GetBufferPointer() : "" },
 		return nullptr,
 		"Root signature creation fail : %s",
 		errorMsg);
 #else
-	HRESULT_CHECKED_FALLBACK(
+	HRESULT_CHECK_FALLBACK(
 		D3D12SerializeVersionedRootSignature(&versionedDesc, &rootSignatureBlob, &errorBlob),,
 		return nullptr,
 		"Root signature creation fail.");
 #endif
 
 	ID3D12RootSignature* signature = nullptr;
-	HRESULT_CHECKED_FALLBACK(
+	HRESULT_CHECK_FALLBACK(
 		DX12::GetRendererDevice()->CreateRootSignature(
 			0,
 			rootSignatureBlob->GetBufferPointer(),
@@ -118,7 +118,7 @@ ID3D12RootSignature* DX12::CreateRootSignature(const DX12::RootSignatureSpec& de
 	return signature;
 }
 
-ID3D12PipelineState* DX12::CreatePipelineState(void* stream, unsigned long int streamSize)
+ID3D12PipelineState* DX12::CreatePipelineState(void* stream, unsigned long long int streamSize)
 {
 	CRITICAL_ASSERT(stream && streamSize > 0, "Cannot create pipeline state without valid stream.");
 
@@ -127,7 +127,7 @@ ID3D12PipelineState* DX12::CreatePipelineState(void* stream, unsigned long int s
 	desc.SizeInBytes = streamSize;
 
 	ID3D12PipelineState* stateObject = nullptr;
-	HRESULT_CHECKED_FALLBACK(
+	HRESULT_CHECK_FALLBACK(
 		DX12::GetRendererDevice()->CreatePipelineState(&desc, IID_PPV_ARGS(&stateObject)), ,
 		assert(false),
 		"Could not create pipeline state.");

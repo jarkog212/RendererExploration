@@ -43,9 +43,6 @@ namespace DX12
 		D3D12_RECT _scissorRect = {};
 		unsigned int _presentFlags = 0;
 		unsigned int _allowTearing = 0;
-
-
-
 		RenderTargetData _renderTargetData[DX12::CC::k_frameBuffers];
 	};
 }

@@ -20,7 +20,7 @@ namespace
     {
         if (::g_mainWindow == hwnd)
         {
-            DX12::Cleanup();
+            DX12::Release();
             ::g_running = false;
         }
 
@@ -50,7 +50,7 @@ int WINAPI wWinMain(
         return 0,
         "Window class registration failed.");
 
-    ::g_mainWindow = Utils::CreateWindowsWindow(::k_winTitle, 1920, 1080, &::g_winClass);
+    ::g_mainWindow = Utils::System::CreateWindowsWindow(::k_winTitle, 1920, 1080, &::g_winClass);
     FALLBACK_ASSERT(::g_mainWindow, return 0, "Window creation failed.");
 
     ShowWindow(::g_mainWindow, nCmdShow);
@@ -116,7 +116,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
    }
 }
 
-HWND UtilsImpl::CreateWindowsWindow(
+HWND UtilsImpl::System::CreateWindowsWindow(
     const wchar_t* title,
     const unsigned int width,
     const unsigned int height,

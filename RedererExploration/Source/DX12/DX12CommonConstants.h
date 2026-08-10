@@ -6,9 +6,7 @@
 namespace DX12::CC
 {
 	constexpr int k_forAllFrames = -1;
-
 	constexpr unsigned int k_frameBuffers = 3;
-
 	constexpr DXGI_FORMAT k_defaultRenderTargetFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
 
 	namespace RootSignatureSpec

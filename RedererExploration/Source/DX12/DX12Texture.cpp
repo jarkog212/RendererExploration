@@ -23,7 +23,7 @@ DX12::Texture::Texture(TextureSpecs& specs)
 	else if (specs._heap)
 	{
 
-		HRESULT_CHECKED_FALLBACK(
+		HRESULT_CHECK_FALLBACK(
 			device->CreatePlacedResource(
 				specs._heap,
 				specs._allocationInfo.Offset,
@@ -36,7 +36,7 @@ DX12::Texture::Texture(TextureSpecs& specs)
 	}
 	else
 	{
-		HRESULT_CHECKED_FALLBACK(
+		HRESULT_CHECK_FALLBACK(
 			device->CreateCommittedResource(
 				&DX12::CC::Desc::k_defaultHeapProperties,
 				D3D12_HEAP_FLAG_NONE,

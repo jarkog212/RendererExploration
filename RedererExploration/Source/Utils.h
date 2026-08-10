@@ -27,7 +27,7 @@ if (!(##instruction)) {\
 	OutputDebugStringA(buffer); \
 }
 
-#define HRESULT_CHECKED(instruction, format, ...) {\
+#define HRESULT_CHECK_CRITICAL(instruction, format, ...) {\
 	HRESULT hr = ##instruction; \
 	if (FAILED(hr)) \
 	{\
@@ -36,7 +36,7 @@ if (!(##instruction)) {\
 	}\
 }
 
-#define HRESULT_CHECKED_FALLBACK(instruction, premsg, fallback, format, ...) {\
+#define HRESULT_CHECK_FALLBACK(instruction, premsg, fallback, format, ...) {\
 	HRESULT hr = ##instruction; \
 	if (FAILED(hr))\
 	{\
@@ -60,15 +60,18 @@ namespace UtilsImpl
 	namespace COM
 	{
 		void Release(IUnknown* resource);
-
 		void DeferredRenderThreadRelease(IUnknown* resource);
 	}
 
-	HWND CreateWindowsWindow(
-		const wchar_t* title,
-		const unsigned int width,
-		const unsigned int height,
-		WNDCLASSEXW* wc);
+	namespace System
+	{
+		HWND CreateWindowsWindow(
+			const wchar_t* title,
+			const unsigned int width,
+			const unsigned int height,
+			WNDCLASSEXW* wc);
+
+	}
 
 	float GetFps();
 }
@@ -98,13 +101,16 @@ namespace Utils
 		}
 	}
 
-	inline HWND CreateWindowsWindow(
-		const wchar_t* title,
-		const unsigned int width,
-		const unsigned int height,
-		WNDCLASSEXW* wc)
+	namespace System
 	{
-		return UtilsImpl::CreateWindowsWindow(title, width, height, wc); 
+		inline HWND CreateWindowsWindow(
+			const wchar_t* title,
+			const unsigned int width,
+			const unsigned int height,
+			WNDCLASSEXW* wc)
+		{
+			return UtilsImpl::System::CreateWindowsWindow(title, width, height, wc);
+		}
 	}
 
 	inline float GetFPS() 

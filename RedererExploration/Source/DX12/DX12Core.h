@@ -31,7 +31,7 @@ namespace DX12
 	DX12::DescriptorHeap* GetUAVHeap();
 
 	ID3D12RootSignature* CreateRootSignature(const DX12::RootSignatureSpec& desc);
-	ID3D12PipelineState* CreatePipelineState(void* stream, unsigned long int streamSize);
+	ID3D12PipelineState* CreatePipelineState(void* stream, unsigned long long int streamSize);
 
 	void SetPendingResourceFreeingFlag();
 	bool TestPendingResourceFreeingFlag(const unsigned int frame);
@@ -39,7 +39,7 @@ namespace DX12
 	bool Initialize(HWND hwnd);
 	void Render(DX12::GfxCommandExecutor* command, DX12::RenderSurface* surface);
 	void Render();
-	void Cleanup();	
+	void Release();	
 
 	namespace Example
 	{

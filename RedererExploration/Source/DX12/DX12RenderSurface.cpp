@@ -8,7 +8,7 @@ DX12::RenderSurface::RenderSurface(const HWND window, DXGI_FORMAT format, ID3D12
 {
 	IDXGIFactory7* factory = DX12::GetDxgiFactory();
 
-	HRESULT_CHECKED(
+	HRESULT_CHECK_CRITICAL(
 		factory->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING, &_allowTearing, sizeof(_allowTearing)),
 		"Could not test for tearing support.");
 
@@ -36,17 +36,17 @@ DX12::RenderSurface::RenderSurface(const HWND window, DXGI_FORMAT format, ID3D12
 	desc.Stereo = false;
 
 	IDXGISwapChain1* swapChain = nullptr;
-	HRESULT_CHECKED_FALLBACK(
+	HRESULT_CHECK_FALLBACK(
 		factory->CreateSwapChainForHwnd(commandQueue, _window, &desc, nullptr, nullptr, &swapChain),,
 		assert(false),
 		"Could not create a swap chain.");
 
-	HRESULT_CHECKED_FALLBACK(
+	HRESULT_CHECK_FALLBACK(
 		factory->MakeWindowAssociation(_window, DXGI_MWA_NO_ALT_ENTER),,
 		assert(false),
 		"Could not restirct fullscreen on swapchain.");
 
-	HRESULT_CHECKED_FALLBACK(
+	HRESULT_CHECK_FALLBACK(
 		swapChain->QueryInterface(IID_PPV_ARGS(&_swapChain)),,
 		assert(false),
 		"Could not get newer swap chain interface.");
@@ -120,7 +120,7 @@ void DX12::RenderSurface::Finalize(DXGI_FORMAT format)
 	for (int i = 0; i < _k_swapChainBuffers; i++)
 	{
 		RenderTargetData& data = _renderTargetData[i];
-		HRESULT_CHECKED(
+		HRESULT_CHECK_CRITICAL(
 			_swapChain->GetBuffer(i, IID_PPV_ARGS(&data._resource)),
 			"Could not get a hold of the swap chain internal buffer.");
 
@@ -132,7 +132,7 @@ void DX12::RenderSurface::Finalize(DXGI_FORMAT format)
 	}
 
 	DXGI_SWAP_CHAIN_DESC desc{};
-	HRESULT_CHECKED(_swapChain->GetDesc(&desc), "Could not get swap chain descriptor object.");
+	HRESULT_CHECK_CRITICAL(_swapChain->GetDesc(&desc), "Could not get swap chain descriptor object.");
 
 	const unsigned int height = desc.BufferDesc.Height;
 	const unsigned int width = desc.BufferDesc.Width;

@@ -1,0 +1,70 @@
+#pragma once
+
+#include "DX12CommonConstants.h"
+#include "Utils.h"
+
+namespace DX12::Shaders
+{
+	enum Stage 
+	{
+		Vertex = 0,
+		Hull,
+		Domain,
+		Geometry,
+		Pixel,
+		Amplification,
+		Mesh,
+		Compute,
+
+		Count
+	};
+
+	struct ShaderView
+	{
+		static constexpr unsigned int _k_headerSize = sizeof(unsigned long long int);
+
+		unsigned long long int _size = 0;
+		char* _byteCode = nullptr;
+	};
+
+	struct Shader : public ShaderView 
+	{
+		Shader() = default;
+		~Shader();
+		Shader(Shader&& other) noexcept { MoveImpl(std::move(other)); };
+		void operator=(Shader&& other) noexcept { MoveImpl(std::move(other)); };
+
+		NO_COPY(Shader);
+
+	private:
+
+		void MoveImpl(Shader&& other);
+	};
+
+	struct GenericShader
+	{
+		enum Type : unsigned int
+		{
+			FullscreenTri_VS = 0,
+
+			Count, 
+		}_type;
+
+		DX12::Shaders::ShaderView const* _shader = nullptr;
+	};
+
+	struct ShaderSpecs
+	{
+		const wchar_t* _filename;
+		const wchar_t* _function;
+		DX12::Shaders::GenericShader::Type _type;
+		DX12::Shaders::Stage _stage;
+	};
+
+	void Initialize();
+	void Release();
+
+	D3D12_SHADER_BYTECODE GetGenericShader(DX12::Shaders::GenericShader::Type type);
+
+	DX12::Shaders::Shader LoadAndCompileShader(DX12::Shaders::ShaderSpecs& spec);
+}

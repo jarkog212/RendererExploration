@@ -4,6 +4,8 @@
 #include <iostream>
 #include <windows.h>
 #include <chrono>
+#include <string>
+#include <fstream>
 
 #include "Utils.h"
 #include "DX12/DX12Core.h"
@@ -137,6 +139,62 @@ HWND UtilsImpl::System::CreateWindowsWindow(
         wc->hInstance,
         nullptr
     );
+}
+
+bool UtilsImpl::System::FileExists(std::filesystem::path& path)
+{
+    CRITICAL_ASSERT(!path.empty(), "Cannot determine if the file exists for an invalid path.");
+    return std::filesystem::exists(path);
+}
+
+unsigned long long int UtilsImpl::System::FileSizeOf(std::filesystem::path& path)
+{
+    std::error_code ec;
+    unsigned long long int fileSize = std::filesystem::file_size(path, ec);
+    CRITICAL_ASSERT(!ec, "Error trying to get the filesize: [%u] %s", ec.value(), ec.message().data());
+
+    return fileSize;
+}
+
+void UtilsImpl::System::LoadFile(std::filesystem::path& path, char*& buffer, unsigned long long int& size)
+{
+    CRITICAL_ASSERT(!path.empty(), "Trying to load a file with empty path.");
+
+    std::ifstream file(path, std::ios::binary);
+    CRITICAL_ASSERT(file, "File cound not be opened: %s", path.string().c_str());
+    
+    if (buffer)
+    {
+        if (size == 0)
+        {
+            DISPLAY_ERROR("Loading a file where buffer weas provided but size is unknown. %s", path.string().c_str());
+            assert(false);
+        }
+
+        CRITICAL_ASSERT(file.read(buffer, size), "File cound not be read: %s", path.string().c_str());
+        return;
+    }
+        
+    size = UtilsImpl::System::FileSizeOf(path);
+    buffer = new char[size];
+
+    CRITICAL_ASSERT(file.read(buffer, size), "File cound not be read: %s", path.string().c_str());
+}
+
+void UtilsImpl::System::SaveFile(std::filesystem::path& path, const char* buffer, const unsigned long long int size)
+{
+    CRITICAL_ASSERT(!path.empty(), "Trying to save a file with empty path.");
+    std::filesystem::create_directories(path.parent_path());
+    std::ofstream file(path, std::ios::out | std::ios::binary);
+
+    FALLBACK_ASSERT(
+        file && Utils::System::FileExists(path),
+        file.close(); assert(false),
+        "Could not save file: %s",
+        path.string().c_str());
+
+    file.write(buffer, size);
+    file.close();
 }
 
 float UtilsImpl::GetFps() 

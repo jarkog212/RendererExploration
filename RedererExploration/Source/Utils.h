@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <cstdio>
 #include <windows.h>
+#include <filesystem>
 
 #define DISPLAY_ERROR(format, ...) {\
 	wchar_t buffer[1024] = L""; \
@@ -71,6 +72,10 @@ namespace UtilsImpl
 			const unsigned int height,
 			WNDCLASSEXW* wc);
 
+		bool FileExists(std::filesystem::path& path);
+		unsigned long long int FileSizeOf(std::filesystem::path& path);
+		void LoadFile(std::filesystem::path& path, char*& buffer, unsigned long long int& size);
+		void SaveFile(std::filesystem::path& path, const char* buffer, const unsigned long long int size);
 	}
 
 	float GetFps();
@@ -110,6 +115,26 @@ namespace Utils
 			WNDCLASSEXW* wc)
 		{
 			return UtilsImpl::System::CreateWindowsWindow(title, width, height, wc);
+		}
+
+		inline bool FileExists(std::filesystem::path& path)
+		{
+			return UtilsImpl::System::FileExists(path);
+		}
+
+		inline unsigned long long int FileSizeOf(std::filesystem::path& path)
+		{
+			return UtilsImpl::System::FileSizeOf(path);
+		}
+
+		inline void LoadFile(std::filesystem::path& path, char*& buffer, unsigned long long int& size)
+		{
+			UtilsImpl::System::LoadFile(path, buffer, size);
+		}
+
+		inline void SaveFile(std::filesystem::path& path, const char* buffer, const unsigned long long int size)
+		{
+			UtilsImpl::System::SaveFile(path, buffer, size);
 		}
 	}
 

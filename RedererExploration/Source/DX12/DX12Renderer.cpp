@@ -1,6 +1,7 @@
 #include "DX12Renderer.h"
 #include "DX12DescriptorHeap.h"
 #include "DX12RenderSurface.h"
+#include "DX12Shaders.h"
 
 namespace
 {
@@ -269,6 +270,8 @@ void DX12::Release()
 	// intended to be called only once at shutdown, reinit is not possible due to static nature of things?
 	static auto cleaner = []()
 		{
+			DX12::Shaders::Release();
+
 			::g_mainRenderSurface.reset();
 
 			DX12::GetMainCommandExecutor()->Release();

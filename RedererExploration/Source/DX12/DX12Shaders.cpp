@@ -27,7 +27,7 @@ namespace
 		};
 		static_assert(_countof(k_shaderStageNames) == DX12::Shaders::Stage::Count, "Number of names does not match count of shader stages.");
 
-		IDxcBlob* CompileShader(DX12::Shaders::ShaderSpecs& spec)
+		IDxcBlob* CompileShader(const DX12::Shaders::ShaderSpecs& spec)
 		{
 			if (!::Compiler::g_shaderCompiler) [[unlikely]]
 				HRESULT_CHECK_CRITICAL(
@@ -45,8 +45,7 @@ namespace
 					"Could not instantiate Dxc Include handler.");
 
 			std::filesystem::path path = DX12::CC::k_shaderFilePath;
-			path.append("\\")
-				.append(spec._filename);
+			path.append(spec._filename);
 
 			Microsoft::WRL::ComPtr<IDxcBlobEncoding> blobEncoding = nullptr;
 			HRESULT_CHECK_CRITICAL(
@@ -108,11 +107,11 @@ namespace
 
 	static std::unique_ptr<char[]> g_genericShadersRaw = nullptr;
 	static std::unique_ptr<DX12::Shaders::GenericShader[]> g_genericShaderViews = nullptr;
-	constexpr DX12::Shaders::ShaderSpecs k_genericShaderFiles[] = 
+	constexpr DX12::Shaders::ShaderSpecs k_genericShaderSpecs[] = 
 	{
 		{L"FullscreenTri.hlsl", L"FullscreenTri", DX12::Shaders::GenericShader::Type::FullscreenTri_VS, DX12::Shaders::Stage::Vertex},
 	};
-	static_assert(_countof(k_genericShaderFiles) == DX12::Shaders::GenericShader::Type::Count, "Missing file specification of at least one generic shader.");
+	static_assert(_countof(k_genericShaderSpecs) == DX12::Shaders::GenericShader::Type::Count, "Missing file specification of at least one generic shader.");
 
 	unsigned long long int CompileAndSaveGenericShaders() 
 	{
@@ -120,16 +119,9 @@ namespace
 		Microsoft::WRL::ComPtr<IDxcBlob> blobs[DX12::Shaders::GenericShader::Type::Count];
 
 		for (int i = 0; i < DX12::Shaders::GenericShader::Count; i++)
-		{
-			DX12::Shaders::ShaderSpecs spec = k_genericShaderFiles[i];
-			std::filesystem::path path = DX12::CC::k_shaderFilePath;
-			path.append("\\")
-				.append(spec._filename);
-
-			CRITICAL_ASSERT(Utils::System::FileExists(path), "Missing generic shader file: %s", path.string().c_str());
-			
-			IDxcBlob* blob = ::Compiler::CompileShader(spec);
-			shaderHeapSize += blob->GetBufferSize() + sizeof(DX12::Shaders::ShaderView::_k_headerSize);
+		{	
+			IDxcBlob* blob = ::Compiler::CompileShader(k_genericShaderSpecs[i]);
+			shaderHeapSize += blob->GetBufferSize() + DX12::Shaders::ShaderView::_k_headerSize;
 			blobs[i].Attach(blob);
 		}
 
@@ -138,9 +130,9 @@ namespace
 		for (int i = 0; i < DX12::Shaders::GenericShader::Count; i++)
 		{
 			unsigned long long int size = blobs[i]->GetBufferSize();
-			memcpy((void*)g_genericShadersRaw[offset], &size, sizeof(DX12::Shaders::ShaderView::_k_headerSize));
+			memcpy((void*)(&g_genericShadersRaw[offset]), &size, DX12::Shaders::ShaderView::_k_headerSize);
 			offset += DX12::Shaders::ShaderView::_k_headerSize;
-			memcpy((void*)g_genericShadersRaw[offset], blobs[i]->GetBufferPointer(), size);
+			memcpy((void*)(&g_genericShadersRaw[offset]), blobs[i]->GetBufferPointer(), size);
 			offset += size;
 		}
 
@@ -163,7 +155,7 @@ namespace
 		}
 		else
 		{
-			unsigned long long int shaderHeapSize = Utils::System::FileSizeOf(DX12::CC::k_precompiledShaderFilePath);
+			shaderHeapSize = Utils::System::FileSizeOf(DX12::CC::k_precompiledShaderFilePath);
 			g_genericShadersRaw = std::make_unique<char[]>(shaderHeapSize);
 			char* bufferProxy = g_genericShadersRaw.get();
 			Utils::System::LoadFile(DX12::CC::k_precompiledShaderFilePath, bufferProxy, shaderHeapSize);

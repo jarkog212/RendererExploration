@@ -230,6 +230,8 @@ bool DX12::Initialize(HWND hwnd)
 {
 	bool result = true;
 
+	DX12::Shaders::Initialize();
+
 	DX12::GetMainRenderSurface(
 		hwnd,
 		DX12::CC::k_defaultRenderTargetFormat,

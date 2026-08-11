@@ -2,8 +2,10 @@
 #include "DX12DescriptorHeap.h"
 #include "DX12CommonDescriptors.h"
 
-void DX12::DescriptorHandle::MoveImpl(DescriptorHandle&& other)
+DX12::DescriptorHandle& DX12::DescriptorHandle::MoveImpl(DescriptorHandle&& other)
 {
+	CRITICAL_ASSERT(this != &other, "Trying to move descriptor handle to itself.")
+
 	_cpu = other._cpu;
 	_gpu = other._gpu;
 
@@ -19,6 +21,8 @@ void DX12::DescriptorHandle::MoveImpl(DescriptorHandle&& other)
 		other._index = 0;
 	}
 #endif
+
+	return *this;
 }
 
 void DX12::RenderTargetData::Release()
@@ -27,12 +31,14 @@ void DX12::RenderTargetData::Release()
 	DX12::GetRTVHeap()->Free(_rtvHandle);
 }
 
-void DX12::RenderTargetData::MoveImpl(RenderTargetData&& other)
+DX12::RenderTargetData& DX12::RenderTargetData::MoveImpl(RenderTargetData&& other)
 {
 	CRITICAL_ASSERT(this != &other, "Moving RenderTargetData to itself.");
 
 	_resource = std::move(other._resource);
 	_rtvHandle = std::move(other._rtvHandle);
+
+	return *this;
 }
 
 void DX12::RootParameter::AsConstants(unsigned int numConstants, D3D12_SHADER_VISIBILITY visibility, unsigned int shaderRegister, unsigned int space)

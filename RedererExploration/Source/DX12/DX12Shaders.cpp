@@ -114,6 +114,7 @@ namespace
 	constexpr DX12::Shaders::ShaderSpecs k_genericShaderSpecs[] = 
 	{
 		{L"FullscreenTri", L"FullscreenTri", DX12::Shaders::GenericShader::Type::FullscreenTri_VS, DX12::Shaders::Stage::Vertex},
+		{L"FillColor", L"FillColor", DX12::Shaders::GenericShader::Type::FillColor_PS, DX12::Shaders::Stage::Pixel},
 	};
 	static_assert(_countof(k_genericShaderSpecs) == DX12::Shaders::GenericShader::Type::Count, "Missing file specification of at least one generic shader.");
 
@@ -207,7 +208,7 @@ const DX12::Shaders::ShaderView DX12::Shaders::Shader::CreateView() const
 	return out;
 }
 
-void DX12::Shaders::Shader::MoveImpl(Shader&& other)
+DX12::Shaders::Shader& DX12::Shaders::Shader::MoveImpl(Shader&& other)
 {
 	CRITICAL_ASSERT(this != &other, "Trying to move shader to itself.");
 
@@ -215,6 +216,8 @@ void DX12::Shaders::Shader::MoveImpl(Shader&& other)
 	_byteCode = other._byteCode;
 
 	other = {};
+
+	return *this;
 }
 
 void DX12::Shaders::Initialize()

@@ -27,7 +27,7 @@ namespace DX12
 		Texture(TextureSpecs& specs);
 		~Texture() { Release(); }
 		Texture(Texture&& other) noexcept { MoveImpl(std::move(other)); };
-		void operator=(Texture&& other) noexcept { MoveImpl(std::move(other)); };
+		Texture& operator=(Texture&& other) noexcept { return MoveImpl(std::move(other)); };
 
 		NO_COPY(Texture);
 
@@ -37,7 +37,7 @@ namespace DX12
 	private:
 
 		void Release();
-		void MoveImpl(Texture&& other);
+		Texture& MoveImpl(Texture&& other);
 
 		ID3D12Resource* _resource = nullptr; // non-owning (deferred free) so RAW
 		DX12::DescriptorHandle _srvHandle = {};

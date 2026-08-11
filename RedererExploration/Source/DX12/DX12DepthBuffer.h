@@ -11,7 +11,7 @@ namespace DX12
 		DepthBuffer(DX12::TextureSpecs& specs);
 		~DepthBuffer() { Release(); }
 		DepthBuffer(DepthBuffer&& other) noexcept { MoveImpl(std::move(other)); }
-		void operator=(DepthBuffer&& other) noexcept { MoveImpl(std::move(other)); }
+		DepthBuffer& operator=(DepthBuffer&& other) noexcept { return MoveImpl(std::move(other)); }
 
 		NO_COPY(DepthBuffer);
 		
@@ -22,7 +22,7 @@ namespace DX12
 	private:
 
 		void Release();
-		void MoveImpl(DepthBuffer&& other);
+		DepthBuffer& MoveImpl(DepthBuffer&& other);
 
 		DX12::Texture _texture;
 		DX12::DescriptorHandle _dsvHandle;

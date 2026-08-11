@@ -50,7 +50,7 @@ namespace DX12
 		using SubobjectRasterizer1 = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_RASTERIZER1, D3D12_RASTERIZER_DESC1>;
 		using SubobjectRasterizer2 = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_RASTERIZER2, D3D12_RASTERIZER_DESC2>;
 		using SubobjectSerializedRootSignature = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_SERIALIZED_ROOT_SIGNATURE, D3D12_SERIALIZED_ROOT_SIGNATURE_DESC>;		
-	};
+	} // PipelineStream;
 
 	struct DescriptorHandle
 	{
@@ -61,14 +61,14 @@ namespace DX12
 		DescriptorHandle(const DescriptorHandle&) = default;
 		DescriptorHandle& operator=(const DescriptorHandle& other) = default;
 		DescriptorHandle(DescriptorHandle&& other) noexcept { MoveImpl(std::move(other)); };
-		void operator=(DescriptorHandle&& other) noexcept { MoveImpl(std::move(other)); };
+		DescriptorHandle& operator=(DescriptorHandle&& other) noexcept { return MoveImpl(std::move(other)); };
 
 		constexpr bool IsValid() const { return _cpu.ptr != 0; }
 		constexpr bool IsShaderVisible() const { return _gpu.ptr != 0; }
 
 	private:
 
-		void MoveImpl(DescriptorHandle&& other);
+		DescriptorHandle& MoveImpl(DescriptorHandle&& other);
 
 #ifdef _DEBUG
 	private:
@@ -87,7 +87,7 @@ namespace DX12
 
 		RenderTargetData() = default;
 		RenderTargetData(RenderTargetData&& other) noexcept { MoveImpl(std::move(other)); }
-		void operator=(RenderTargetData&& other) noexcept { MoveImpl(std::move(other)); }
+		RenderTargetData& operator=(RenderTargetData&& other) noexcept { return MoveImpl(std::move(other)); }
 
 		NO_COPY(RenderTargetData)
 
@@ -95,7 +95,7 @@ namespace DX12
 
 	private:
 
-		void MoveImpl(RenderTargetData&& other);
+		RenderTargetData& MoveImpl(RenderTargetData&& other);
 	};
 
 	struct DescriptorRange : public D3D12_DESCRIPTOR_RANGE1

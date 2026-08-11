@@ -35,8 +35,8 @@ namespace DX12::Shaders
 	{
 		Shader() = default;
 		~Shader();
-		Shader(Shader&& other) noexcept { MoveImpl(std::move(other)); };
-		void operator=(Shader&& other) noexcept { MoveImpl(std::move(other)); };
+		Shader(Shader&& other) noexcept { MoveImpl(std::move(other)); }
+		Shader& operator=(Shader&& other) noexcept { return MoveImpl(std::move(other)); }
 
 		NO_COPY(Shader);
 
@@ -44,7 +44,7 @@ namespace DX12::Shaders
 
 	private:
 
-		void MoveImpl(Shader&& other);
+		Shader& MoveImpl(Shader&& other);
 	};
 
 	struct GenericShader
@@ -52,6 +52,7 @@ namespace DX12::Shaders
 		enum Type : unsigned int
 		{
 			FullscreenTri_VS = 0,
+			FillColor_PS,
 
 			Count, 
 		}_type;

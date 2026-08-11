@@ -22,7 +22,6 @@ DX12::Texture::Texture(TextureSpecs& specs)
 	}
 	else if (specs._heap)
 	{
-
 		HRESULT_CHECK_FALLBACK(
 			device->CreatePlacedResource(
 				specs._heap,
@@ -58,7 +57,7 @@ void DX12::Texture::Release()
 	Utils::COM::SafeDeferredRenderThreadRelease(_resource);
 }
 
-void DX12::Texture::MoveImpl(Texture&& other)
+DX12::Texture& DX12::Texture::MoveImpl(Texture&& other)
 {
 	CRITICAL_ASSERT(this != &other, "Moving Texture to itself.");
 
@@ -66,4 +65,6 @@ void DX12::Texture::MoveImpl(Texture&& other)
 	_srvHandle = std::move(other._srvHandle);
 
 	other._resource = nullptr;
+
+	return *this;
 }

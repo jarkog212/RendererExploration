@@ -11,7 +11,7 @@ namespace DX12
 		RenderTargetTexture(DX12::TextureSpecs& spec);
 		~RenderTargetTexture() { Release(); };
 		RenderTargetTexture(RenderTargetTexture&& other) noexcept { MoveImpl(std::move(other)); }
-		void operator=(RenderTargetTexture&& other) noexcept { MoveImpl(std::move(other)); }
+		RenderTargetTexture& operator=(RenderTargetTexture&& other) noexcept { return MoveImpl(std::move(other)); }
 		
 		NO_COPY(RenderTargetTexture);
 
@@ -23,7 +23,7 @@ namespace DX12
 	private:
 		
 		void Release();
-		void MoveImpl(RenderTargetTexture&& other);
+		RenderTargetTexture& MoveImpl(RenderTargetTexture&& other);
 
 		DX12::Texture _texture;
 		DX12::DescriptorHandle _rtvHandles[DX12::Texture::_k_maxMips];

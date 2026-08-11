@@ -2,6 +2,7 @@
 #include "DX12Core.h"
 #include "DX12Renderer.h"
 #include "DX12DescriptorHeap.h"
+#include "DX12CommonDescriptors.h"
 
 DX12::RenderSurface::RenderSurface(const HWND window, DXGI_FORMAT format, ID3D12CommandQueue* commandQueue)
 	: _window(window)
@@ -19,21 +20,14 @@ DX12::RenderSurface::RenderSurface(const HWND window, DXGI_FORMAT format, ID3D12
 	const int width = windowDimensions.right - windowDimensions.left;
 	const int height = windowDimensions.bottom - windowDimensions.top;
 
-	DXGI_SWAP_CHAIN_DESC1 desc{};
-	desc.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
+	DXGI_SWAP_CHAIN_DESC1 desc = DX12::CC::Desc::k_defaultSwapChainTemplate;
 	desc.BufferCount = _k_swapChainBuffers;
-	desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	desc.Flags = (bool)_allowTearing ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
 	desc.Format = format == DXGI_FORMAT_R8G8B8A8_UNORM_SRGB ?
 		DXGI_FORMAT_R8G8B8A8_UNORM :
 		format;
 	desc.Height = height;
 	desc.Width = width;
-	desc.SampleDesc.Count = 1;
-	desc.SampleDesc.Quality = 0;
-	desc.Scaling = DXGI_SCALING_STRETCH;
-	desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-	desc.Stereo = false;
 
 	IDXGISwapChain1* swapChain = nullptr;
 	HRESULT_CHECK_FALLBACK(
@@ -82,7 +76,7 @@ RECT DX12::RenderSurface::GetWindowDimensions() const
 	return rect;
 }
 
-void DX12::RenderSurface::MoveImpl(RenderSurface&& other)
+DX12::RenderSurface& DX12::RenderSurface::MoveImpl(RenderSurface&& other)
 {
 	CRITICAL_ASSERT(this != &other, "Moving RenderSurface to itself.");
 
@@ -103,6 +97,8 @@ void DX12::RenderSurface::MoveImpl(RenderSurface&& other)
 	other._scissorRect = D3D12_RECT();
 	other._presentFlags = 0;
 	other._allowTearing = 0;
+
+	return *this;
 }
 
 void DX12::RenderSurface::Release()
@@ -124,9 +120,8 @@ void DX12::RenderSurface::Finalize(DXGI_FORMAT format)
 			_swapChain->GetBuffer(i, IID_PPV_ARGS(&data._resource)),
 			"Could not get a hold of the swap chain internal buffer.");
 
-		D3D12_RENDER_TARGET_VIEW_DESC desc{};
+		D3D12_RENDER_TARGET_VIEW_DESC desc = DX12::CC::Desc::k_defaultRenderTargetViewTemplate;
 		desc.Format = format;
-		desc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
 
 		DX12::GetRendererDevice()->CreateRenderTargetView(data._resource.Get(), &desc, data._rtvHandle._cpu);
 	}

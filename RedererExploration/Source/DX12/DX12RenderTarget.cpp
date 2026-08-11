@@ -1,5 +1,6 @@
 #include "DX12RenderTarget.h"
 #include "DX12DescriptorHeap.h"
+#include "DX12CommonDescriptors.h"
 
 DX12::RenderTargetTexture::RenderTargetTexture(DX12::TextureSpecs& spec)
 	: _texture(spec)
@@ -10,9 +11,8 @@ DX12::RenderTargetTexture::RenderTargetTexture(DX12::TextureSpecs& spec)
 		_mipCount <= DX12::Texture::_k_maxMips,
 		"RTT resource has more MIPs than our declared maximum.");
 
-	D3D12_RENDER_TARGET_VIEW_DESC desc{};
+	D3D12_RENDER_TARGET_VIEW_DESC desc = DX12::CC::Desc::k_defaultRenderTargetViewTemplate;
 	desc.Format = spec._resourceDesc->Format;
-	desc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
 
 	DX12::DescriptorHeap* rtvHeap = DX12::GetRTVHeap();
 	for (int i = 0; i < _mipCount; i++)
@@ -39,7 +39,7 @@ constexpr D3D12_CPU_DESCRIPTOR_HANDLE DX12::RenderTargetTexture::GetRTVCPUHandle
 	return _rtvHandles[mip]._cpu;
 }
 
-void DX12::RenderTargetTexture::MoveImpl(RenderTargetTexture&& other)
+DX12::RenderTargetTexture& DX12::RenderTargetTexture::MoveImpl(RenderTargetTexture&& other)
 {
 	CRITICAL_ASSERT(this != &other, "Moving RenderTargetTexture to itself.");
 
@@ -49,4 +49,6 @@ void DX12::RenderTargetTexture::MoveImpl(RenderTargetTexture&& other)
 		_rtvHandles[i] = std::move(other._rtvHandles[i]);
 
 	other._mipCount = 0;
+
+	return *this;
 }

@@ -6,6 +6,7 @@
 
 #include <memory>
 #include <filesystem>
+#include <unordered_map>
 
 namespace 
 {
@@ -44,8 +45,11 @@ namespace
 					::Compiler::g_DXCUtils->CreateDefaultIncludeHandler(&::Compiler::g_DXCInlcudeHandler),
 					"Could not instantiate Dxc Include handler.");
 
-			std::filesystem::path path = DX12::CC::k_shaderFilePath;
-			path.append(spec._filename);
+			std::filesystem::path filename = spec._filename;
+			filename += DX12::CC::k_shaderSourceExtension;
+
+			std::filesystem::path path = DX12::CC::k_shaderFilePrefix;
+			path.append(filename.c_str());
 
 			Microsoft::WRL::ComPtr<IDxcBlobEncoding> blobEncoding = nullptr;
 			HRESULT_CHECK_CRITICAL(
@@ -55,7 +59,7 @@ namespace
 
 			LPCWSTR args[]
 			{
-				spec._filename,
+				filename.c_str(),
 				L"-E", spec._function,
 				L"-T", ::Compiler::k_shaderStageNames[(int)spec._stage],
 				DXC_ARG_ALL_RESOURCES_BOUND,
@@ -105,13 +109,15 @@ namespace
 		}
 	} // Compiler
 
-	static std::unique_ptr<char[]> g_genericShadersRaw = nullptr;
+	static std::unique_ptr<char[]> g_genericShadersArena = nullptr;
 	static std::unique_ptr<DX12::Shaders::GenericShader[]> g_genericShaderViews = nullptr;
 	constexpr DX12::Shaders::ShaderSpecs k_genericShaderSpecs[] = 
 	{
-		{L"FullscreenTri.hlsl", L"FullscreenTri", DX12::Shaders::GenericShader::Type::FullscreenTri_VS, DX12::Shaders::Stage::Vertex},
+		{L"FullscreenTri", L"FullscreenTri", DX12::Shaders::GenericShader::Type::FullscreenTri_VS, DX12::Shaders::Stage::Vertex},
 	};
 	static_assert(_countof(k_genericShaderSpecs) == DX12::Shaders::GenericShader::Type::Count, "Missing file specification of at least one generic shader.");
+
+	static std::unordered_map<const wchar_t* ,DX12::Shaders::Shader> g_shaders;
 
 	unsigned long long int CompileAndSaveGenericShaders() 
 	{
@@ -125,20 +131,20 @@ namespace
 			blobs[i].Attach(blob);
 		}
 
-		g_genericShadersRaw = std::make_unique<char[]>(shaderHeapSize);
+		g_genericShadersArena = std::make_unique<char[]>(shaderHeapSize);
 		unsigned long long int offset = 0;
 		for (int i = 0; i < DX12::Shaders::GenericShader::Count; i++)
 		{
 			unsigned long long int size = blobs[i]->GetBufferSize();
-			memcpy((void*)(&g_genericShadersRaw[offset]), &size, DX12::Shaders::ShaderView::_k_headerSize);
+			memcpy((void*)(&g_genericShadersArena[offset]), &size, DX12::Shaders::ShaderView::_k_headerSize);
 			offset += DX12::Shaders::ShaderView::_k_headerSize;
-			memcpy((void*)(&g_genericShadersRaw[offset]), blobs[i]->GetBufferPointer(), size);
+			memcpy((void*)(&g_genericShadersArena[offset]), blobs[i]->GetBufferPointer(), size);
 			offset += size;
 		}
 
 		CRITICAL_ASSERT(offset == shaderHeapSize, "Parsing shaders to raw heap was not successful.")
 
-		Utils::System::SaveFile(DX12::CC::k_precompiledShaderFilePath, g_genericShadersRaw.get(), shaderHeapSize);
+		Utils::System::SaveFile(DX12::CC::k_precompiledGenericShaderFilePath, g_genericShadersArena.get(), shaderHeapSize);
 
 		return shaderHeapSize;
 	}
@@ -146,22 +152,22 @@ namespace
 	void PreloadGenericShaders()
 	{
 		unsigned long long int shaderHeapSize = 0;
-		CRITICAL_ASSERT(!g_genericShadersRaw, "Loading new generic shaders while their heap is not empty.");
+		CRITICAL_ASSERT(!g_genericShadersArena, "Loading new generic shaders while their heap is not empty.");
 		CRITICAL_ASSERT(!g_genericShaderViews, "There are already generic shader views despite the call to make them again.");
 
-		if (!Utils::System::FileExists(DX12::CC::k_precompiledShaderFilePath))
+		if (!Utils::System::FileExists(DX12::CC::k_precompiledGenericShaderFilePath))
 		{
 			shaderHeapSize = ::CompileAndSaveGenericShaders();
 		}
 		else
 		{
-			shaderHeapSize = Utils::System::FileSizeOf(DX12::CC::k_precompiledShaderFilePath);
-			g_genericShadersRaw = std::make_unique<char[]>(shaderHeapSize);
-			char* bufferProxy = g_genericShadersRaw.get();
-			Utils::System::LoadFile(DX12::CC::k_precompiledShaderFilePath, bufferProxy, shaderHeapSize);
+			shaderHeapSize = Utils::System::FileSizeOf(DX12::CC::k_precompiledGenericShaderFilePath);
+			g_genericShadersArena = std::make_unique<char[]>(shaderHeapSize);
+			char* bufferProxy = g_genericShadersArena.get();
+			Utils::System::LoadFile(DX12::CC::k_precompiledGenericShaderFilePath, bufferProxy, shaderHeapSize);
 		}
 
-		CRITICAL_ASSERT(g_genericShadersRaw && shaderHeapSize > 0, "Failed to load or compile generic shaders or allocate shader heap.");
+		CRITICAL_ASSERT(g_genericShadersArena && shaderHeapSize > 0, "Failed to load or compile generic shaders or allocate shader heap.");
 
 		g_genericShaderViews = std::make_unique<DX12::Shaders::GenericShader[]>(DX12::Shaders::GenericShader::Count);
 
@@ -172,7 +178,7 @@ namespace
 		{
 			g_genericShaderViews[index]._type = static_cast<DX12::Shaders::GenericShader::Type>(index);
 			DX12::Shaders::ShaderView const*& shader = g_genericShaderViews[index]._shader;
-			shader = reinterpret_cast<DX12::Shaders::ShaderView const*>(&g_genericShadersRaw[offset]);
+			shader = reinterpret_cast<DX12::Shaders::ShaderView const*>(&g_genericShadersArena[offset]);
 
 			offset += shader->_size + DX12::Shaders::ShaderView::_k_headerSize;
 		}
@@ -184,6 +190,21 @@ namespace
 DX12::Shaders::Shader::~Shader()
 {
 	delete[] _byteCode;
+}
+
+D3D12_SHADER_BYTECODE DX12::Shaders::ShaderView::AsDX12Bytecode() const
+{
+	D3D12_SHADER_BYTECODE out;
+	out.BytecodeLength = _size;
+	out.pShaderBytecode = &_byteCode;
+	return out;
+}
+
+const DX12::Shaders::ShaderView DX12::Shaders::Shader::CreateView() const
+{
+	DX12::Shaders::ShaderView out;
+	memcpy(&out, this, sizeof(this));
+	return out;
 }
 
 void DX12::Shaders::Shader::MoveImpl(Shader&& other)
@@ -203,8 +224,9 @@ void DX12::Shaders::Initialize()
 
 void DX12::Shaders::Release()
 {
-	g_genericShaderViews.reset();
-	g_genericShadersRaw.reset();
+	::g_genericShaderViews.reset();
+	::g_genericShadersArena.reset();
+	::g_shaders.clear();
 	::Compiler::g_shaderCompiler.Reset();
 	::Compiler::g_DXCUtils.Reset();
 	::Compiler::g_DXCInlcudeHandler.Reset();
@@ -226,17 +248,56 @@ D3D12_SHADER_BYTECODE DX12::Shaders::GetGenericShader(DX12::Shaders::GenericShad
 	return DX12::Shaders::GetGenericShader(type);
 }
 
-DX12::Shaders::Shader DX12::Shaders::LoadAndCompileShader(DX12::Shaders::ShaderSpecs& spec)
+const DX12::Shaders::ShaderView DX12::Shaders::LoadOrCompile(const DX12::Shaders::ShaderSpecs& specs)
 {
-	IDxcBlob* shaderBlob = ::Compiler::CompileShader(spec);
-	DX12::Shaders::Shader shader{};
-	shader._size = shaderBlob->GetBufferSize();
-	shader._byteCode = new char[shader._size];
-	
-	memcpy(shader._byteCode, shaderBlob->GetBufferPointer(), shader._size);
+	DX12::Shaders::TryReleaseShader(specs);
+	DX12::Shaders::Shader& out = ::g_shaders[specs._filename];
+	std::filesystem::path precompiledPath = DX12::CC::k_precompiledShaderPrefix;
+	precompiledPath.append(specs._filename);
+	precompiledPath += DX12::CC::k_shaderBinaryExtension;
 
-	Utils::COM::SafeRelease(shaderBlob);
+	if (Utils::System::FileExists(precompiledPath))
+	{
+		Utils::System::LoadFile(precompiledPath, out._byteCode, out._size);
+		return out.CreateView();
+	}
 
-	return shader;
+	{
+		Microsoft::WRL::ComPtr<IDxcBlob> blob = ::Compiler::CompileShader(specs);
+		out._size = blob->GetBufferSize();
+		out._byteCode = new char[out._size];
+		memcpy(out._byteCode, blob->GetBufferPointer(), out._size);
+	}
+
+	Utils::System::SaveFile(precompiledPath, out._byteCode, out._size);
+
+	return out.CreateView();
 }
 
+bool DX12::Shaders::TryReleaseShader(const DX12::Shaders::ShaderSpecs& specs)
+{
+	if (auto it = ::g_shaders.find(specs._filename); it != ::g_shaders.end())
+	{
+		::g_shaders.erase(it);
+		return true;
+	}
+
+	return false;
+}
+
+D3D12_SHADER_BYTECODE DX12::Shaders::GetShader(const DX12::Shaders::ShaderSpecs& specs)
+{
+	if (auto it = ::g_shaders.find(specs._filename); it != ::g_shaders.end())
+		return it->second.AsDX12Bytecode();
+
+	DX12::Shaders::ShaderView view = DX12::Shaders::LoadOrCompile(specs);
+	return view.AsDX12Bytecode();
+}
+
+const DX12::Shaders::ShaderView DX12::Shaders::GetShaderView(const DX12::Shaders::ShaderSpecs& specs)
+{
+	if (auto it = ::g_shaders.find(specs._filename); it != ::g_shaders.end())
+		return it->second.CreateView();
+
+	return DX12::Shaders::LoadOrCompile(specs);
+}

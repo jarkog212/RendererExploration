@@ -10,8 +10,11 @@ namespace DX12::CC
 	constexpr int k_forAllFrames = -1;
 	constexpr unsigned int k_frameBuffers = 3;
 	constexpr DXGI_FORMAT k_defaultRenderTargetFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
-	static std::filesystem::path k_shaderFilePath(".\\Shaders");
-	static std::filesystem::path k_precompiledShaderFilePath = ".\\Shaders\\shaders.bin";
+	static std::filesystem::path k_shaderFilePrefix(".\\Shaders");
+	static std::filesystem::path k_precompiledShaderPrefix(".\\Shaders\\bin");
+	static std::filesystem::path k_precompiledGenericShaderFilePath = ".\\Shaders\\bin\\shaders.bin";
+	constexpr const wchar_t* k_shaderBinaryExtension = L".shad";
+	constexpr const wchar_t* k_shaderSourceExtension = L".hlsl";
 
 	namespace RootSignatureSpec
 	{
@@ -31,5 +34,5 @@ namespace DX12::CC
 		constexpr D3D12_ROOT_SIGNATURE_FLAGS k_PixelStageOnly =
 			DX12::CC::RootSignatureSpec::k_VertexPixelStagesOnly
 			| D3D12_ROOT_SIGNATURE_FLAG_DENY_VERTEX_SHADER_ROOT_ACCESS;
-	}
+	} // RootSignatureSpec
 }

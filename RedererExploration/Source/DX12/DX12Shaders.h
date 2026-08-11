@@ -27,6 +27,8 @@ namespace DX12::Shaders
 
 		unsigned long long int _size = 0;
 		char* _byteCode = nullptr;
+
+		D3D12_SHADER_BYTECODE AsDX12Bytecode() const;
 	};
 
 	struct Shader : public ShaderView 
@@ -37,6 +39,8 @@ namespace DX12::Shaders
 		void operator=(Shader&& other) noexcept { MoveImpl(std::move(other)); };
 
 		NO_COPY(Shader);
+
+		const DX12::Shaders::ShaderView CreateView() const;
 
 	private:
 
@@ -67,6 +71,8 @@ namespace DX12::Shaders
 	void Release();
 
 	D3D12_SHADER_BYTECODE GetGenericShader(DX12::Shaders::GenericShader::Type type);
-
-	DX12::Shaders::Shader LoadAndCompileShader(DX12::Shaders::ShaderSpecs& spec);
+	const DX12::Shaders::ShaderView LoadOrCompile(const DX12::Shaders::ShaderSpecs& specs);
+	bool TryReleaseShader(const DX12::Shaders::ShaderSpecs& specs);
+	D3D12_SHADER_BYTECODE GetShader(const DX12::Shaders::ShaderSpecs& specs);
+	const DX12::Shaders::ShaderView GetShaderView(const DX12::Shaders::ShaderSpecs& specs);
 }

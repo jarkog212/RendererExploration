@@ -56,4 +56,11 @@ namespace DX12
 		unsigned int _currentFrame = 0;
 		unsigned int _issuableFenceValue = 0;
 	};
+
+	namespace Example
+	{
+		ID3D12GraphicsCommandList6* ExampleRenderBuild();
+		ID3D12RootSignature* GetRootSignature();
+		ID3D12PipelineState* GetPipelineState();
+	} // Example
 };

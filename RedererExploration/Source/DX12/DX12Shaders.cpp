@@ -29,17 +29,17 @@ namespace
 
 		IDxcBlob* CompileShader(DX12::Shaders::ShaderSpecs& spec)
 		{
-			if (!::Compiler::g_shaderCompiler)
+			if (!::Compiler::g_shaderCompiler) [[unlikely]]
 				HRESULT_CHECK_CRITICAL(
 					DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&::Compiler::g_shaderCompiler)),
 					"Could not instantiate compiler.");
 
-			if (!::Compiler::g_DXCUtils)
+			if (!::Compiler::g_DXCUtils) [[unlikely]]
 				HRESULT_CHECK_CRITICAL(
 					DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&::Compiler::g_DXCUtils)),
 					"Could not instantiate Dxc Utils.");
 
-			if (!::Compiler::g_DXCInlcudeHandler)
+			if (!::Compiler::g_DXCInlcudeHandler) [[unlikely]]
 				HRESULT_CHECK_CRITICAL(
 					::Compiler::g_DXCUtils->CreateDefaultIncludeHandler(&::Compiler::g_DXCInlcudeHandler),
 					"Could not instantiate Dxc Include handler.");
@@ -54,10 +54,57 @@ namespace
 				"Could not load the shader file: %ls",
 				path.c_str());
 
+			LPCWSTR args[]
+			{
+				spec._filename,
+				L"-E", spec._function,
+				L"-T", ::Compiler::k_shaderStageNames[(int)spec._stage],
+				DXC_ARG_ALL_RESOURCES_BOUND,
+#ifdef _DEBUG
+				DXC_ARG_DEBUG,
+				DXC_ARG_SKIP_OPTIMIZATIONS,
+#else
+				DXC_ARGS_OPTIMIZATION_LEVEL3
+#endif
+				DXC_ARG_WARNINGS_ARE_ERRORS,
+				L"-Qstrip_reflect",
+				L"-Qstrip_debug",
+			};
 
-			return nullptr;
+			DISPLAY_RAW_OUTPUT("Compiling shader: %ls", spec._filename);
+
+			DxcBuffer buffer{};
+			buffer.Encoding = DXC_CP_ACP;
+			buffer.Ptr = blobEncoding->GetBufferPointer();
+			buffer.Size = blobEncoding->GetBufferSize();
+
+			Microsoft::WRL::ComPtr<IDxcResult> results = nullptr;
+			HRESULT_CHECK_FALLBACK(
+				::Compiler::g_shaderCompiler->Compile(&buffer, args, _countof(args), ::Compiler::g_DXCInlcudeHandler.Get(), IID_PPV_ARGS(&results)),,,
+				"Could not compile the shader: %ls",
+				spec._filename);
+
+			Microsoft::WRL::ComPtr<IDxcBlobUtf8> errors = nullptr;
+			HRESULT_CHECK_FALLBACK(
+				results->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&errors), nullptr),,,
+				"Could not access shader compilation output logs (errors): %ls",
+				spec._filename);
+
+			CRITICAL_ASSERT(
+				errors && errors->GetStringLength() == 0,
+				"[ERROR] Shader compilation error: \n -- %s", errors->GetStringPointer());
+
+			DISPLAY_RAW_OUTPUT("[COMPILED]");
+
+			IDxcBlob* out = nullptr;
+			HRESULT_CHECK_CRITICAL(
+				results->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(&out), nullptr),
+				"Could not get the compiled shader buffer for %ls",
+				spec._filename);
+
+			return out;
 		}
-	}
+	} // Compiler
 
 	static std::unique_ptr<char[]> g_genericShadersRaw = nullptr;
 	static std::unique_ptr<DX12::Shaders::GenericShader[]> g_genericShaderViews = nullptr;

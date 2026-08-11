@@ -12,12 +12,12 @@
 }
 
 #define FALLBACK_ASSERT(instruction, fallback, format, ...)\
-if (!(##instruction)) {\
+if (!(##instruction)) [[unlikely]] {\
 	DISPLAY_ERROR(format, __VA_ARGS__); \
 	##fallback; \
 }
 #define CRITICAL_ASSERT(instruction, format, ...)\
-if (!(##instruction)) {\
+if (!(##instruction)) [[unlikely]] {\
 	DISPLAY_ERROR(format, __VA_ARGS__); \
 	assert(false); \
 }
@@ -30,7 +30,7 @@ if (!(##instruction)) {\
 
 #define HRESULT_CHECK_CRITICAL(instruction, format, ...) {\
 	HRESULT hr = ##instruction; \
-	if (FAILED(hr)) \
+	if (FAILED(hr)) [[unlikely]] \
 	{\
 		DISPLAY_ERROR("[%x] "##format, hr, __VA_ARGS__) \
 		assert(false); \
@@ -39,7 +39,7 @@ if (!(##instruction)) {\
 
 #define HRESULT_CHECK_FALLBACK(instruction, premsg, fallback, format, ...) {\
 	HRESULT hr = ##instruction; \
-	if (FAILED(hr))\
+	if (FAILED(hr)) [[unlikely]] \
 	{\
 		##premsg; \
 		DISPLAY_ERROR("[%x] "##format, hr, __VA_ARGS__); \
@@ -62,7 +62,7 @@ namespace UtilsImpl
 	{
 		void Release(IUnknown* resource);
 		void DeferredRenderThreadRelease(IUnknown* resource);
-	}
+	} // COM
 
 	namespace System
 	{
@@ -76,10 +76,10 @@ namespace UtilsImpl
 		unsigned long long int FileSizeOf(std::filesystem::path& path);
 		void LoadFile(std::filesystem::path& path, char*& buffer, unsigned long long int& size);
 		void SaveFile(std::filesystem::path& path, const char* buffer, const unsigned long long int size);
-	}
+	} // System
 
 	float GetFps();
-}
+} // UtilsImpl
 
 namespace Utils
 {
@@ -104,7 +104,7 @@ namespace Utils
 			UtilsImpl::COM::DeferredRenderThreadRelease(resource);
 			resource = nullptr;
 		}
-	}
+	} // COM
 
 	namespace System
 	{
@@ -136,10 +136,10 @@ namespace Utils
 		{
 			UtilsImpl::System::SaveFile(path, buffer, size);
 		}
-	}
+	} // System
 
 	inline float GetFPS() 
 	{
 		return UtilsImpl::GetFps();
 	}
-}
+} // Utils

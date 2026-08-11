@@ -3,6 +3,8 @@
 #include "DX12CommonConstants.h"
 #include "Utils.h"
 
+#pragma comment(lib, "dxcompiler.lib")
+
 namespace DX12::Shaders
 {
 	enum Stage 

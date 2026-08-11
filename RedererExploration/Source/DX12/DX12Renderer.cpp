@@ -47,7 +47,7 @@ namespace
 	{
 		static Microsoft::WRL::ComPtr<ID3D12RootSignature> COMRenderRootSignature = nullptr;
 		static Microsoft::WRL::ComPtr<ID3D12PipelineState> COMRenderPipelineState = nullptr;
-	}
+	} // Example
 }
 
 void UtilsImpl::COM::Release(IUnknown* resource)
@@ -64,7 +64,7 @@ void UtilsImpl::COM::DeferredRenderThreadRelease(IUnknown* resource)
 ID3D12Device8* DX12::GetRendererDevice()
 {
 	ID3D12Device8* device = ::COMRendererDevice.Get();
-	if (device)
+	if (device) [[likely]]
 		return device;
 
 	HRESULT_CHECK_CRITICAL(
@@ -93,7 +93,7 @@ ID3D12Device8* DX12::GetRendererDevice()
 IDXGIFactory7* DX12::GetDxgiFactory()
 {	
 	IDXGIFactory7* factory = ::COMDxgiFactory.Get();
-	if (factory)
+	if (factory) [[likely]]
 		return factory;
 
 	unsigned int flags = 0;
@@ -117,7 +117,7 @@ IDXGIFactory7* DX12::GetDxgiFactory()
 IDXGIAdapter4* DX12::GetDxgiAdapter()
 {
 	IDXGIAdapter4* adapter = ::COMDxgiAdapter.Get();
-	if (adapter)
+	if (adapter) [[likely]]
 		return adapter;
 
 	for (unsigned int i = 0;
@@ -175,7 +175,7 @@ DX12::RenderSurface* DX12::GetMainRenderSurface(
 	DXGI_FORMAT format,
 	ID3D12CommandQueue* commandQueue)
 {
-	if (::g_mainRenderSurface)
+	if (::g_mainRenderSurface) [[likely]]
 		return ::g_mainRenderSurface.get();
 
 	CRITICAL_ASSERT(
@@ -476,7 +476,7 @@ ID3D12GraphicsCommandList6* DX12::Example::ExampleRenderBuild()
 
 ID3D12RootSignature* DX12::Example::GetRootSignature()
 {
-	if (::Example::COMRenderRootSignature)
+	if (::Example::COMRenderRootSignature) [[likely]]
 		return ::Example::COMRenderRootSignature.Get();
 
 	// Create signature = memory layout for buffers
@@ -496,7 +496,7 @@ ID3D12RootSignature* DX12::Example::GetRootSignature()
 
 ID3D12PipelineState* DX12::Example::GetPipelineState()
 {
-	if (::Example::COMRenderPipelineState)
+	if (::Example::COMRenderPipelineState) [[likely]]
 		return ::Example::COMRenderPipelineState.Get();
 
 	struct {

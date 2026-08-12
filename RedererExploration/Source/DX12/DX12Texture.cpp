@@ -61,8 +61,8 @@ DX12::Texture& DX12::Texture::operator=(Texture&& other) noexcept
 {
 	CRITICAL_ASSERT(this != &other, "Moving Texture to itself.");
 
-	_resource = std::exchange(other._resource, nullptr);
-	_srvHandle = std::move(other._srvHandle);
+	std::swap(_resource, other._resource);
+	std::swap(_srvHandle, other._srvHandle);
 
 	return *this;
 }

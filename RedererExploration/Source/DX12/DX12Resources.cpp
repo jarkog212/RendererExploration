@@ -16,13 +16,13 @@ DX12::DescriptorHandle& DX12::DescriptorHandle::operator=(DescriptorHandle&& oth
 {
 	CRITICAL_ASSERT(this != &other, "Trying to move descriptor handle to itself.");
 
-	_cpu = std::exchange(other._cpu, { 0 });
-	_gpu = std::exchange(other._gpu, { 0 });
+	std::swap(_cpu, other._cpu);
+	std::swap(_gpu, other._gpu);
 
 #ifdef _DEBUG
 	{
-		_owner = std::exchange(other._owner, nullptr);
-		_index = std::exchange(other._index, 0);
+		std::swap(_owner, other._owner);
+		std::swap(_index, other._index);
 	}
 #endif
 
@@ -39,8 +39,8 @@ DX12::RenderTargetData& DX12::RenderTargetData::operator=(RenderTargetData&& oth
 {
 	CRITICAL_ASSERT(this != &other, "Moving RenderTargetData to itself.");
 
-	_resource = std::move(other._resource);
-	_rtvHandle = std::move(other._rtvHandle);
+	std::swap(_resource, other._resource);
+	std::swap(_rtvHandle, other._rtvHandle);
 
 	return *this;
 }

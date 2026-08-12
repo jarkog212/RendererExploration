@@ -45,7 +45,9 @@ DX12::DepthBuffer::DepthBuffer(DepthBuffer&& other) noexcept :
 
 DX12::DepthBuffer& DX12::DepthBuffer::operator=(DepthBuffer&& other) noexcept
 {
-	assert(this != &other);
+	CRITICAL_ASSERT(this != &other, "Moving Depth buffer to itself.");
+
+	Release();
 
 	_texture = std::move(other._texture);
 	_dsvHandle = std::move(other._dsvHandle);

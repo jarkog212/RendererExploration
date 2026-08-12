@@ -58,9 +58,9 @@ DX12::GPass& DX12::GPass::operator=(GPass&& other) noexcept
 {
 	CRITICAL_ASSERT(this != &other, "Moving GPass to itself.");
 
-	_mainBuffer = std::move(other._mainBuffer);
-	_depthBuffer = std::move(other._depthBuffer);
-	_dimensions = std::exchange(other._dimensions, { 0,0 });
+	std::swap(_mainBuffer,other._mainBuffer);
+	std::swap(_depthBuffer, other._depthBuffer);
+	std::swap(_dimensions, other._dimensions);
 
 	return *this;
 }

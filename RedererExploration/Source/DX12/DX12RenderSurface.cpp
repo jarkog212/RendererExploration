@@ -70,15 +70,15 @@ DX12::RenderSurface& DX12::RenderSurface::operator=(RenderSurface&& other) noexc
 {
 	CRITICAL_ASSERT(this != &other, "Moving RenderSurface to itself.");
 
-	_window = std::exchange(other._window, HWND(NULL));
-	_currentBackBufferIndex = std::exchange(other._currentBackBufferIndex, 0);
-	_viewport = std::exchange(other._viewport, D3D12_VIEWPORT());
-	_scissorRect = std::exchange(other._scissorRect, D3D12_RECT());
-	_presentFlags = std::exchange(other._presentFlags, 0);
-	_allowTearing = std::exchange(other._allowTearing, 0);
+	std::swap(_window, other._window);
+	std::swap(_currentBackBufferIndex, other._currentBackBufferIndex);
+	std::swap(_viewport, other._viewport);
+	std::swap(_scissorRect, other._scissorRect);
+	std::swap(_presentFlags, other._presentFlags);
+	std::swap(_allowTearing, other._allowTearing);
 
 	for (int i = 0; i < _k_swapChainBuffers; i++)
-		_renderTargetData[i] = std::move(other._renderTargetData[i]);
+		std::swap(_renderTargetData[i], other._renderTargetData[i]);
 
 	return *this;
 }

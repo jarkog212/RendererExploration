@@ -47,10 +47,10 @@ DX12::RenderTargetTexture& DX12::RenderTargetTexture::operator=(RenderTargetText
 {
 	CRITICAL_ASSERT(this != &other, "Moving RenderTargetTexture to itself.");
 
-	_texture = std::move(other._texture);
-	_mipCount = std::exchange(other._mipCount, 0);
+	std::swap(_texture, other._texture);
+	std::swap(_mipCount, other._mipCount);
 	for (int i = 0; i < _mipCount; i++)
-		_rtvHandles[i] = std::move(other._rtvHandles[i]);
+		std::swap(_rtvHandles[i], other._rtvHandles[i]);
 
 	return *this;
 }

@@ -32,10 +32,6 @@ namespace DX12
 
 		void SetDimensions(DX12::Math::Vector2u32 dimensions) { _dimensions = dimensions; }
 
-	private:
-
-		GPass& MoveImpl(GPass& other);
-
 		DX12::RenderTargetTexture _mainBuffer;
 		DX12::DepthBuffer _depthBuffer;
 		DX12::Math::Vector2u32 _dimensions = ::k_defaultDimensions;

@@ -34,13 +34,15 @@ namespace DX12::Shaders
 	struct Shader : public ShaderView 
 	{
 		Shader() = default;
-		~Shader();
+		~Shader() { Release(); };
 		Shader(Shader&& other) noexcept;
 		Shader& operator=(Shader&& other);
 
 		NO_COPY(Shader);
 
-		const DX12::Shaders::ShaderView CreateView() const;
+		void Release();
+
+		const DX12::Shaders::ShaderView CreateView() const;		
 	};
 
 	struct GenericShader

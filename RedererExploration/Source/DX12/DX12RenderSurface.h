@@ -10,8 +10,8 @@ namespace DX12
 
 		RenderSurface(const HWND window, DXGI_FORMAT format, ID3D12CommandQueue* commandQueue);
 		~RenderSurface() { Release(); }
-		RenderSurface(RenderSurface&& other) noexcept { MoveImpl(std::move(other)); };
-		RenderSurface& operator=(RenderSurface&& other) noexcept { return MoveImpl(std::move(other)); };
+		RenderSurface(RenderSurface&& other) noexcept;
+		RenderSurface& operator=(RenderSurface&& other) noexcept;
 
 		NO_COPY(RenderSurface);
 
@@ -30,7 +30,6 @@ namespace DX12
 	private:
 
 		void Release();
-		RenderSurface& MoveImpl(RenderSurface&& other);
 
 		void Finalize(DXGI_FORMAT format);
 

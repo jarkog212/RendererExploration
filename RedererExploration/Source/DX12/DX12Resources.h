@@ -60,15 +60,11 @@ namespace DX12
 		DescriptorHandle() = default;
 		DescriptorHandle(const DescriptorHandle&) = default;
 		DescriptorHandle& operator=(const DescriptorHandle& other) = default;
-		DescriptorHandle(DescriptorHandle&& other) noexcept { MoveImpl(std::move(other)); };
-		DescriptorHandle& operator=(DescriptorHandle&& other) noexcept { return MoveImpl(std::move(other)); };
+		DescriptorHandle(DescriptorHandle&& other) noexcept;
+		DescriptorHandle& operator=(DescriptorHandle&& other) noexcept;
 
 		constexpr bool IsValid() const { return _cpu.ptr != 0; }
 		constexpr bool IsShaderVisible() const { return _gpu.ptr != 0; }
-
-	private:
-
-		DescriptorHandle& MoveImpl(DescriptorHandle&& other);
 
 #ifdef _DEBUG
 	private:
@@ -86,16 +82,12 @@ namespace DX12
 		DX12::DescriptorHandle _rtvHandle = {};
 
 		RenderTargetData() = default;
-		RenderTargetData(RenderTargetData&& other) noexcept { MoveImpl(std::move(other)); }
-		RenderTargetData& operator=(RenderTargetData&& other) noexcept { return MoveImpl(std::move(other)); }
+		RenderTargetData(RenderTargetData&& other) noexcept;
+		RenderTargetData& operator=(RenderTargetData&& other) noexcept;
 
 		NO_COPY(RenderTargetData)
 
 		void Release();
-
-	private:
-
-		RenderTargetData& MoveImpl(RenderTargetData&& other);
 	};
 
 	struct DescriptorRange : public D3D12_DESCRIPTOR_RANGE1
@@ -157,5 +149,14 @@ namespace DX12
 			D3D12_ROOT_SIGNATURE_FLAGS flags = DX12::CC::RootSignatureSpec::k_PixelStageOnly)
 		: D3D12_ROOT_SIGNATURE_DESC2{parameterCount, parameters, samplerCount, samplers, flags}
 		{};
+	};
+
+	class IRenderPass 
+	{
+	public:
+		virtual void Initialize() = 0;
+		virtual void Release() = 0;
+		virtual void SetNext(IRenderPass* pass) = 0;
+		virtual void Render() = 0;
 	};
 }

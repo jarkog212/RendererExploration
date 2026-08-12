@@ -2,25 +2,45 @@
 #include "DX12DescriptorHeap.h"
 #include "DX12CommonDescriptors.h"
 
-DX12::DescriptorHandle& DX12::DescriptorHandle::MoveImpl(DescriptorHandle&& other)
+DX12::DescriptorHandle::DescriptorHandle(DescriptorHandle&& other) noexcept :
+	_cpu(std::exchange(other._cpu, { 0 })),
+	_gpu(std::exchange(other._gpu, { 0 }))
+#ifdef _DEBUG
+	,_owner(std::exchange(other._owner, nullptr)),
+	_index(std::exchange(other._index, 0))
+#endif
 {
-	CRITICAL_ASSERT(this != &other, "Trying to move descriptor handle to itself.")
+}
 
-	_cpu = other._cpu;
-	_gpu = other._gpu;
+DX12::DescriptorHandle& DX12::DescriptorHandle::operator=(DescriptorHandle&& other) noexcept
+{
+	CRITICAL_ASSERT(this != &other, "Trying to move descriptor handle to itself.");
 
-	other._cpu = { 0 };
-	other._gpu = { 0 };
+	_cpu = std::exchange(other._cpu, { 0 });
+	_gpu = std::exchange(other._gpu, { 0 });
 
 #ifdef _DEBUG
 	{
-		_owner = other._owner;
-		_index = other._index;
-
-		other._owner = nullptr;
-		other._index = 0;
+		_owner = std::exchange(other._owner, nullptr);
+		_index = std::exchange(other._index, 0);
 	}
 #endif
+
+	return *this;
+}
+
+DX12::RenderTargetData::RenderTargetData(RenderTargetData&& other) noexcept :
+	_resource(std::move(other._resource)),
+	_rtvHandle(std::move(other._rtvHandle))
+{
+}
+
+DX12::RenderTargetData& DX12::RenderTargetData::operator=(RenderTargetData&& other) noexcept
+{
+	CRITICAL_ASSERT(this != &other, "Moving RenderTargetData to itself.");
+
+	_resource = std::move(other._resource);
+	_rtvHandle = std::move(other._rtvHandle);
 
 	return *this;
 }
@@ -29,16 +49,6 @@ void DX12::RenderTargetData::Release()
 {
 	_resource.Reset();
 	DX12::GetRTVHeap()->Free(_rtvHandle);
-}
-
-DX12::RenderTargetData& DX12::RenderTargetData::MoveImpl(RenderTargetData&& other)
-{
-	CRITICAL_ASSERT(this != &other, "Moving RenderTargetData to itself.");
-
-	_resource = std::move(other._resource);
-	_rtvHandle = std::move(other._rtvHandle);
-
-	return *this;
 }
 
 void DX12::RootParameter::AsConstants(unsigned int numConstants, D3D12_SHADER_VISIBILITY visibility, unsigned int shaderRegister, unsigned int space)

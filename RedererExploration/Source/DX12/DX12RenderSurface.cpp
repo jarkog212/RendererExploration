@@ -20,7 +20,7 @@ DX12::RenderSurface::RenderSurface(const HWND window, DXGI_FORMAT format, ID3D12
 	const int width = windowDimensions.right - windowDimensions.left;
 	const int height = windowDimensions.bottom - windowDimensions.top;
 
-	DXGI_SWAP_CHAIN_DESC1 desc = DX12::CC::Desc::k_defaultSwapChainTemplate;
+	DXGI_SWAP_CHAIN_DESC1 desc = DX12::CC::Desc::k_swapChainTemplate;
 	desc.BufferCount = _k_swapChainBuffers;
 	desc.Flags = (bool)_allowTearing ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
 	desc.Format = format == DXGI_FORMAT_R8G8B8A8_UNORM_SRGB ?
@@ -54,6 +54,35 @@ DX12::RenderSurface::RenderSurface(const HWND window, DXGI_FORMAT format, ID3D12
 	Finalize(format);
 }
 
+DX12::RenderSurface::RenderSurface(RenderSurface&& other) noexcept :
+	_window(std::exchange(other._window, HWND(NULL))),
+	_currentBackBufferIndex(std::exchange(other._currentBackBufferIndex, 0)),
+	_viewport(std::exchange(other._viewport, D3D12_VIEWPORT())),
+	_scissorRect(std::exchange(other._scissorRect, D3D12_RECT())),
+	_presentFlags(std::exchange(other._presentFlags, 0)),
+	_allowTearing(std::exchange(other._allowTearing, 0))
+{
+	for (int i = 0; i < _k_swapChainBuffers; i++)
+		_renderTargetData[i] = std::move(other._renderTargetData[i]);
+}
+
+DX12::RenderSurface& DX12::RenderSurface::operator=(RenderSurface&& other) noexcept
+{
+	CRITICAL_ASSERT(this != &other, "Moving RenderSurface to itself.");
+
+	_window = std::exchange(other._window, HWND(NULL));
+	_currentBackBufferIndex = std::exchange(other._currentBackBufferIndex, 0);
+	_viewport = std::exchange(other._viewport, D3D12_VIEWPORT());
+	_scissorRect = std::exchange(other._scissorRect, D3D12_RECT());
+	_presentFlags = std::exchange(other._presentFlags, 0);
+	_allowTearing = std::exchange(other._allowTearing, 0);
+
+	for (int i = 0; i < _k_swapChainBuffers; i++)
+		_renderTargetData[i] = std::move(other._renderTargetData[i]);
+
+	return *this;
+}
+
 void DX12::RenderSurface::Resize()
 {
 	DX12::GetMainCommandExecutor()->Flush();
@@ -76,31 +105,6 @@ RECT DX12::RenderSurface::GetWindowDimensions() const
 	return rect;
 }
 
-DX12::RenderSurface& DX12::RenderSurface::MoveImpl(RenderSurface&& other)
-{
-	CRITICAL_ASSERT(this != &other, "Moving RenderSurface to itself.");
-
-	_window = other._window;
-	_currentBackBufferIndex = other._currentBackBufferIndex;
-	_viewport = other._viewport;
-	_scissorRect = other._scissorRect;
-	_presentFlags = other._presentFlags;
-	_allowTearing = other._allowTearing;
-
-	for (int i = 0; i < _k_swapChainBuffers; i++)
-		_renderTargetData[i] = std::move(other._renderTargetData[i]);
-
-	// clean non-move specified data
-	other._window = NULL;
-	other._currentBackBufferIndex = 0;
-	other._viewport = D3D12_VIEWPORT();
-	other._scissorRect = D3D12_RECT();
-	other._presentFlags = 0;
-	other._allowTearing = 0;
-
-	return *this;
-}
-
 void DX12::RenderSurface::Release()
 {
 	DX12::GetMainCommandExecutor()->Flush();
@@ -120,7 +124,7 @@ void DX12::RenderSurface::Finalize(DXGI_FORMAT format)
 			_swapChain->GetBuffer(i, IID_PPV_ARGS(&data._resource)),
 			"Could not get a hold of the swap chain internal buffer.");
 
-		D3D12_RENDER_TARGET_VIEW_DESC desc = DX12::CC::Desc::k_defaultRenderTargetViewTemplate;
+		D3D12_RENDER_TARGET_VIEW_DESC desc = DX12::CC::Desc::k_renderTargetViewTemplate;
 		desc.Format = format;
 
 		DX12::GetRendererDevice()->CreateRenderTargetView(data._resource.Get(), &desc, data._rtvHandle._cpu);

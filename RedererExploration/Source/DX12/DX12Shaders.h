@@ -35,16 +35,12 @@ namespace DX12::Shaders
 	{
 		Shader() = default;
 		~Shader();
-		Shader(Shader&& other) noexcept { MoveImpl(std::move(other)); }
-		Shader& operator=(Shader&& other) noexcept { return MoveImpl(std::move(other)); }
+		Shader(Shader&& other) noexcept;
+		Shader& operator=(Shader&& other);
 
 		NO_COPY(Shader);
 
 		const DX12::Shaders::ShaderView CreateView() const;
-
-	private:
-
-		Shader& MoveImpl(Shader&& other);
 	};
 
 	struct GenericShader

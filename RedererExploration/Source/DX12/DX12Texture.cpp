@@ -37,7 +37,7 @@ DX12::Texture::Texture(TextureSpecs& specs)
 	{
 		HRESULT_CHECK_FALLBACK(
 			device->CreateCommittedResource(
-				&DX12::CC::Desc::k_defaultHeapProperties,
+				&DX12::CC::Desc::k_heapPropertiesTemplate,
 				D3D12_HEAP_FLAG_NONE,
 				specs._resourceDesc,
 				specs._initialState,
@@ -51,20 +51,24 @@ DX12::Texture::Texture(TextureSpecs& specs)
 	device->CreateShaderResourceView(_resource, specs._srvDesc, _srvHandle._cpu);
 }
 
+DX12::Texture::Texture(Texture&& other) noexcept :
+	_resource(std::exchange(other._resource, nullptr)),
+	_srvHandle(std::move(other._srvHandle))
+{
+}
+
+DX12::Texture& DX12::Texture::operator=(Texture&& other) noexcept
+{
+	CRITICAL_ASSERT(this != &other, "Moving Texture to itself.");
+
+	_resource = std::exchange(other._resource, nullptr);
+	_srvHandle = std::move(other._srvHandle);
+
+	return *this;
+}
+
 void DX12::Texture::Release()
 {
 	DX12::GetSRVHeap()->Free(_srvHandle);
 	Utils::COM::SafeDeferredRenderThreadRelease(_resource);
-}
-
-DX12::Texture& DX12::Texture::MoveImpl(Texture&& other)
-{
-	CRITICAL_ASSERT(this != &other, "Moving Texture to itself.");
-
-	_resource = other._resource;
-	_srvHandle = std::move(other._srvHandle);
-
-	other._resource = nullptr;
-
-	return *this;
 }

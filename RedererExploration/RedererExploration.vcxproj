@@ -140,6 +140,7 @@
     <ClCompile Include="RedererExploration.cpp" />
     <ClCompile Include="Source\DX12\DX12DepthBuffer.cpp" />
     <ClCompile Include="Source\DX12\DX12DescriptorHeap.cpp" />
+    <ClCompile Include="Source\DX12\DX12GPass.cpp" />
     <ClCompile Include="Source\DX12\DX12Renderer.cpp" />
     <ClCompile Include="Source\DX12\DX12RenderSurface.cpp" />
     <ClCompile Include="Source\DX12\DX12RenderTarget.cpp" />
@@ -156,6 +157,8 @@
     <ClInclude Include="Source\DX12\DX12Core.h" />
     <ClInclude Include="Source\DX12\DX12DepthBuffer.h" />
     <ClInclude Include="Source\DX12\DX12DescriptorHeap.h" />
+    <ClInclude Include="Source\DX12\DX12GPass.h" />
+    <ClInclude Include="Source\DX12\DX12Math.h" />
     <ClInclude Include="Source\DX12\DX12RenderSurface.h" />
     <ClInclude Include="Source\DX12\DX12RenderTarget.h" />
     <ClInclude Include="Source\DX12\DX12Resources.h" />

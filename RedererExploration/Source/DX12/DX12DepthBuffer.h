@@ -8,10 +8,11 @@ namespace DX12
 	{
 	public:
 
-		DepthBuffer(DX12::TextureSpecs& specs);
+		static DepthBuffer Create(DX12::TextureSpecs& specs);
+
 		~DepthBuffer() { Release(); }
-		DepthBuffer(DepthBuffer&& other) noexcept { MoveImpl(std::move(other)); }
-		DepthBuffer& operator=(DepthBuffer&& other) noexcept { return MoveImpl(std::move(other)); }
+		DepthBuffer(DepthBuffer&& other) noexcept;
+		DepthBuffer& operator=(DepthBuffer&& other) noexcept;
 
 		NO_COPY(DepthBuffer);
 		
@@ -21,9 +22,9 @@ namespace DX12
 
 	private:
 
+		DepthBuffer(DX12::TextureSpecs& specs, DXGI_FORMAT stencilFormat);
 		void Release();
-		DepthBuffer& MoveImpl(DepthBuffer&& other);
-
+		
 		DX12::Texture _texture;
 		DX12::DescriptorHandle _dsvHandle;
 	};

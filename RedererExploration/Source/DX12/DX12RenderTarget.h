@@ -8,10 +8,11 @@ namespace DX12
 	{
 	public:
 
-		RenderTargetTexture(DX12::TextureSpecs& spec);
+		static RenderTargetTexture Create(DX12::TextureSpecs& specs);
+
 		~RenderTargetTexture() { Release(); };
-		RenderTargetTexture(RenderTargetTexture&& other) noexcept { MoveImpl(std::move(other)); }
-		RenderTargetTexture& operator=(RenderTargetTexture&& other) noexcept { return MoveImpl(std::move(other)); }
+		RenderTargetTexture(RenderTargetTexture&& other) noexcept;
+		RenderTargetTexture& operator=(RenderTargetTexture&& other) noexcept;
 		
 		NO_COPY(RenderTargetTexture);
 
@@ -21,9 +22,10 @@ namespace DX12
 		ID3D12Resource* GetResource() const { return _texture.GetResource(); }
 
 	private:
+
+		RenderTargetTexture(DX12::TextureSpecs& spec);
 		
 		void Release();
-		RenderTargetTexture& MoveImpl(RenderTargetTexture&& other);
 
 		DX12::Texture _texture;
 		DX12::DescriptorHandle _rtvHandles[DX12::Texture::_k_maxMips];

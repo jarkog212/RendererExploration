@@ -193,6 +193,22 @@ DX12::Shaders::Shader::~Shader()
 	delete[] _byteCode;
 }
 
+DX12::Shaders::Shader::Shader(Shader&& other) noexcept
+{
+	_size = std::exchange(other._size, 0);
+	_byteCode = std::exchange(other._byteCode, nullptr);
+}
+
+DX12::Shaders::Shader& DX12::Shaders::Shader::operator=(Shader&& other)
+{
+	CRITICAL_ASSERT(this != &other, "Trying to move shader to itself.");
+
+	_size = std::exchange(other._size, 0);
+	_byteCode = std::exchange(other._byteCode, nullptr);
+
+	return *this;
+}
+
 D3D12_SHADER_BYTECODE DX12::Shaders::ShaderView::AsDX12Bytecode() const
 {
 	D3D12_SHADER_BYTECODE out;
@@ -206,18 +222,6 @@ const DX12::Shaders::ShaderView DX12::Shaders::Shader::CreateView() const
 	DX12::Shaders::ShaderView out;
 	memcpy(&out, this, sizeof(this));
 	return out;
-}
-
-DX12::Shaders::Shader& DX12::Shaders::Shader::MoveImpl(Shader&& other)
-{
-	CRITICAL_ASSERT(this != &other, "Trying to move shader to itself.");
-
-	_size = other._size;
-	_byteCode = other._byteCode;
-
-	other = {};
-
-	return *this;
 }
 
 void DX12::Shaders::Initialize()

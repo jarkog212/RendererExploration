@@ -41,6 +41,9 @@
     <ClCompile Include="Source\DX12\DX12Shaders.cpp">
       <Filter>Source Files\DX12</Filter>
     </ClCompile>
+    <ClCompile Include="Source\DX12\DX12GPass.cpp">
+      <Filter>Source Files\DX12</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
@@ -80,6 +83,12 @@
       <Filter>Source Files\DX12</Filter>
     </ClInclude>
     <ClInclude Include="Source\DX12\DX12Shaders.h">
+      <Filter>Source Files\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\DX12\DX12GPass.h">
+      <Filter>Source Files\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\DX12\DX12Math.h">
       <Filter>Source Files\DX12</Filter>
     </ClInclude>
   </ItemGroup>

@@ -2,14 +2,20 @@
 #include "DX12DescriptorHeap.h"
 #include "DX12CommonDescriptors.h"
 
+DX12::DescriptorHandle::~DescriptorHandle()
+{
+	if (_owner)
+		_owner->Free(*this);
+}
+
 DX12::DescriptorHandle::DescriptorHandle(DescriptorHandle&& other) noexcept :
-	_cpu(std::exchange(other._cpu, { 0 })),
-	_gpu(std::exchange(other._gpu, { 0 }))
+	_owner(std::exchange(other._owner, nullptr))
 #ifdef _DEBUG
-	,_owner(std::exchange(other._owner, nullptr)),
-	_index(std::exchange(other._index, 0))
+	,_index(std::exchange(other._index, 0))
 #endif
 {
+	_cpu = std::exchange(other._cpu, { 0 });
+	_gpu = std::exchange(other._gpu, { 0 });
 }
 
 DX12::DescriptorHandle& DX12::DescriptorHandle::operator=(DescriptorHandle&& other) noexcept
@@ -18,10 +24,10 @@ DX12::DescriptorHandle& DX12::DescriptorHandle::operator=(DescriptorHandle&& oth
 
 	std::swap(_cpu, other._cpu);
 	std::swap(_gpu, other._gpu);
+	std::swap(_owner, other._owner);
 
 #ifdef _DEBUG
 	{
-		std::swap(_owner, other._owner);
 		std::swap(_index, other._index);
 	}
 #endif
@@ -43,12 +49,6 @@ DX12::RenderTargetData& DX12::RenderTargetData::operator=(RenderTargetData&& oth
 	std::swap(_rtvHandle, other._rtvHandle);
 
 	return *this;
-}
-
-void DX12::RenderTargetData::Release()
-{
-	_resource.Reset();
-	DX12::GetRTVHeap()->Free(_rtvHandle);
 }
 
 void DX12::RootParameter::AsConstants(unsigned int numConstants, D3D12_SHADER_VISIBILITY visibility, unsigned int shaderRegister, unsigned int space)
@@ -149,4 +149,12 @@ ID3D12PipelineState* DX12::CreatePipelineState(void* stream, unsigned long long 
 		"Could not create pipeline state.");
 
 	return stateObject;
+}
+
+void DX12::RenderPassBase::Render(DX12::GfxCommandExecutor& commandExecutor)
+{
+	RenderPass(commandExecutor);
+
+	if (_next)
+		Render(commandExecutor);
 }

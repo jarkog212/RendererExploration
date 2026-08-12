@@ -22,18 +22,16 @@ namespace DX12
 		static constexpr unsigned int _k_maxMips = 14;
 
 		Texture(TextureSpecs& specs);
-		~Texture() { Release(); }
+		~Texture();
 		Texture(Texture&& other) noexcept;
 		Texture& operator=(Texture&& other) noexcept;
 
 		NO_COPY(Texture);
 
 		ID3D12Resource* GetResource() const { return _resource; }
-		 DescriptorHandle GetSRVHandle() const { return _srvHandle; }
+		const DX12::DescriptorHandleView GetSRVHandle() const { return _srvHandle.CreateView(); }
 
 	private:
-
-		void Release();
 
 		ID3D12Resource* _resource = nullptr; // non-owning (deferred free) so RAW
 		DX12::DescriptorHandle _srvHandle = {};

@@ -9,7 +9,7 @@ namespace DX12
 	public:
 
 		RenderSurface(const HWND window, DXGI_FORMAT format, ID3D12CommandQueue* commandQueue);
-		~RenderSurface() { Release(); }
+		~RenderSurface();
 		RenderSurface(RenderSurface&& other) noexcept;
 		RenderSurface& operator=(RenderSurface&& other) noexcept;
 
@@ -29,8 +29,6 @@ namespace DX12
 
 	private:
 
-		void Release();
-
 		void Finalize(DXGI_FORMAT format);
 
 		static constexpr int _k_swapChainBuffers = 3;
@@ -42,6 +40,6 @@ namespace DX12
 		D3D12_RECT _scissorRect = {};
 		unsigned int _presentFlags = 0;
 		unsigned int _allowTearing = 0;
-		RenderTargetData _renderTargetData[DX12::CC::k_frameBuffers];
+		DX12::RenderTargetData _renderTargetData[DX12::CC::k_frameBuffers];
 	};
 }

@@ -188,6 +188,12 @@ namespace
 	}
 }
 
+DX12::Shaders::Shader::~Shader()
+{
+	_size = 0;
+	delete[] _byteCode;
+}
+
 DX12::Shaders::Shader::Shader(Shader&& other) noexcept
 {
 	_size = std::exchange(other._size, 0);
@@ -209,19 +215,6 @@ D3D12_SHADER_BYTECODE DX12::Shaders::ShaderView::AsDX12Bytecode() const
 	D3D12_SHADER_BYTECODE out;
 	out.BytecodeLength = _size;
 	out.pShaderBytecode = &_byteCode;
-	return out;
-}
-
-void DX12::Shaders::Shader::Release()
-{
-	_size = 0;
-	delete[] _byteCode;
-}
-
-const DX12::Shaders::ShaderView DX12::Shaders::Shader::CreateView() const
-{
-	DX12::Shaders::ShaderView out;
-	memcpy(&out, this, sizeof(this));
 	return out;
 }
 

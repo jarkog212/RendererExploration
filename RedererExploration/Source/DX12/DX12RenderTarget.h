@@ -10,7 +10,6 @@ namespace DX12
 
 		static RenderTargetTexture Create(DX12::TextureSpecs& specs);
 
-		~RenderTargetTexture() { Release(); };
 		RenderTargetTexture(RenderTargetTexture&& other) noexcept;
 		RenderTargetTexture& operator=(RenderTargetTexture&& other) noexcept;
 		
@@ -18,14 +17,12 @@ namespace DX12
 
 		constexpr unsigned int GetMipCount() const { return _mipCount; }
 		constexpr D3D12_CPU_DESCRIPTOR_HANDLE GetRTVCPUHandle(unsigned int mip) const;
-		DX12::DescriptorHandle GetSRVHandle() const { return _texture.GetSRVHandle(); }
+		DX12::DescriptorHandleView GetSRVHandle() const { return _texture.GetSRVHandle(); }
 		ID3D12Resource* GetResource() const { return _texture.GetResource(); }
 
 	private:
 
 		RenderTargetTexture(DX12::TextureSpecs& spec);
-		
-		void Release();
 
 		DX12::Texture _texture;
 		DX12::DescriptorHandle _rtvHandles[DX12::Texture::_k_maxMips];

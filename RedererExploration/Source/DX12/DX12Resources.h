@@ -52,26 +52,35 @@ namespace DX12
 		using SubobjectSerializedRootSignature = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_SERIALIZED_ROOT_SIGNATURE, D3D12_SERIALIZED_ROOT_SIGNATURE_DESC>;		
 	} // PipelineStream;
 
-	struct DescriptorHandle
+	struct DescriptorHandleView
 	{
 		D3D12_CPU_DESCRIPTOR_HANDLE _cpu{ 0 };
 		D3D12_GPU_DESCRIPTOR_HANDLE _gpu{ 0 };
 
+		constexpr bool IsValid() const { return _cpu.ptr != 0; }
+		constexpr bool IsShaderVisible() const { return _gpu.ptr != 0; }
+	};
+
+	struct DescriptorHandle : public DescriptorHandleView
+	{
 		DescriptorHandle() = default;
-		DescriptorHandle(const DescriptorHandle&) = default;
-		DescriptorHandle& operator=(const DescriptorHandle& other) = default;
+		~DescriptorHandle();
 		DescriptorHandle(DescriptorHandle&& other) noexcept;
 		DescriptorHandle& operator=(DescriptorHandle&& other) noexcept;
 
+		NO_COPY(DescriptorHandle);
+
 		constexpr bool IsValid() const { return _cpu.ptr != 0; }
 		constexpr bool IsShaderVisible() const { return _gpu.ptr != 0; }
+		const DX12::DescriptorHandleView CreateView() const { return { _cpu , _gpu }; };
+
+		DX12::DescriptorHeap* _owner = nullptr;
 
 #ifdef _DEBUG
 	private:
 
-		friend class DescriptorHeap;
+		friend class DX12::DescriptorHeap;
 
-		DescriptorHeap* _owner = nullptr;
 		unsigned int _index = 0;
 #endif
 	};
@@ -86,8 +95,6 @@ namespace DX12
 		RenderTargetData& operator=(RenderTargetData&& other) noexcept;
 
 		NO_COPY(RenderTargetData)
-
-		void Release();
 	};
 
 	struct DescriptorRange : public D3D12_DESCRIPTOR_RANGE1
@@ -151,12 +158,22 @@ namespace DX12
 		{};
 	};
 
-	class IRenderPass 
+	class RenderPassBase
 	{
 	public:
-		virtual void Initialize() = 0;
-		virtual void Release() = 0;
-		virtual void SetNext(IRenderPass* pass) = 0;
-		virtual void Render() = 0;
+
+		void SetNext(RenderPassBase& pass) { _next = &pass; };
+		void UnsetNext() { _next = nullptr; };
+		void Render(DX12::GfxCommandExecutor& commandExecutor);
+
+	protected:
+
+		virtual void RenderPass(DX12::GfxCommandExecutor& commandExecutor) = 0;
+
+		const char* _name = "";
+
+	private:
+
+		RenderPassBase* _next = nullptr;
 	};
 }

@@ -54,6 +54,12 @@ DX12::RenderSurface::RenderSurface(const HWND window, DXGI_FORMAT format, ID3D12
 	Finalize(format);
 }
 
+DX12::RenderSurface::~RenderSurface()
+{
+	// Stall out the GPU
+	DX12::GetMainCommandExecutor()->Flush();
+}
+
 DX12::RenderSurface::RenderSurface(RenderSurface&& other) noexcept :
 	_window(std::exchange(other._window, HWND(NULL))),
 	_currentBackBufferIndex(std::exchange(other._currentBackBufferIndex, 0)),
@@ -103,16 +109,6 @@ RECT DX12::RenderSurface::GetWindowDimensions() const
 	RECT rect;
 	FALLBACK_ASSERT(GetWindowRect(_window, &rect), ,"Error getting window dimensions.")
 	return rect;
-}
-
-void DX12::RenderSurface::Release()
-{
-	DX12::GetMainCommandExecutor()->Flush();
-
-	for (int i = 0; i < _k_swapChainBuffers; i++)
-		_renderTargetData[i].Release();
-
-	_swapChain.Reset();
 }
 
 void DX12::RenderSurface::Finalize(DXGI_FORMAT format)

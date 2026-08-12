@@ -66,9 +66,10 @@ DX12::DescriptorHandle DX12::DescriptorHeap::Allocate()
 	if (IsShaderVisible())
 		out._gpu.ptr = _mainHandles._gpu.ptr + offset;
 
+	out._owner = this;
+
 #ifdef _DEBUG
 	{
-		out._owner = this;
 		out._index = index;
 	}
 #endif
@@ -108,8 +109,6 @@ void DX12::DescriptorHeap::Free(DescriptorHandle& handle)
 		const int currentFrame = DX12::GetMainCommandExecutor()->GetCurrentFrame();
 		_deferredResourceFreeing[currentFrame].push_back(index);
 		DX12::SetPendingResourceFreeingFlag();
-
-		handle = {};
 	}
 }
 

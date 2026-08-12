@@ -54,8 +54,3 @@ DX12::DepthBuffer& DX12::DepthBuffer::operator=(DepthBuffer&& other) noexcept
 
 	return *this;
 }
-
-void DX12::DepthBuffer::Release()
-{
-	DX12::GetDSVHeap()->Free(_dsvHandle);
-}

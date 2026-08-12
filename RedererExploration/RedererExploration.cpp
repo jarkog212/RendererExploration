@@ -2,7 +2,6 @@
 //
 
 #include <iostream>
-#include <windows.h>
 #include <chrono>
 #include <string>
 #include <fstream>

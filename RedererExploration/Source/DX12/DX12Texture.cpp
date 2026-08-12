@@ -51,6 +51,11 @@ DX12::Texture::Texture(TextureSpecs& specs)
 	device->CreateShaderResourceView(_resource, specs._srvDesc, _srvHandle._cpu);
 }
 
+DX12::Texture::~Texture()
+{
+	Utils::COM::SafeDeferredRenderThreadRelease(_resource);
+}
+
 DX12::Texture::Texture(Texture&& other) noexcept :
 	_resource(std::exchange(other._resource, nullptr)),
 	_srvHandle(std::move(other._srvHandle))
@@ -65,10 +70,4 @@ DX12::Texture& DX12::Texture::operator=(Texture&& other) noexcept
 	std::swap(_srvHandle, other._srvHandle);
 
 	return *this;
-}
-
-void DX12::Texture::Release()
-{
-	DX12::GetSRVHeap()->Free(_srvHandle);
-	Utils::COM::SafeDeferredRenderThreadRelease(_resource);
 }

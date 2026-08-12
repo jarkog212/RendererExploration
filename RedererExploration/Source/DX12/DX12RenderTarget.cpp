@@ -55,13 +55,6 @@ DX12::RenderTargetTexture& DX12::RenderTargetTexture::operator=(RenderTargetText
 	return *this;
 }
 
-void DX12::RenderTargetTexture::Release()
-{
-	DX12::DescriptorHeap* rtvHeap = DX12::GetRTVHeap();
-	for (int i = 0; i < _mipCount; i++)
-		rtvHeap->Free(_rtvHandles[i]);
-}
-
 constexpr D3D12_CPU_DESCRIPTOR_HANDLE DX12::RenderTargetTexture::GetRTVCPUHandle(unsigned int mip) const
 {
 	CRITICAL_ASSERT(

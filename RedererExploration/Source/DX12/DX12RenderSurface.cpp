@@ -67,7 +67,8 @@ DX12::RenderSurface& DX12::RenderSurface::operator=(RenderSurface&& other) noexc
 
 void DX12::RenderSurface::Resize()
 {
-	DX12::GetMainCommandExecutor()->Flush();
+	if (_linkedCommandExecutor)
+		_linkedCommandExecutor->Flush();
 
 	// body
 }

@@ -21,6 +21,8 @@ namespace DX12::Math
 	{
 		Vector2u32(unsigned int X, unsigned int Y) { _data = { X, Y }; }
 		unsigned int& X() { return _data[0]; }
+		unsigned int X() const { return _data[0]; }
 		unsigned int& Y() { return _data[1]; }
+		unsigned int Y() const { return _data[1]; }
 	};
 }

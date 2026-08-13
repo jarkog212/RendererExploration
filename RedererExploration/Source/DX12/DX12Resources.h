@@ -154,7 +154,7 @@ namespace DX12
 
 		void SetNext(RenderPassBase& pass) { _next = &pass; };
 		void UnsetNext() { _next = nullptr; };
-		void Render(ID3D12GraphicsCommandList6* commandList);
+		void BakeCommands(ID3D12GraphicsCommandList6* commandList);
 
 	protected:
 

@@ -15,26 +15,33 @@ namespace
 	constexpr float k_clearValue[4]{};
 #endif
 
-	static ID3D12RootSignature* GPassRootSignature = nullptr; // raw as it's cleanup is deferred
-	static ID3D12PipelineState* GPassPipelineState = nullptr; // raw as it's cleanup is deferred
+	static ID3D12RootSignature* g_GPassRootSignature = nullptr; // raw as it's cleanup is deferred
+	static ID3D12PipelineState* g_GPassPipelineState = nullptr; // raw as it's cleanup is deferred
+
+	static std::unique_ptr<DX12::DepthPass> g_DepthPass = nullptr;
+	static std::unique_ptr<DX12::GPassRT> g_GPassRTPass = nullptr;
 }
 
 void DX12::GPassSpace::WarmUp()
 {
 	DX12::GPassSpace::GetRootSignature();
 	DX12::GPassSpace::GetPipelineState();
+	DX12::GPassSpace::GetDepthPass(::k_defaultDimensions);
+	DX12::GPassSpace::GetGPassRTPass(::k_defaultDimensions);
 }
 
 void DX12::GPassSpace::Release()
 {
-	Utils::COM::SafeDeferredRenderThreadRelease(::GPassRootSignature);
-	Utils::COM::SafeDeferredRenderThreadRelease(::GPassPipelineState);
+	Utils::COM::SafeDeferredRenderThreadRelease(::g_GPassRootSignature);
+	Utils::COM::SafeDeferredRenderThreadRelease(::g_GPassPipelineState);
+	::g_DepthPass.reset();
+	::g_GPassRTPass.reset();
 }
 
 ID3D12RootSignature* DX12::GPassSpace::GetRootSignature()
 {
-	if (::GPassRootSignature) [[likely]]
-		return ::GPassRootSignature;
+	if (::g_GPassRootSignature) [[likely]]
+		return ::g_GPassRootSignature;
 
 	DX12::RootParameter params[1]{};
 	params[0].AsConstants(1, D3D12_SHADER_VISIBILITY_PIXEL, 1);
@@ -43,19 +50,19 @@ ID3D12RootSignature* DX12::GPassSpace::GetRootSignature()
 	desc.NumParameters = _countof(params);
 	desc.pParameters = params;
 
-	::GPassRootSignature = DX12::CreateRootSignature(desc);
+	::g_GPassRootSignature = DX12::CreateRootSignature(desc);
 
 	HRESULT_CHECK_CRITICAL(
-		::GPassRootSignature->SetName(L"GPass Root Signature."),
+		::g_GPassRootSignature->SetName(L"GPass Root Signature."),
 		"Could not name GPass roost signature.");
 
-	return ::GPassRootSignature;
+	return ::g_GPassRootSignature;
 }
 
 ID3D12PipelineState* DX12::GPassSpace::GetPipelineState()
 {
-	if (::GPassPipelineState) [[likely]]
-		return ::GPassPipelineState;
+	if (::g_GPassPipelineState) [[likely]]
+		return ::g_GPassPipelineState;
 
 	D3D12_RT_FORMAT_ARRAY renderTargetFormats;
 	renderTargetFormats.NumRenderTargets = 1;
@@ -73,91 +80,85 @@ ID3D12PipelineState* DX12::GPassSpace::GetPipelineState()
 		SubDepthStencil1 depth{ DX12::CC::Desc::DepthStencil::k_disabledBothTemplate };
 	}stream;
 
-	::GPassPipelineState = DX12::CreatePipelineState(&stream, sizeof(stream));
+	::g_GPassPipelineState = DX12::CreatePipelineState(&stream, sizeof(stream));
 
 	HRESULT_CHECK_CRITICAL(
-		::GPassPipelineState->SetName(L"GPass PSO."),
+		::g_GPassPipelineState->SetName(L"GPass PSO."),
 		"Could not name GPass PSO.");
 
-	return ::GPassPipelineState;
+	return ::g_GPassPipelineState;
 }
 
-DX12::GPass DX12::GPass::Create(DX12::Math::Vector2u32& size)
+DX12::DepthPass* DX12::GPassSpace::GetDepthPass(DX12::Math::Vector2u32 size)
 {
-	return GPass(
-		DX12::GPass::CreateMainBufferTemplate(size),
-		DX12::GPass::CreateDepthBufferTemplate(size));
+	if (::g_DepthPass) [[likely]]
+		return ::g_DepthPass.get();
+
+	::g_DepthPass = std::make_unique<DX12::DepthPass>(DX12::DepthPass::Create(size));
+	return ::g_DepthPass.get();
 }
 
-DX12::GPass::GPass(DX12::RenderTargetTexture&& mainBuffer, DX12::DepthBufferTexture&& depthBuffer) :
-	_mainBuffer(std::move(mainBuffer)),
+DX12::GPassRT* DX12::GPassSpace::GetGPassRTPass(DX12::Math::Vector2u32 size)
+{
+	if (::g_GPassRTPass) [[likely]]
+		return ::g_GPassRTPass.get();
+
+	::g_GPassRTPass = std::make_unique<DX12::GPassRT>(DX12::GPassRT::Create(size));
+	return ::g_GPassRTPass.get();
+}
+
+DX12::DepthPass DX12::DepthPass::Create(const DX12::Math::Vector2u32& size)
+{
+	return DepthPass(DX12::DepthPass::CreateDepthBuffer(size));
+}
+
+DX12::DepthPass::DepthPass(DX12::DepthBufferTexture&& depthBuffer) : 
 	_depthBuffer(std::move(depthBuffer))
 {
-	_name = "GPass";
+	_name = "GPass - Depth buffer";
 }
 
-DX12::GPass::GPass(GPass&& other) noexcept :
+DX12::DepthPass::DepthPass(DepthPass&& other) noexcept :
 	RenderPassBase(std::move(other)),
-	_mainBuffer(std::move(other._mainBuffer)),
 	_depthBuffer(std::move(other._depthBuffer)),
 	_dimensions(std::exchange(other._dimensions, { 0,0 }))
 {
 }
 
-DX12::GPass& DX12::GPass::operator=(GPass&& other) noexcept
+DX12::DepthPass& DX12::DepthPass::operator=(DepthPass&& other) noexcept
 {
-	CRITICAL_ASSERT(this != &other, "Moving GPass to itself.");
+	CRITICAL_ASSERT(this != &other, "Moving Depth Pass to itself.");
 
 	RenderPassBase::operator=(std::move(other));
 
-	std::swap(_mainBuffer,other._mainBuffer);
 	std::swap(_depthBuffer, other._depthBuffer);
 	std::swap(_dimensions, other._dimensions);
 
 	return *this;
 }
 
-void DX12::GPass::RenderPass(ID3D12GraphicsCommandList6* commandList)
+void DX12::DepthPass::RenderPass(ID3D12GraphicsCommandList6* commandList)
 {
-	commandList->SetGraphicsRootSignature(DX12::GPassSpace::GetRootSignature());
-	commandList->SetPipelineState(DX12::GPassSpace::GetPipelineState());
-	commandList->IASetPrimitiveTopology(D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	const D3D12_CPU_DESCRIPTOR_HANDLE dsv = _depthBuffer.GetDSVCpuHandle();
+	commandList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 0.f, 0, 0, nullptr);
+	commandList->OMSetRenderTargets(0, nullptr, false, &dsv);
 
-	static unsigned int call = 0;
-	commandList->SetGraphicsRoot32BitConstant(0, ++call, 0);
-
-	DepthPass(commandList);
+	// Further pass code here
 }
 
-void DX12::GPass::SetDimensions(DX12::Math::Vector2u32 dimensions)
+void DX12::DepthPass::SetDimensions(const DX12::Math::Vector2u32& dimensions)
 {
 	DX12::Math::Vector2u32 newDimensions = dimensions;
 	if (dimensions.X() > _dimensions.X() || dimensions.X() > _dimensions.Y())
 	{
 		newDimensions = { std::max(dimensions.X(), _dimensions.X()), std::max(dimensions.Y(), _dimensions.Y()) };
-		_mainBuffer = DX12::GPass::CreateMainBufferTemplate(newDimensions);
-		_depthBuffer = DX12::GPass::CreateDepthBufferTemplate(newDimensions);
+		_depthBuffer = DX12::DepthPass::CreateDepthBuffer(newDimensions);
 	}
 
 	_dimensions = newDimensions;
 }
 
-DX12::RenderTargetTexture DX12::GPass::CreateMainBufferTemplate(DX12::Math::Vector2u32& size)
-{
-	D3D12_RESOURCE_DESC desc = DX12::CC::Desc::GPassRes::k_mainTextureTemplate;
-	desc.Width = size.X();
-	desc.Height = size.Y();
-
-	DX12::TextureSpecs specs;
-	specs._resourceDesc = &desc;
-	specs._initialState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-	specs._clearValue.Format = desc.Format;
-	memcpy(&specs._clearValue.Color, &::k_clearValue, sizeof(::k_clearValue));
-
-	return DX12::RenderTargetTexture::Create(specs);
-}
-
-DX12::DepthBufferTexture DX12::GPass::CreateDepthBufferTemplate(DX12::Math::Vector2u32& size)
+DX12::DepthBufferTexture DX12::DepthPass::CreateDepthBuffer(const DX12::Math::Vector2u32& size)
 {
 	D3D12_RESOURCE_DESC desc = DX12::CC::Desc::GPassRes::k_depthTextureTemplate;
 	desc.Width = size.X();
@@ -176,21 +177,85 @@ DX12::DepthBufferTexture DX12::GPass::CreateDepthBufferTemplate(DX12::Math::Vect
 	return DX12::DepthBufferTexture::Create(specs);
 }
 
-void DX12::GPass::DepthPass(ID3D12GraphicsCommandList6* commandList)
+DX12::GPassRT DX12::GPassRT::Create(const DX12::Math::Vector2u32& size)
 {
-	const D3D12_CPU_DESCRIPTOR_HANDLE dsv = _depthBuffer.GetDSVCpuHandle();
-	commandList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 0.f, 0, 0, nullptr);
-	commandList->OMSetRenderTargets(0, nullptr, false, &dsv);
-
-	commandList->DrawInstanced(3, 1, 0, 0);
+	return GPassRT(DX12::GPassRT::CreateRenderTarget(size));
 }
 
-void DX12::GPass::FullPass(ID3D12GraphicsCommandList6* commandList)
+DX12::GPassRT::GPassRT(DX12::RenderTargetTexture&& mainBuffer) :
+	_mainBuffer(std::move(mainBuffer))
 {
-	const D3D12_CPU_DESCRIPTOR_HANDLE dsv = _depthBuffer.GetDSVCpuHandle();
+	_name = "GPass - Render Target";
+}
+
+DX12::GPassRT::GPassRT(GPassRT&& other) noexcept :
+	RenderPassBase(std::move(other)),
+	_linkToDepthPass(std::exchange(other._linkToDepthPass, nullptr)),
+	_mainBuffer(std::move(other._mainBuffer)),
+	_dimensions(std::exchange(other._dimensions, { 0,0 }))
+{
+}
+
+DX12::GPassRT& DX12::GPassRT::operator=(GPassRT&& other) noexcept
+{
+	CRITICAL_ASSERT(this != &other, "Moving GPass RT to itself.");
+
+	RenderPassBase::operator=(std::move(other));
+
+	std::swap(_linkToDepthPass, other._linkToDepthPass);
+	std::swap(_mainBuffer, other._mainBuffer);
+	std::swap(_dimensions, other._dimensions);
+
+	return *this;
+}
+
+void DX12::GPassRT::RenderPass(ID3D12GraphicsCommandList6* commandList)
+{
+	CRITICAL_ASSERT(_linkToDepthPass, "Cannot render without a valid depth pass.")
+
 	const D3D12_CPU_DESCRIPTOR_HANDLE rtv = _mainBuffer.GetRTVCPUHandle(0);
+	const D3D12_CPU_DESCRIPTOR_HANDLE dsv = _linkToDepthPass->GetDepthBuffer()->GetDSVCpuHandle();
 
 	commandList->ClearRenderTargetView(rtv, k_clearValue, 0, nullptr);
 	commandList->OMSetRenderTargets(1, &rtv, false, &dsv);
+
+	commandList->SetGraphicsRootSignature(DX12::GPassSpace::GetRootSignature());
+	commandList->SetPipelineState(DX12::GPassSpace::GetPipelineState());
+	
+	static unsigned int call = 0;
+	commandList->SetGraphicsRoot32BitConstant(0, ++call, 0);
+
+	commandList->IASetPrimitiveTopology(D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	commandList->DrawInstanced(3, 1, 0, 0);
+
 }
+
+void DX12::GPassRT::SetDimensions(const DX12::Math::Vector2u32& dimensions)
+{
+	DX12::Math::Vector2u32 newDimensions = dimensions;
+	if (dimensions.X() > _dimensions.X() || dimensions.X() > _dimensions.Y())
+	{
+		newDimensions = { std::max(dimensions.X(), _dimensions.X()), std::max(dimensions.Y(), _dimensions.Y()) };
+		_mainBuffer = DX12::GPassRT::CreateRenderTarget(newDimensions);
+	}
+
+	_dimensions = newDimensions;
+}
+
+DX12::RenderTargetTexture DX12::GPassRT::CreateRenderTarget(const DX12::Math::Vector2u32& size)
+{
+	D3D12_RESOURCE_DESC desc = DX12::CC::Desc::GPassRes::k_mainTextureTemplate;
+	desc.Width = size.X();
+	desc.Height = size.Y();
+
+	DX12::TextureSpecs specs;
+	specs._resourceDesc = &desc;
+	specs._initialState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+	specs._clearValue.Format = desc.Format;
+	memcpy(&specs._clearValue.Color, &::k_clearValue, sizeof(::k_clearValue));
+
+	return DX12::RenderTargetTexture::Create(specs);
+
+}
+
 

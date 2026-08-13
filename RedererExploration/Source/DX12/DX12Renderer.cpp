@@ -10,6 +10,7 @@ namespace
 	static Microsoft::WRL::ComPtr<IDXGIFactory7> COMDxgiFactory = nullptr;
 	static Microsoft::WRL::ComPtr<IDXGIAdapter4> COMDxgiAdapter = nullptr;
 
+	static DX12::RenderPassBase* g_rootRenderNode = nullptr;
 	static std::unique_ptr<DX12::RenderSurface> g_mainRenderSurface = nullptr;
 	static D3D_FEATURE_LEVEL g_expectedMinimumFeatureLevel{ D3D_FEATURE_LEVEL_11_0 };
 	static int g_deferredResourceFreeingFlag = 0;
@@ -202,7 +203,12 @@ bool DX12::Initialize(HWND hwnd)
 	// Things are written lazy init style mostly (encapsulation purposes),
 	// warmup efectively moakes the initialization controlled.
 	DX12::Shaders::WarmUp();
-	//DX12::GPassSpace::WarmUp();
+	DX12::GPassSpace::WarmUp();
+
+	// Build the pass tree
+	g_rootRenderNode = DX12::GPassSpace::GetDepthPass();
+	DX12::GPassSpace::GetDepthPass()->SetNext(*DX12::GPassSpace::GetGPassRTPass());
+	DX12::GPassSpace::GetGPassRTPass()->LinkToDepthPass(DX12::GPassSpace::GetDepthPass());
 
 	DX12::GetMainRenderSurface(
 		hwnd,
@@ -222,12 +228,21 @@ void DX12::Render(DX12::RenderSurface& surface, DX12::RenderPassBase* root)
 	surface.PreRender();
 	
 	DX12::GfxCommandExecutor* executor = surface.GetLinkedCommandExecutor();
+	ID3D12GraphicsCommandList6* commandList = executor->GetCommandList();
+
 	const unsigned int currentFrame = executor->GetCurrentFrame();
 	if (TestPendingResourceFreeingFlag(currentFrame))
 		FreePendingResources(currentFrame);
 
-	if (root)
-		root->Render(executor->GetCommandList());
+	DX12::Math::Vector2u32 size{ surface.GetWidth(), surface.GetHeight() };
+	DX12::GPassSpace::GetDepthPass()->SetDimensions(size);
+	DX12::GPassSpace::GetGPassRTPass()->SetDimensions(size);
+
+	commandList->RSSetViewports(1, &surface.GetViewport());
+	commandList->RSSetScissorRects(1, &surface.GetScissor());
+
+	if (g_rootRenderNode)
+		g_rootRenderNode->BakeCommands(commandList);
 
 	surface.Present();
 

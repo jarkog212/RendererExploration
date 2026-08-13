@@ -151,12 +151,12 @@ ID3D12PipelineState* DX12::CreatePipelineState(void* stream, unsigned long long 
 	return state;
 }
 
-void DX12::RenderPassBase::Render(ID3D12GraphicsCommandList6* commandList)
+void DX12::RenderPassBase::BakeCommands(ID3D12GraphicsCommandList6* commandList)
 {
 	CRITICAL_ASSERT(commandList, "Cannot render the pass without a valid command list.");
 
 	RenderPass(commandList);
 
 	if (_next)
-		Render(commandList);
+		_next->BakeCommands(commandList);
 }

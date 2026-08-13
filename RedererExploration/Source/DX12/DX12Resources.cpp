@@ -98,11 +98,11 @@ constexpr void DX12::RootParameter::AsDescriptor(unsigned int shaderRegister, un
 	Descriptor.Flags = flags;
 }
 
-ID3D12RootSignature* DX12::CreateRootSignature(const DX12::RootSignatureSpec& desc)
+ID3D12RootSignature* DX12::CreateRootSignature(const D3D12_ROOT_SIGNATURE_DESC2& desc)
 {
 	D3D12_VERSIONED_ROOT_SIGNATURE_DESC versionedDesc{};
 	versionedDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_2;
-	versionedDesc.Desc_1_2 = (D3D12_ROOT_SIGNATURE_DESC2)desc;
+	versionedDesc.Desc_1_2 = desc;
 
 	Microsoft::WRL::ComPtr<ID3DBlob> rootSignatureBlob = nullptr;
 	Microsoft::WRL::ComPtr<ID3DBlob> errorBlob = nullptr;
@@ -111,13 +111,13 @@ ID3D12RootSignature* DX12::CreateRootSignature(const DX12::RootSignatureSpec& de
 	HRESULT_CHECK_FALLBACK(
 		D3D12SerializeVersionedRootSignature(&versionedDesc, &rootSignatureBlob, &errorBlob),
 		const char* errorMsg = { errorBlob ? (const char*)errorBlob->GetBufferPointer() : "" },
-		return nullptr,
+		assert(false),
 		"Root signature creation fail : %s",
 		errorMsg);
 #else
 	HRESULT_CHECK_FALLBACK(
 		D3D12SerializeVersionedRootSignature(&versionedDesc, &rootSignatureBlob, &errorBlob),,
-		return nullptr,
+		assert(false),
 		"Root signature creation fail.");
 #endif
 
@@ -142,19 +142,21 @@ ID3D12PipelineState* DX12::CreatePipelineState(void* stream, unsigned long long 
 	desc.pPipelineStateSubobjectStream = stream;
 	desc.SizeInBytes = streamSize;
 
-	ID3D12PipelineState* stateObject = nullptr;
+	ID3D12PipelineState* state = nullptr;
 	HRESULT_CHECK_FALLBACK(
-		DX12::GetRendererDevice()->CreatePipelineState(&desc, IID_PPV_ARGS(&stateObject)), ,
+		DX12::GetRendererDevice()->CreatePipelineState(&desc, IID_PPV_ARGS(&state)), ,
 		assert(false),
 		"Could not create pipeline state.");
 
-	return stateObject;
+	return state;
 }
 
-void DX12::RenderPassBase::Render(DX12::GfxCommandExecutor& commandExecutor)
+void DX12::RenderPassBase::Render(ID3D12GraphicsCommandList6* commandList)
 {
-	RenderPass(commandExecutor);
+	CRITICAL_ASSERT(commandList, "Cannot render the pass without a valid command list.");
+
+	RenderPass(commandList);
 
 	if (_next)
-		Render(commandExecutor);
+		Render(commandList);
 }

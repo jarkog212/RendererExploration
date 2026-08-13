@@ -4,11 +4,13 @@
 
 namespace DX12
 {
+	class GfxCommandExecutor;
+
 	class RenderSurface
 	{
 	public:
 
-		RenderSurface(const HWND window, DXGI_FORMAT format, ID3D12CommandQueue* commandQueue);
+		RenderSurface(const HWND window, DXGI_FORMAT format, DX12::GfxCommandExecutor& commandExecutor);
 		~RenderSurface();
 		RenderSurface(RenderSurface&& other) noexcept;
 		RenderSurface& operator=(RenderSurface&& other) noexcept;
@@ -16,8 +18,13 @@ namespace DX12
 		NO_COPY(RenderSurface);
 
 		void Resize();
+		void PreRender();
+		void PostRender();
 		void Present() const;
 
+		void ResetSwapChain(DX12::GfxCommandExecutor& commandExecutor, DXGI_FORMAT format);
+
+		DX12::GfxCommandExecutor* GetLinkedCommandExecutor() const { return _linkedCommandExecutor; }
 		constexpr HWND GetWindow() const { return _window; }
 		RECT GetWindowDimensions() const;
 		constexpr unsigned int GetWidth() const { return _viewport.Width; }
@@ -33,6 +40,7 @@ namespace DX12
 
 		static constexpr int _k_swapChainBuffers = 3;
 
+		DX12::GfxCommandExecutor* _linkedCommandExecutor = nullptr; // non-owning
 		Microsoft::WRL::ComPtr<IDXGISwapChain4> _swapChain = nullptr;
 		HWND _window = NULL;
 		mutable unsigned int _currentBackBufferIndex = 0;

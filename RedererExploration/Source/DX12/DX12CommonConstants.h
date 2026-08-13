@@ -3,6 +3,9 @@
 #include <dxgi1_6.h>
 #include <d3d12.h>
 
+#pragma comment(lib, "dxgi.lib")
+#pragma comment(lib, "d3d12.lib")
+
 #include <filesystem>
 
 namespace DX12::CC
@@ -16,7 +19,7 @@ namespace DX12::CC
 	constexpr const wchar_t* k_shaderBinaryExtension = L".shad";
 	constexpr const wchar_t* k_shaderSourceExtension = L".hlsl";
 
-	namespace RootSignatureSpec
+	namespace RootSignature
 	{
 		constexpr D3D12_ROOT_SIGNATURE_FLAGS k_LegacyStagesOnly =
 			D3D12_ROOT_SIGNATURE_FLAG_DENY_AMPLIFICATION_SHADER_ROOT_ACCESS
@@ -28,11 +31,11 @@ namespace DX12::CC
 			| D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
 
 		constexpr D3D12_ROOT_SIGNATURE_FLAGS k_VertexPixelStagesOnly =
-			DX12::CC::RootSignatureSpec::k_LegacyStagesOnly
-			| DX12::CC::RootSignatureSpec::k_ModernStagesOnly;
+			DX12::CC::RootSignature::k_LegacyStagesOnly
+			| DX12::CC::RootSignature::k_ModernStagesOnly;
 
 		constexpr D3D12_ROOT_SIGNATURE_FLAGS k_PixelStageOnly =
-			DX12::CC::RootSignatureSpec::k_VertexPixelStagesOnly
+			DX12::CC::RootSignature::k_VertexPixelStagesOnly
 			| D3D12_ROOT_SIGNATURE_FLAG_DENY_VERTEX_SHADER_ROOT_ACCESS;
 	} // RootSignatureSpec
 }

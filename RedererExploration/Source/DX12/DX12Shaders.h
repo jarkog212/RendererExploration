@@ -64,7 +64,7 @@ namespace DX12::Shaders
 		DX12::Shaders::Stage _stage;
 	};
 
-	void Initialize();
+	void WarmUp();
 	void Release();
 
 	D3D12_SHADER_BYTECODE GetGenericShader(DX12::Shaders::GenericShader::Type type);

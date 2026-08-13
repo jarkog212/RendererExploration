@@ -32,16 +32,19 @@
     <ClCompile Include="Source\DX12\DX12Texture.cpp">
       <Filter>Source Files\DX12</Filter>
     </ClCompile>
-    <ClCompile Include="Source\DX12\DX12RenderTarget.cpp">
+    <ClCompile Include="Source\DX12\DX12RenderTargetTexture.cpp">
       <Filter>Source Files\DX12</Filter>
     </ClCompile>
-    <ClCompile Include="Source\DX12\DX12DepthBuffer.cpp">
+    <ClCompile Include="Source\DX12\DX12DepthBufferTexture.cpp">
       <Filter>Source Files\DX12</Filter>
     </ClCompile>
     <ClCompile Include="Source\DX12\DX12Shaders.cpp">
       <Filter>Source Files\DX12</Filter>
     </ClCompile>
     <ClCompile Include="Source\DX12\DX12GPass.cpp">
+      <Filter>Source Files\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\DX12\DX12Example.cpp">
       <Filter>Source Files\DX12</Filter>
     </ClCompile>
   </ItemGroup>
@@ -76,10 +79,10 @@
     <ClInclude Include="Source\DX12\DX12Texture.h">
       <Filter>Source Files\DX12</Filter>
     </ClInclude>
-    <ClInclude Include="Source\DX12\DX12RenderTarget.h">
+    <ClInclude Include="Source\DX12\DX12RenderTargetTexture.h">
       <Filter>Source Files\DX12</Filter>
     </ClInclude>
-    <ClInclude Include="Source\DX12\DX12DepthBuffer.h">
+    <ClInclude Include="Source\DX12\DX12DepthBufferTexture.h">
       <Filter>Source Files\DX12</Filter>
     </ClInclude>
     <ClInclude Include="Source\DX12\DX12Shaders.h">

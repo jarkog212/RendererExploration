@@ -37,7 +37,7 @@ DX12::Texture::Texture(TextureSpecs& specs)
 	{
 		HRESULT_CHECK_FALLBACK(
 			device->CreateCommittedResource(
-				&DX12::CC::Desc::k_heapPropertiesTemplate,
+				&DX12::CC::Desc::Heap::k_propertiesTemplate,
 				D3D12_HEAP_FLAG_NONE,
 				specs._resourceDesc,
 				specs._initialState,

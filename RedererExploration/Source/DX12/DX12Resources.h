@@ -22,34 +22,34 @@ namespace DX12
 			T _subobject;
 		};
 
-		using SubobjectRootSignature = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_ROOT_SIGNATURE, ID3D12RootSignature*>;
-		using SubobjectVertexShader = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_VS, D3D12_SHADER_BYTECODE>;
-		using SubobjectPixelShader = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_PS, D3D12_SHADER_BYTECODE>;
-		using SubobjectDomainShader = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DS, D3D12_SHADER_BYTECODE>;
-		using SubobjectHullShader = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_HS, D3D12_SHADER_BYTECODE>;
-		using SubobjectGeometryShader = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_GS, D3D12_SHADER_BYTECODE>;
-		using SubobjectComputeShader = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_CS, D3D12_SHADER_BYTECODE>;
-		using SubobjectAmplificationShader = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_AS, D3D12_SHADER_BYTECODE>;
-		using SubobjectMeshShader = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_MS, D3D12_SHADER_BYTECODE>;
-		using SubobjectStreamOutput = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_STREAM_OUTPUT, D3D12_STREAM_OUTPUT_DESC>;
-		using SubobjectBlend = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_BLEND, D3D12_BLEND_DESC>;
-		using SubobjectSampleMask = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_SAMPLE_MASK, unsigned int>;
-		using SubobjectRasterizer = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_RASTERIZER, D3D12_RASTERIZER_DESC>;
-		using SubobjectDepthStencil = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL, D3D12_DEPTH_STENCIL_DESC>;
-		using SubobjectInputLayout = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_INPUT_LAYOUT, D3D12_INPUT_LAYOUT_DESC>;
-		using SubobjectIndexBufferStripCutValue = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_IB_STRIP_CUT_VALUE, D3D12_INDEX_BUFFER_STRIP_CUT_VALUE>;
-		using SubobjectPrimitiveTopology = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_PRIMITIVE_TOPOLOGY, D3D12_PRIMITIVE_TOPOLOGY_TYPE>;
-		using SubobjectRenderTargetFormats = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_RENDER_TARGET_FORMATS, D3D12_RT_FORMAT_ARRAY>;
-		using SubobjectDepthStencilFormats = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL_FORMAT, DXGI_FORMAT>;
-		using SubobjectSampleDesc = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_SAMPLE_DESC, DXGI_SAMPLE_DESC>;
-		using SubobjectNodeMask = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_NODE_MASK, unsigned int>;
-		using SubobjectCachedPipelineStateObject = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_CACHED_PSO, D3D12_CACHED_PIPELINE_STATE>;
-		using SubobjectDepthStencil1 = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL1, D3D12_DEPTH_STENCIL_DESC1>;
-		using SubobjectViewInstancing = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_VIEW_INSTANCING, D3D12_VIEW_INSTANCING_DESC>;
-		using SubobjectepthStencil2 = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL2, D3D12_DEPTH_STENCIL_DESC2>;
-		using SubobjectRasterizer1 = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_RASTERIZER1, D3D12_RASTERIZER_DESC1>;
-		using SubobjectRasterizer2 = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_RASTERIZER2, D3D12_RASTERIZER_DESC2>;
-		using SubobjectSerializedRootSignature = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_SERIALIZED_ROOT_SIGNATURE, D3D12_SERIALIZED_ROOT_SIGNATURE_DESC>;		
+		using SubRootSignature = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_ROOT_SIGNATURE, ID3D12RootSignature*>;
+		using SubVertexShader = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_VS, D3D12_SHADER_BYTECODE>;
+		using SubPixelShader = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_PS, D3D12_SHADER_BYTECODE>;
+		using SubDomainShader = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DS, D3D12_SHADER_BYTECODE>;
+		using SubHullShader = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_HS, D3D12_SHADER_BYTECODE>;
+		using SubGeometryShader = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_GS, D3D12_SHADER_BYTECODE>;
+		using SubComputeShader = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_CS, D3D12_SHADER_BYTECODE>;
+		using SubAmplificationShader = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_AS, D3D12_SHADER_BYTECODE>;
+		using SubMeshShader = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_MS, D3D12_SHADER_BYTECODE>;
+		using SubStreamOutput = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_STREAM_OUTPUT, D3D12_STREAM_OUTPUT_DESC>;
+		using SubBlend = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_BLEND, D3D12_BLEND_DESC>;
+		using SubSampleMask = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_SAMPLE_MASK, unsigned int>;
+		using SubRasterizer = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_RASTERIZER, D3D12_RASTERIZER_DESC>;
+		using SubDepthStencil = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL, D3D12_DEPTH_STENCIL_DESC>;
+		using SubInputLayout = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_INPUT_LAYOUT, D3D12_INPUT_LAYOUT_DESC>;
+		using SubIndexBufferStripCutValue = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_IB_STRIP_CUT_VALUE, D3D12_INDEX_BUFFER_STRIP_CUT_VALUE>;
+		using SubPrimitiveTopology = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_PRIMITIVE_TOPOLOGY, D3D12_PRIMITIVE_TOPOLOGY_TYPE>;
+		using SubRenderTargetFormats = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_RENDER_TARGET_FORMATS, D3D12_RT_FORMAT_ARRAY>;
+		using SubDepthStencilFormat = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL_FORMAT, DXGI_FORMAT>;
+		using SubSampleDesc = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_SAMPLE_DESC, DXGI_SAMPLE_DESC>;
+		using SubNodeMask = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_NODE_MASK, unsigned int>;
+		using SubCachedPipelineStateObject = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_CACHED_PSO, D3D12_CACHED_PIPELINE_STATE>;
+		using SubDepthStencil1 = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL1, D3D12_DEPTH_STENCIL_DESC1>;
+		using SubViewInstancing = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_VIEW_INSTANCING, D3D12_VIEW_INSTANCING_DESC>;
+		using SubepthStencil2 = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL2, D3D12_DEPTH_STENCIL_DESC2>;
+		using SubRasterizer1 = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_RASTERIZER1, D3D12_RASTERIZER_DESC1>;
+		using SubRasterizer2 = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_RASTERIZER2, D3D12_RASTERIZER_DESC2>;
+		using SubSerializedRootSignature = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_SERIALIZED_ROOT_SIGNATURE, D3D12_SERIALIZED_ROOT_SIGNATURE_DESC>;		
 	} // PipelineStream;
 
 	struct DescriptorHandleView
@@ -94,7 +94,9 @@ namespace DX12
 		RenderTargetData(RenderTargetData&& other) noexcept;
 		RenderTargetData& operator=(RenderTargetData&& other) noexcept;
 
-		NO_COPY(RenderTargetData)
+		NO_COPY(RenderTargetData);
+
+		void Release() { if(_rtvHandle._owner) *this = RenderTargetData(); }
 	};
 
 	struct DescriptorRange : public D3D12_DESCRIPTOR_RANGE1
@@ -146,29 +148,17 @@ namespace DX12
 			D3D12_ROOT_DESCRIPTOR_FLAGS flags = D3D12_ROOT_DESCRIPTOR_FLAG_NONE);
 	};
 
-	struct RootSignatureSpec : public D3D12_ROOT_SIGNATURE_DESC2 
-	{
-		RootSignatureSpec(
-			const DX12::RootParameter* parameters,
-			unsigned int parameterCount,
-			const D3D12_STATIC_SAMPLER_DESC1* samplers = nullptr,
-			unsigned int samplerCount = 0,
-			D3D12_ROOT_SIGNATURE_FLAGS flags = DX12::CC::RootSignatureSpec::k_PixelStageOnly)
-		: D3D12_ROOT_SIGNATURE_DESC2{parameterCount, parameters, samplerCount, samplers, flags}
-		{};
-	};
-
 	class RenderPassBase
 	{
 	public:
 
 		void SetNext(RenderPassBase& pass) { _next = &pass; };
 		void UnsetNext() { _next = nullptr; };
-		void Render(DX12::GfxCommandExecutor& commandExecutor);
+		void Render(ID3D12GraphicsCommandList6* commandList);
 
 	protected:
 
-		virtual void RenderPass(DX12::GfxCommandExecutor& commandExecutor) = 0;
+		virtual void RenderPass(ID3D12GraphicsCommandList6* commandList) = 0;
 
 		const char* _name = "";
 

@@ -218,7 +218,7 @@ D3D12_SHADER_BYTECODE DX12::Shaders::ShaderView::AsDX12Bytecode() const
 	return out;
 }
 
-void DX12::Shaders::Initialize()
+void DX12::Shaders::WarmUp()
 {
 	DX12::Shaders::GetGenericShader(DX12::Shaders::GenericShader::Type::FullscreenTri_VS);
 }

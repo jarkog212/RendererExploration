@@ -4,7 +4,7 @@
 #include "DX12DescriptorHeap.h"
 #include "DX12CommonDescriptors.h"
 
-DX12::RenderSurface::RenderSurface(const HWND window, DXGI_FORMAT format, ID3D12CommandQueue* commandQueue)
+DX12::RenderSurface::RenderSurface(const HWND window, DXGI_FORMAT format, DX12::GfxCommandExecutor& commandExecutor)
 	: _window(window)
 {
 	IDXGIFactory7* factory = DX12::GetDxgiFactory();
@@ -16,40 +16,12 @@ DX12::RenderSurface::RenderSurface(const HWND window, DXGI_FORMAT format, ID3D12
 	if ((bool)_allowTearing)
 		_presentFlags = DXGI_PRESENT_ALLOW_TEARING;
 
-	RECT windowDimensions = GetWindowDimensions();
-	const int width = windowDimensions.right - windowDimensions.left;
-	const int height = windowDimensions.bottom - windowDimensions.top;
-
-	DXGI_SWAP_CHAIN_DESC1 desc = DX12::CC::Desc::k_swapChainTemplate;
-	desc.BufferCount = _k_swapChainBuffers;
-	desc.Flags = (bool)_allowTearing ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
-	desc.Format = format == DXGI_FORMAT_R8G8B8A8_UNORM_SRGB ?
-		DXGI_FORMAT_R8G8B8A8_UNORM :
-		format;
-	desc.Height = height;
-	desc.Width = width;
-
-	IDXGISwapChain1* swapChain = nullptr;
-	HRESULT_CHECK_FALLBACK(
-		factory->CreateSwapChainForHwnd(commandQueue, _window, &desc, nullptr, nullptr, &swapChain),,
-		assert(false),
-		"Could not create a swap chain.");
+	ResetSwapChain(commandExecutor, format);
 
 	HRESULT_CHECK_FALLBACK(
-		factory->MakeWindowAssociation(_window, DXGI_MWA_NO_ALT_ENTER),,
+		factory->MakeWindowAssociation(_window, DXGI_MWA_NO_ALT_ENTER), ,
 		assert(false),
 		"Could not restirct fullscreen on swapchain.");
-
-	HRESULT_CHECK_FALLBACK(
-		swapChain->QueryInterface(IID_PPV_ARGS(&_swapChain)),,
-		assert(false),
-		"Could not get newer swap chain interface.");
-
-	Utils::COM::SafeRelease(swapChain);
-	_currentBackBufferIndex = _swapChain->GetCurrentBackBufferIndex();
-
-	for (int i = 0; i < _k_swapChainBuffers; i++)
-		_renderTargetData[i]._rtvHandle = DX12::GetRTVHeap()->Allocate();
 
 	Finalize(format);
 }
@@ -57,10 +29,12 @@ DX12::RenderSurface::RenderSurface(const HWND window, DXGI_FORMAT format, ID3D12
 DX12::RenderSurface::~RenderSurface()
 {
 	// Stall out the GPU
-	DX12::GetMainCommandExecutor()->Flush();
+	_linkedCommandExecutor->Flush();
 }
 
 DX12::RenderSurface::RenderSurface(RenderSurface&& other) noexcept :
+	_linkedCommandExecutor(std::exchange(other._linkedCommandExecutor, nullptr)),
+	_swapChain(std::move(other._swapChain)),
 	_window(std::exchange(other._window, HWND(NULL))),
 	_currentBackBufferIndex(std::exchange(other._currentBackBufferIndex, 0)),
 	_viewport(std::exchange(other._viewport, D3D12_VIEWPORT())),
@@ -76,6 +50,8 @@ DX12::RenderSurface& DX12::RenderSurface::operator=(RenderSurface&& other) noexc
 {
 	CRITICAL_ASSERT(this != &other, "Moving RenderSurface to itself.");
 
+	std::swap(_linkedCommandExecutor, other._linkedCommandExecutor);
+	std::swap(_swapChain, other._swapChain);
 	std::swap(_window, other._window);
 	std::swap(_currentBackBufferIndex, other._currentBackBufferIndex);
 	std::swap(_viewport, other._viewport);
@@ -96,12 +72,71 @@ void DX12::RenderSurface::Resize()
 	// body
 }
 
+void DX12::RenderSurface::PreRender()
+{
+	CRITICAL_ASSERT(_linkedCommandExecutor, "Cannot prepare render without valid command executor.");
+
+	_linkedCommandExecutor->PreRender();
+}
+
+void DX12::RenderSurface::PostRender()
+{
+	CRITICAL_ASSERT(_linkedCommandExecutor, "Cannot finish render without valid command executor.");
+
+	_linkedCommandExecutor->PostRender();
+}
+
 void DX12::RenderSurface::Present() const
 {
 	CRITICAL_ASSERT(_swapChain, "Trying to present an invalid swap chain.");
 
 	_swapChain->Present(0, _presentFlags);
 	_currentBackBufferIndex = _swapChain->GetCurrentBackBufferIndex();
+}
+
+void DX12::RenderSurface::ResetSwapChain(DX12::GfxCommandExecutor& commandExecutor, DXGI_FORMAT format)
+{
+	if (_linkedCommandExecutor)
+		_linkedCommandExecutor->Flush();
+
+	_linkedCommandExecutor = &commandExecutor;
+
+	RECT windowDimensions = GetWindowDimensions();
+	const int width = windowDimensions.right - windowDimensions.left;
+	const int height = windowDimensions.bottom - windowDimensions.top;
+
+	DXGI_SWAP_CHAIN_DESC1 desc = DX12::CC::Desc::SwapChain::k_descTemplate;
+	desc.BufferCount = _k_swapChainBuffers;
+	desc.Flags = (bool)_allowTearing ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
+	desc.Format = format == DXGI_FORMAT_R8G8B8A8_UNORM_SRGB ?
+		DXGI_FORMAT_R8G8B8A8_UNORM :
+		format;
+	desc.Height = height;
+	desc.Width = width;
+
+	{
+		Microsoft::WRL::ComPtr<IDXGISwapChain1> swapChain = nullptr;
+		HRESULT_CHECK_FALLBACK(
+			DX12::GetDxgiFactory()->CreateSwapChainForHwnd(
+				_linkedCommandExecutor->GetCommandQueue(), _window, &desc, nullptr, nullptr, &swapChain),,
+			assert(false),
+			"Could not create a swap chain.");
+
+		HRESULT_CHECK_FALLBACK(
+			swapChain->QueryInterface(IID_PPV_ARGS(&_swapChain)),,
+			assert(false),
+			"Could not get newer swap chain interface.");
+	}
+
+	_currentBackBufferIndex = _swapChain->GetCurrentBackBufferIndex();
+
+	for (int i = 0; i < _k_swapChainBuffers; i++)
+	{
+		_renderTargetData[i].Release();
+		_renderTargetData[i]._rtvHandle = DX12::GetRTVHeap()->Allocate();
+	}
+
+	Finalize(format);
 }
 
 RECT DX12::RenderSurface::GetWindowDimensions() const
@@ -120,7 +155,7 @@ void DX12::RenderSurface::Finalize(DXGI_FORMAT format)
 			_swapChain->GetBuffer(i, IID_PPV_ARGS(&data._resource)),
 			"Could not get a hold of the swap chain internal buffer.");
 
-		D3D12_RENDER_TARGET_VIEW_DESC desc = DX12::CC::Desc::k_renderTargetViewTemplate;
+		D3D12_RENDER_TARGET_VIEW_DESC desc = DX12::CC::Desc::RTView::k_descTemplate;
 		desc.Format = format;
 
 		DX12::GetRendererDevice()->CreateRenderTargetView(data._resource.Get(), &desc, data._rtvHandle._cpu);

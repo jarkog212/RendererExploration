@@ -66,6 +66,8 @@ int WINAPI wWinMain(
         {
             TranslateMessage(&msg);
             DispatchMessageW(&msg);
+            if (!::g_running)
+                break;
         }
 
         DX12::Render();

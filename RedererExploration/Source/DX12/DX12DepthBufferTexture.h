@@ -4,16 +4,16 @@
 
 namespace DX12
 {
-	class DepthBuffer
+	class DepthBufferTexture
 	{
 	public:
 
-		static DepthBuffer Create(DX12::TextureSpecs& specs);
+		static DepthBufferTexture Create(DX12::TextureSpecs& specs);
 
-		DepthBuffer(DepthBuffer&& other) noexcept;
-		DepthBuffer& operator=(DepthBuffer&& other) noexcept;
+		DepthBufferTexture(DepthBufferTexture&& other) noexcept;
+		DepthBufferTexture& operator=(DepthBufferTexture&& other) noexcept;
 
-		NO_COPY(DepthBuffer);
+		NO_COPY(DepthBufferTexture);
 		
 		D3D12_CPU_DESCRIPTOR_HANDLE GetDSVCpuHandle() const { return _dsvHandle._cpu; }
 		DX12::DescriptorHandleView GetSRVHandle() const { return _texture.GetSRVHandle(); }
@@ -21,7 +21,7 @@ namespace DX12
 
 	private:
 
-		DepthBuffer(DX12::TextureSpecs& specs, DXGI_FORMAT stencilFormat);
+		DepthBufferTexture(DX12::TextureSpecs& specs, DXGI_FORMAT depthStencilFormat);
 		
 		DX12::Texture _texture;
 		DX12::DescriptorHandle _dsvHandle;

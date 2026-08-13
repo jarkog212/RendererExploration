@@ -1,4 +1,4 @@
-#include "DX12RenderTarget.h"
+#include "DX12RenderTargetTexture.h"
 #include "DX12DescriptorHeap.h"
 #include "DX12CommonDescriptors.h"
 
@@ -7,7 +7,7 @@ DX12::RenderTargetTexture DX12::RenderTargetTexture::Create(DX12::TextureSpecs& 
 	CRITICAL_ASSERT(specs._resourceDesc, "Trying to make render target with invalid resource descriptor.");
 	CRITICAL_ASSERT(!specs._resource, "Trying to make render target with non-empty DX12 resource.");
 
-	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = DX12::CC::Desc::k_renderTargetSRVTemplate;
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = DX12::CC::Desc::RTT::k_SRVTemplate;
 	if (!specs._srvDesc)
 		specs._srvDesc = &srvDesc;
 
@@ -23,7 +23,7 @@ DX12::RenderTargetTexture::RenderTargetTexture(DX12::TextureSpecs& specs) :
 		_mipCount <= DX12::Texture::_k_maxMips,
 		"RTT resource has more MIPs than our declared maximum.");
 
-	D3D12_RENDER_TARGET_VIEW_DESC desc = DX12::CC::Desc::k_renderTargetViewTemplate;
+	D3D12_RENDER_TARGET_VIEW_DESC desc = DX12::CC::Desc::RTView::k_descTemplate;
 	desc.Format = specs._resourceDesc->Format;
 
 	DX12::DescriptorHeap* rtvHeap = DX12::GetRTVHeap();
@@ -55,7 +55,7 @@ DX12::RenderTargetTexture& DX12::RenderTargetTexture::operator=(RenderTargetText
 	return *this;
 }
 
-constexpr D3D12_CPU_DESCRIPTOR_HANDLE DX12::RenderTargetTexture::GetRTVCPUHandle(unsigned int mip) const
+D3D12_CPU_DESCRIPTOR_HANDLE DX12::RenderTargetTexture::GetRTVCPUHandle(unsigned int mip) const
 {
 	CRITICAL_ASSERT(
 		mip < _mipCount,

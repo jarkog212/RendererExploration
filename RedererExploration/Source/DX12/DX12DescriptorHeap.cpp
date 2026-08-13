@@ -1,6 +1,30 @@
 #include "DX12DescriptorHeap.h"
 #include "DX12Renderer.h"
 
+DX12::DescriptorHeap* DX12::GetRTVHeap()
+{
+	static DX12::DescriptorHeap instance(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 512, false);
+	return &instance;
+}
+
+DX12::DescriptorHeap* DX12::GetDSVHeap()
+{
+	static DX12::DescriptorHeap instance(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 512, false);
+	return &instance;
+}
+
+DX12::DescriptorHeap* DX12::GetSRVHeap()
+{
+	static DX12::DescriptorHeap instance(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 4096, true);
+	return &instance;
+}
+
+DX12::DescriptorHeap* DX12::GetUAVHeap()
+{
+	static DX12::DescriptorHeap instance(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 512, false);
+	return &instance;
+}
+
 DX12::DescriptorHeap::DescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type, unsigned int capacity, bool isShaderVisible) : _type(type)
 {
 	CRITICAL_ASSERT(

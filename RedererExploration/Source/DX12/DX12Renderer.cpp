@@ -2,6 +2,7 @@
 #include "DX12DescriptorHeap.h"
 #include "DX12RenderSurface.h"
 #include "DX12Shaders.h"
+#include "DX12GPass.h"
 
 namespace
 {
@@ -42,12 +43,6 @@ namespace
 		else
 			cleaner(currentFrame);
 	}
-
-	namespace Example 
-	{
-		static Microsoft::WRL::ComPtr<ID3D12RootSignature> COMRenderRootSignature = nullptr;
-		static Microsoft::WRL::ComPtr<ID3D12PipelineState> COMRenderPipelineState = nullptr;
-	} // Example
 }
 
 void UtilsImpl::COM::Release(IUnknown* resource)
@@ -173,46 +168,22 @@ IDXGIAdapter4* DX12::GetDxgiAdapter()
 DX12::RenderSurface* DX12::GetMainRenderSurface(
 	HWND window,
 	DXGI_FORMAT format,
-	ID3D12CommandQueue* commandQueue)
+	DX12::GfxCommandExecutor* commandExecutor)
 {
 	if (::g_mainRenderSurface) [[likely]]
 		return ::g_mainRenderSurface.get();
 
 	CRITICAL_ASSERT(
-		window != NULL && commandQueue,
+		window != NULL && commandExecutor,
 		"Uninitialized render surface requires legitimate arguments so it can be initialized.");
 
-	::g_mainRenderSurface = std::make_unique<DX12::RenderSurface>(window, format, commandQueue);
+	::g_mainRenderSurface = std::make_unique<DX12::RenderSurface>(window, format, *commandExecutor);
 	return ::g_mainRenderSurface.get();
 }
 
 DX12::GfxCommandExecutor* DX12::GetMainCommandExecutor()
 {
 	static DX12::GfxCommandExecutor instance(D3D12_COMMAND_LIST_TYPE_DIRECT);
-	return &instance;
-}
-
-DX12::DescriptorHeap* DX12::GetRTVHeap()
-{
-	static DX12::DescriptorHeap instance(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 512, false);
-	return &instance;
-}
-
-DX12::DescriptorHeap* DX12::GetDSVHeap()
-{
-	static DX12::DescriptorHeap instance(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 512, false);
-	return &instance;
-}
-
-DX12::DescriptorHeap* DX12::GetSRVHeap()
-{
-	static DX12::DescriptorHeap instance(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 4096, true);
-	return &instance;
-}
-
-DX12::DescriptorHeap* DX12::GetUAVHeap()
-{
-	static DX12::DescriptorHeap instance(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 512, false);
 	return &instance;
 }
 
@@ -228,14 +199,15 @@ bool DX12::TestPendingResourceFreeingFlag(const unsigned int frame)
 
 bool DX12::Initialize(HWND hwnd)
 {
-	bool result = true;
-
-	DX12::Shaders::Initialize();
+	// Things are written lazy init style mostly (encapsulation purposes),
+	// warmup efectively moakes the initialization controlled.
+	DX12::Shaders::WarmUp();
+	//DX12::GPassSpace::WarmUp();
 
 	DX12::GetMainRenderSurface(
 		hwnd,
 		DX12::CC::k_defaultRenderTargetFormat,
-		DX12::GetMainCommandExecutor()->GetCommandQueue());
+		DX12::GetMainCommandExecutor());
 
 	HRESULT_CHECK_FALLBACK(DX12::GetRTVHeap()->GetHeap()->SetName(L"RTV Heap"),,, "Could not name RTV Heap.");
 	HRESULT_CHECK_FALLBACK(DX12::GetDSVHeap()->GetHeap()->SetName(L"DSV Heap"),,, "Could not name DSV Heap.");
@@ -245,26 +217,26 @@ bool DX12::Initialize(HWND hwnd)
 	return true;
 }
 
-void DX12::Render(DX12::GfxCommandExecutor* command, DX12::RenderSurface* surface)
+void DX12::Render(DX12::RenderSurface& surface, DX12::RenderPassBase* root)
 {
-	command->PreRender();
-
-	ID3D12GraphicsCommandList6* clist = command->GetCommandList();
+	surface.PreRender();
 	
-	const unsigned int currentFrame = DX12::GetMainCommandExecutor()->GetCurrentFrame();
+	DX12::GfxCommandExecutor* executor = surface.GetLinkedCommandExecutor();
+	const unsigned int currentFrame = executor->GetCurrentFrame();
 	if (TestPendingResourceFreeingFlag(currentFrame))
 		FreePendingResources(currentFrame);
 
-	surface->Present();
+	if (root)
+		root->Render(executor->GetCommandList());
 
-	command->PostRender();
+	surface.Present();
+
+	surface.PostRender();
 }
 
 void DX12::Render()
 {
-	DX12::Render(
-		DX12::GetMainCommandExecutor(),
-		DX12::GetMainRenderSurface());
+	DX12::Render(*DX12::GetMainRenderSurface() /*, root pass will go here */);
 }
 
 void DX12::Release()
@@ -272,6 +244,7 @@ void DX12::Release()
 	// intended to be called only once at shutdown, reinit is not possible due to static nature of things?
 	static auto cleaner = []()
 		{
+			DX12::GPassSpace::Release();
 			DX12::Shaders::Release();
 
 			::g_mainRenderSurface.reset();
@@ -288,12 +261,9 @@ void DX12::Release()
 			// Heap releases add to the deferred pile
 			::FreePendingResources(DX12::CC::k_forAllFrames);
 
-			::Example::COMRenderRootSignature.Reset();
-			::Example::COMRenderPipelineState.Reset();
-
 			::COMDxgiFactory.Reset();
-			::COMRendererDevice.Reset();
 			::COMDxgiAdapter.Reset();
+			::COMRendererDevice.Reset();
 		};
 			
 #ifdef _DEBUG
@@ -452,60 +422,4 @@ void DX12::GfxCommandExecutor::GfxCommandFrame::WaitForGPU(HANDLE fenceEvent, ID
 	HRESULT_CHECK_CRITICAL(fence->SetEventOnCompletion(_fenceValue, fenceEvent), "Could not assign fence signal to event handle.");
 
 	WaitForSingleObject(fenceEvent, INFINITE);
-}
-
-ID3D12GraphicsCommandList6* DX12::Example::ExampleRenderBuild()
-{
-	DX12::DescriptorHeap* srvHeap = DX12::GetSRVHeap();
-
-	ID3D12GraphicsCommandList6* commandList = DX12::GetMainCommandExecutor()->GetCommandList();
-
-	commandList->SetGraphicsRootSignature(DX12::Example::GetRootSignature());
-	commandList->SetPipelineState(DX12::Example::GetPipelineState());
-
-	ID3D12DescriptorHeap* heaps[]{ srvHeap->GetHeap() };
-	commandList->SetDescriptorHeaps(1, heaps);
-
-	commandList->SetGraphicsRootDescriptorTable(0, srvHeap->GetGpuPtr());
-
-	commandList->SetGraphicsRoot32BitConstant(1, (int)Utils::GetFPS(), 0);
-	commandList->SetGraphicsRoot32BitConstant(1, 42, 1);
-
-	//commandList->SetGraphicsRootConstantBufferView(1,);
-
-	return commandList;
-}
-
-ID3D12RootSignature* DX12::Example::GetRootSignature()
-{
-	if (::Example::COMRenderRootSignature) [[likely]]
-		return ::Example::COMRenderRootSignature.Get();
-
-	// Create signature = memory layout for buffers
-	DX12::RootParameter rootParams[2]{};
-	DX12::DescriptorRange descriptorRanges[]{
-		DX12::DescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, DX12::GetSRVHeap()->GetCapacity(), 0) };
-
-	rootParams[0].AsDescriptorTable(D3D12_SHADER_VISIBILITY_PIXEL, descriptorRanges, 1);
-
-	rootParams[1].AsConstants(2, D3D12_SHADER_VISIBILITY_PIXEL, 0);
-
-	DX12::RootSignatureSpec rootSpec(rootParams, _countof(rootParams));
-	::Example::COMRenderRootSignature = DX12::CreateRootSignature(rootSpec);
-
-	return ::Example::COMRenderRootSignature.Get();
-}
-
-ID3D12PipelineState* DX12::Example::GetPipelineState()
-{
-	if (::Example::COMRenderPipelineState) [[likely]]
-		return ::Example::COMRenderPipelineState.Get();
-
-	struct {
-		DX12::PipelineStream::SubobjectRootSignature rs{ DX12::Example::GetRootSignature() };
-	}stream;
-
-	::Example::COMRenderPipelineState = DX12::CreatePipelineState(&stream, sizeof(stream));
-	
-	return ::Example::COMRenderPipelineState.Get();
 }

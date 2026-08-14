@@ -3,6 +3,7 @@
 #include "DX12RenderSurface.h"
 #include "DX12Shaders.h"
 #include "DX12GPass.h"
+#include "DX12Utils.h"
 
 namespace
 {
@@ -13,37 +14,49 @@ namespace
 	static DX12::RenderPassBase* g_rootRenderNode = nullptr;
 	static std::unique_ptr<DX12::RenderSurface> g_mainRenderSurface = nullptr;
 	static D3D_FEATURE_LEVEL g_expectedMinimumFeatureLevel{ D3D_FEATURE_LEVEL_11_0 };
-	static int g_deferredResourceFreeingFlag = 0;
-	static_assert(sizeof(g_deferredResourceFreeingFlag) * sizeof(char) > DX12::CC::k_frameBuffers, "Flag bit-buffer needs to be wide enough for frame buffer count.");
-	static std::vector<IUnknown*> g_deferredCOMReleases[DX12::CC::k_frameBuffers];
 
-	static void FreePendingResources(const int currentFrame = DX12::CC::k_forAllFrames)
+	namespace DefferedFree
 	{
-		static std::mutex mutex;
-		std::lock_guard lock(mutex);
+		// This should be connected with DX12::RendererCommand - likely inside it.
 
-		::g_deferredResourceFreeingFlag &= ~(1ull << currentFrame);
+		static int g_deferredResourceFreeingFlag = 0;
+		static_assert(sizeof(g_deferredResourceFreeingFlag) * sizeof(char) > DX12::CC::k_frameBuffers, "Flag bit-buffer needs to be wide enough for frame buffer count.");
+		static std::vector<IUnknown*> g_deferredCOMReleases[DX12::CC::k_frameBuffers];
 
-		DX12::GetDSVHeap()->ProcessPendingResourceFreeing(currentFrame);
-		DX12::GetRTVHeap()->ProcessPendingResourceFreeing(currentFrame);
-		DX12::GetSRVHeap()->ProcessPendingResourceFreeing(currentFrame);
-		DX12::GetUAVHeap()->ProcessPendingResourceFreeing(currentFrame);
+		static void FreePendingResources(const int currentFrame = DX12::CC::k_forAllFrames)
+		{
+			static std::mutex mutex;
+			std::lock_guard lock(mutex);
 
-		static auto cleaner = [](const unsigned int frame)
-			{
-				std::vector<IUnknown*>& pendingCOMList = g_deferredCOMReleases[frame];
-				for (auto& comObj : pendingCOMList)
-					Utils::COM::SafeRelease(comObj);
+			::DefferedFree::g_deferredResourceFreeingFlag &= ~(1ull << currentFrame);
 
-				pendingCOMList.clear();
-			};
+			DX12::GetDSVHeap()->ProcessPendingResourceFreeing(currentFrame);
+			DX12::GetRTVHeap()->ProcessPendingResourceFreeing(currentFrame);
+			DX12::GetSRVHeap()->ProcessPendingResourceFreeing(currentFrame);
+			DX12::GetUAVHeap()->ProcessPendingResourceFreeing(currentFrame);
 
-		if (currentFrame == DX12::CC::k_forAllFrames)
-			for (int i = 0; i < DX12::CC::k_frameBuffers; i++)
-				cleaner(i);
-		else
-			cleaner(currentFrame);
-	}
+			static auto cleaner = [](const unsigned int frame)
+				{
+					std::vector<IUnknown*>& pendingCOMList = g_deferredCOMReleases[frame];
+					for (auto& comObj : pendingCOMList)
+						Utils::COM::SafeRelease(comObj);
+
+					pendingCOMList.clear();
+				};
+
+			if (currentFrame == DX12::CC::k_forAllFrames)
+				for (int i = 0; i < DX12::CC::k_frameBuffers; i++)
+					cleaner(i);
+			else
+				cleaner(currentFrame);
+		}
+	} // DeferredFree
+
+	namespace ResourceBarriers
+	{
+		static D3D12_RESOURCE_BARRIER g_resourceBarriers[DX12::CC::k_maxResourceBarriers];
+		static unsigned int g_usedResourceBarriers = 0;
+	} // ResourceBarriers
 }
 
 void UtilsImpl::COM::Release(IUnknown* resource)
@@ -53,8 +66,9 @@ void UtilsImpl::COM::Release(IUnknown* resource)
 
 void UtilsImpl::COM::DeferredRenderThreadRelease(IUnknown* resource)
 {
-	unsigned int currentFrame = DX12::GetMainCommandExecutor()->GetCurrentFrame();
-	g_deferredCOMReleases[currentFrame].push_back(resource);
+	unsigned int currentFrame = DX12::GetMainRendererCommand()->GetCurrentFrame();
+	::DefferedFree::g_deferredCOMReleases[currentFrame].push_back(resource);
+	DX12::SetPendingResourceFreeingFlag();
 }
 
 ID3D12Device8* DX12::GetRendererDevice()
@@ -169,33 +183,33 @@ IDXGIAdapter4* DX12::GetDxgiAdapter()
 DX12::RenderSurface* DX12::GetMainRenderSurface(
 	HWND window,
 	DXGI_FORMAT format,
-	DX12::GfxCommandExecutor* commandExecutor)
+	DX12::RendererCommand* rendererCommand)
 {
 	if (::g_mainRenderSurface) [[likely]]
 		return ::g_mainRenderSurface.get();
 
 	CRITICAL_ASSERT(
-		window != NULL && commandExecutor,
+		window != NULL && rendererCommand,
 		"Uninitialized render surface requires legitimate arguments so it can be initialized.");
 
-	::g_mainRenderSurface = std::make_unique<DX12::RenderSurface>(window, format, *commandExecutor);
+	::g_mainRenderSurface = std::make_unique<DX12::RenderSurface>(window, format, *rendererCommand);
 	return ::g_mainRenderSurface.get();
 }
 
-DX12::GfxCommandExecutor* DX12::GetMainCommandExecutor()
+DX12::RendererCommand* DX12::GetMainRendererCommand()
 {
-	static DX12::GfxCommandExecutor instance(D3D12_COMMAND_LIST_TYPE_DIRECT);
+	static DX12::RendererCommand instance(D3D12_COMMAND_LIST_TYPE_DIRECT);
 	return &instance;
 }
 
 void DX12::SetPendingResourceFreeingFlag()
 {
-	::g_deferredResourceFreeingFlag |= 1ull << DX12::GetMainCommandExecutor()->GetCurrentFrame();
+	::DefferedFree::g_deferredResourceFreeingFlag |= 1ull << DX12::GetMainRendererCommand()->GetCurrentFrame();
 }
 
 bool DX12::TestPendingResourceFreeingFlag(const unsigned int frame)
 {
-	return (bool)(::g_deferredResourceFreeingFlag & (1ull << frame));
+	return (bool)(::DefferedFree::g_deferredResourceFreeingFlag & (1ull << frame));
 }
 
 bool DX12::Initialize(HWND hwnd)
@@ -206,14 +220,12 @@ bool DX12::Initialize(HWND hwnd)
 	DX12::GPassSpace::WarmUp();
 
 	// Build the pass tree
-	g_rootRenderNode = DX12::GPassSpace::GetDepthPass();
-	DX12::GPassSpace::GetDepthPass()->SetNext(*DX12::GPassSpace::GetGPassRTPass());
-	DX12::GPassSpace::GetGPassRTPass()->LinkToDepthPass(DX12::GPassSpace::GetDepthPass());
+	g_rootRenderNode = DX12::GPassSpace::GetHeadNode();
 
 	DX12::GetMainRenderSurface(
 		hwnd,
 		DX12::CC::k_defaultRenderTargetFormat,
-		DX12::GetMainCommandExecutor());
+		DX12::GetMainRendererCommand());
 
 	HRESULT_CHECK_FALLBACK(DX12::GetRTVHeap()->GetHeap()->SetName(L"RTV Heap"),,, "Could not name RTV Heap.");
 	HRESULT_CHECK_FALLBACK(DX12::GetDSVHeap()->GetHeap()->SetName(L"DSV Heap"),,, "Could not name DSV Heap.");
@@ -227,24 +239,45 @@ void DX12::Render(DX12::RenderSurface& surface, DX12::RenderPassBase* root)
 {
 	surface.PreRender();
 	
-	DX12::GfxCommandExecutor* executor = surface.GetLinkedCommandExecutor();
-	ID3D12GraphicsCommandList6* commandList = executor->GetCommandList();
+	surface.Present();
 
-	const unsigned int currentFrame = executor->GetCurrentFrame();
+	surface.UpdateViewport();
+
+	DX12::RendererCommand* rendererCommand = surface.GetLinkedRendererCommand();
+	ID3D12GraphicsCommandList6* commandList = rendererCommand->GetCommandList();
+
+#ifdef _DEBUG
+	// HUGE ASSUMPTION!!! THE CURRENT DEFERRED CLEANUP ASSUMES ONLY ONE RENDERER COMMAND
+	// USING ANOTHER ONE WILL WREAK HAVOC ONTO HELD RESOURCES
+	// MOVING COM POINTER RELEASES IS SIMPLE ENOUGH: MOVE THEIR PENDING RELASE MANAGEMENT INTO THE RENDERER COMMAND OBJECT.
+	// MOVING HEAP RELEASES REQUIRES A BIT MORE WORK IN HEAPS TO SOMEHOW LET THEM KNOW HANDLES BEING USED BY WHICH COMMAND.
+	static DX12::RendererCommand* mainCommand = DX12::GetMainRendererCommand();
+	CRITICAL_ASSERT(rendererCommand == mainCommand, "You're about to start freeing resources which may be protected. Currently only one render command is supported.");
+#endif
+
+	const unsigned int currentFrame = rendererCommand->GetCurrentFrame();
 	if (TestPendingResourceFreeingFlag(currentFrame))
-		FreePendingResources(currentFrame);
+		::DefferedFree::FreePendingResources(currentFrame);
 
 	DX12::Math::Vector2u32 size{ surface.GetWidth(), surface.GetHeight() };
-	DX12::GPassSpace::GetDepthPass()->SetDimensions(size);
-	DX12::GPassSpace::GetGPassRTPass()->SetDimensions(size);
+	DX12::GPassSpace::SetDimensions(size);
 
-	commandList->RSSetViewports(1, &surface.GetViewport());
-	commandList->RSSetScissorRects(1, &surface.GetScissor());
+	DX12::TransitionResourceBarrier(
+		commandList,
+		surface.GetBackbuffer(),
+		D3D12_RESOURCE_STATE_PRESENT,
+		D3D12_RESOURCE_STATE_RENDER_TARGET);
 
 	if (g_rootRenderNode)
-		g_rootRenderNode->BakeCommands(commandList);
+		g_rootRenderNode->AccummulateCommands(commandList);
 
-	surface.Present();
+	// Post Process
+
+	DX12::TransitionResourceBarrier(
+		commandList,
+		surface.GetBackbuffer(),
+		D3D12_RESOURCE_STATE_RENDER_TARGET,
+		D3D12_RESOURCE_STATE_PRESENT);
 
 	surface.PostRender();
 }
@@ -264,9 +297,9 @@ void DX12::Release()
 
 			::g_mainRenderSurface.reset();
 
-			DX12::GetMainCommandExecutor()->Release();
+			DX12::GetMainRendererCommand()->Release();
 
-			::FreePendingResources(DX12::CC::k_forAllFrames);
+			::DefferedFree::FreePendingResources(DX12::CC::k_forAllFrames);
 
 			DX12::GetRTVHeap()->Release();
 			DX12::GetDSVHeap()->Release();
@@ -274,7 +307,7 @@ void DX12::Release()
 			DX12::GetUAVHeap()->Release();
 
 			// Heap releases add to the deferred pile
-			::FreePendingResources(DX12::CC::k_forAllFrames);
+			::DefferedFree::FreePendingResources(DX12::CC::k_forAllFrames);
 
 			::COMDxgiFactory.Reset();
 			::COMDxgiAdapter.Reset();
@@ -301,7 +334,63 @@ void DX12::Release()
 #endif
 }
 
-DX12::GfxCommandExecutor::GfxCommandExecutor(D3D12_COMMAND_LIST_TYPE type)
+void DX12::TransitionResourceBarrier(
+	ID3D12GraphicsCommandList6* commandList,
+	ID3D12Resource* resource,
+	D3D12_RESOURCE_STATES before,
+	D3D12_RESOURCE_STATES after,
+	D3D12_RESOURCE_BARRIER_FLAGS flags,
+	unsigned int subresource)
+{
+	CRITICAL_ASSERT(commandList, "No command list to create a barrier into.");
+	CRITICAL_ASSERT(resource, "No resource to create a barrier for.");
+	CRITICAL_ASSERT(::ResourceBarriers::g_usedResourceBarriers < DX12::CC::k_maxResourceBarriers, "No more space for resource barrier.");
+
+	D3D12_RESOURCE_BARRIER& barrier = ::ResourceBarriers::g_resourceBarriers[::ResourceBarriers::g_usedResourceBarriers++];
+	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+	barrier.Flags = flags;
+	barrier.Transition.pResource = resource;
+	barrier.Transition.StateBefore = before;
+	barrier.Transition.StateAfter = after;
+	barrier.Transition.Subresource = subresource;
+
+	commandList->ResourceBarrier(1, &barrier);
+}
+
+void DX12::UAVResourceBarrier(
+	ID3D12GraphicsCommandList6* commandList,
+	ID3D12Resource* resource,
+	D3D12_RESOURCE_BARRIER_FLAGS flags)
+{
+	CRITICAL_ASSERT(commandList, "No command list to create a barrier into.");
+	CRITICAL_ASSERT(resource, "No resource to create a barrier for.");
+	CRITICAL_ASSERT(::ResourceBarriers::g_usedResourceBarriers < DX12::CC::k_maxResourceBarriers, "No more space for resource barrier.");
+
+	D3D12_RESOURCE_BARRIER& barrier = ::ResourceBarriers::g_resourceBarriers[::ResourceBarriers::g_usedResourceBarriers++];
+	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+	barrier.Flags = flags;
+	barrier.UAV.pResource = resource;
+
+	commandList->ResourceBarrier(1, &barrier);
+}
+
+void DX12::AliasingResourceBarrier(ID3D12GraphicsCommandList6* commandList, ID3D12Resource* resourceBefore, ID3D12Resource* resourceAfter, D3D12_RESOURCE_BARRIER_FLAGS flags)
+{
+	CRITICAL_ASSERT(commandList, "No command list to create a barrier into.");
+	CRITICAL_ASSERT(resourceBefore, "No resource to alias FROM.");
+	CRITICAL_ASSERT(resourceAfter, "No resource to alias INTO.");
+	CRITICAL_ASSERT(::ResourceBarriers::g_usedResourceBarriers < DX12::CC::k_maxResourceBarriers, "No more space for resource barrier.");
+
+	D3D12_RESOURCE_BARRIER& barrier = ::ResourceBarriers::g_resourceBarriers[::ResourceBarriers::g_usedResourceBarriers++];
+	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_ALIASING;
+	barrier.Flags = flags;
+	barrier.Aliasing.pResourceBefore = resourceBefore;
+	barrier.Aliasing.pResourceAfter = resourceAfter;
+
+	commandList->ResourceBarrier(1, &barrier);
+}
+
+DX12::RendererCommand::RendererCommand(D3D12_COMMAND_LIST_TYPE type)
 {
 	D3D12_COMMAND_QUEUE_DESC cq;
 	cq.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
@@ -357,15 +446,15 @@ _error:
 	Release();
 }
 
-void DX12::GfxCommandExecutor::PreRender()
+void DX12::RendererCommand::PreRender()
 {
-	DX12::GfxCommandExecutor::GfxCommandFrame& currentFrame = _frame[_currentFrame];
+	DX12::RendererCommand::GfxCommandFrame& currentFrame = _frame[_currentFrame];
 	currentFrame.WaitForGPU(_fenceEvent, _fence.Get());
 	HRESULT_CHECK_CRITICAL(currentFrame.GetAllocator()->Reset(), "Could not clear/reset commandAllocator");
 	HRESULT_CHECK_CRITICAL(_commandList->Reset(currentFrame.GetAllocator(), nullptr), "Could not reset command list.");
 }
 
-void DX12::GfxCommandExecutor::PostRender()
+void DX12::RendererCommand::PostRender()
 {
 	_commandList->Close();
 	ID3D12CommandList* const lists[] = { _commandList.Get() };
@@ -378,7 +467,7 @@ void DX12::GfxCommandExecutor::PostRender()
 	_currentFrame = ++_currentFrame % DX12::CC::k_frameBuffers;
 }
 
-void DX12::GfxCommandExecutor::Flush()
+void DX12::RendererCommand::Flush()
 {
 	for (int i = 0; i < DX12::CC::k_frameBuffers; i++)
 		_frame[i].WaitForGPU(_fenceEvent, _fence.Get());
@@ -386,7 +475,7 @@ void DX12::GfxCommandExecutor::Flush()
 	_issuableFenceValue = 0;
 }
 
-void DX12::GfxCommandExecutor::Release()
+void DX12::RendererCommand::Release()
 {
 	if (_fence)
 	{
@@ -407,7 +496,7 @@ void DX12::GfxCommandExecutor::Release()
 	_currentFrame = 0;
 }
 
-bool DX12::GfxCommandExecutor::GfxCommandFrame::Setup(D3D12_COMMAND_LIST_TYPE type, int index)
+bool DX12::RendererCommand::GfxCommandFrame::Setup(D3D12_COMMAND_LIST_TYPE type, int index)
 {
 	HRESULT_CHECK_FALLBACK(
 		DX12::GetRendererDevice()->CreateCommandAllocator(type, IID_PPV_ARGS(&_allocator)),,
@@ -421,13 +510,13 @@ bool DX12::GfxCommandExecutor::GfxCommandFrame::Setup(D3D12_COMMAND_LIST_TYPE ty
 	return true;
 }
 
-void DX12::GfxCommandExecutor::GfxCommandFrame::Reset()
+void DX12::RendererCommand::GfxCommandFrame::Reset()
 {
 	_allocator.Reset();
 	_fenceValue = 0;
 }
 
-void DX12::GfxCommandExecutor::GfxCommandFrame::WaitForGPU(HANDLE fenceEvent, ID3D12Fence1* fence)
+void DX12::RendererCommand::GfxCommandFrame::WaitForGPU(HANDLE fenceEvent, ID3D12Fence1* fence)
 {
 	assert(fenceEvent && fence);
 

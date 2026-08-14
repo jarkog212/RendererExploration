@@ -1,6 +1,7 @@
 #include "DX12DepthBufferTexture.h"
 #include "DX12DescriptorHeap.h"
 #include "DX12CommonDescriptors.h"
+#include "DX12Utils.h"
 
 DX12::DepthBufferTexture DX12::DepthBufferTexture::Create(DX12::TextureSpecs& specs)
 {
@@ -12,7 +13,7 @@ DX12::DepthBufferTexture DX12::DepthBufferTexture::Create(DX12::TextureSpecs& sp
 	if (!specs._srvDesc)
 	{
 		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = DX12::CC::Desc::DepthStencil::k_SRVTemplate;
-		srvDesc.Format = specs._resourceDesc->Format = DX12::ConvertDepthDSVtoSRVFormat(specs._resourceDesc->Format);
+		srvDesc.Format = specs._resourceDesc->Format = DX12::Helpers::ConvertDepthDSVtoSRVFormat(specs._resourceDesc->Format);
 		specs._srvDesc = &srvDesc;
 	}
 

@@ -166,6 +166,7 @@
     <ClInclude Include="Source\DX12\DX12Renderer.h" />
     <ClInclude Include="Source\DX12\DX12Shaders.h" />
     <ClInclude Include="Source\DX12\DX12Texture.h" />
+    <ClInclude Include="Source\DX12\DX12Utils.h" />
     <ClInclude Include="Source\Utils.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

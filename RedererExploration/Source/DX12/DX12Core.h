@@ -7,7 +7,7 @@
 
 namespace DX12
 {
-	class GfxCommandExecutor;
+	class RendererCommand;
 	class RenderSurface;
 	class DescriptorHeap;
 	class RenderPassBase;
@@ -19,16 +19,13 @@ namespace DX12
 	DX12::RenderSurface* GetMainRenderSurface(
 		HWND window = NULL,
 		DXGI_FORMAT format = DX12::CC::k_defaultRenderTargetFormat,
-		DX12::GfxCommandExecutor* commandExecutor = nullptr);
+		DX12::RendererCommand* renderer = nullptr);
 
-	DX12::GfxCommandExecutor* GetMainCommandExecutor();
+	DX12::RendererCommand* GetMainRendererCommand();
 	DX12::DescriptorHeap* GetRTVHeap();
 	DX12::DescriptorHeap* GetDSVHeap();
 	DX12::DescriptorHeap* GetSRVHeap();
 	DX12::DescriptorHeap* GetUAVHeap();
-
-	ID3D12RootSignature* CreateRootSignature(const D3D12_ROOT_SIGNATURE_DESC2& desc);
-	ID3D12PipelineState* CreatePipelineState(void* stream, unsigned long long int streamSize);
 
 	void SetPendingResourceFreeingFlag();
 	bool TestPendingResourceFreeingFlag(const unsigned int frame);

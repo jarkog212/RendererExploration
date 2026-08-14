@@ -4,7 +4,7 @@
 #include "DX12DescriptorHeap.h"
 #include "DX12CommonDescriptors.h"
 
-DX12::RenderSurface::RenderSurface(const HWND window, DXGI_FORMAT format, DX12::GfxCommandExecutor& commandExecutor)
+DX12::RenderSurface::RenderSurface(const HWND window, DXGI_FORMAT format, DX12::RendererCommand& rendererCommand)
 	: _window(window)
 {
 	IDXGIFactory7* factory = DX12::GetDxgiFactory();
@@ -16,7 +16,7 @@ DX12::RenderSurface::RenderSurface(const HWND window, DXGI_FORMAT format, DX12::
 	if ((bool)_allowTearing)
 		_presentFlags = DXGI_PRESENT_ALLOW_TEARING;
 
-	ResetSwapChain(commandExecutor, format);
+	ResetSwapChain(rendererCommand, format);
 
 	HRESULT_CHECK_FALLBACK(
 		factory->MakeWindowAssociation(_window, DXGI_MWA_NO_ALT_ENTER), ,
@@ -29,11 +29,11 @@ DX12::RenderSurface::RenderSurface(const HWND window, DXGI_FORMAT format, DX12::
 DX12::RenderSurface::~RenderSurface()
 {
 	// Stall out the GPU
-	_linkedCommandExecutor->Flush();
+	_linkedRendererCommand->Flush();
 }
 
 DX12::RenderSurface::RenderSurface(RenderSurface&& other) noexcept :
-	_linkedCommandExecutor(std::exchange(other._linkedCommandExecutor, nullptr)),
+	_linkedRendererCommand(std::exchange(other._linkedRendererCommand, nullptr)),
 	_swapChain(std::move(other._swapChain)),
 	_window(std::exchange(other._window, HWND(NULL))),
 	_currentBackBufferIndex(std::exchange(other._currentBackBufferIndex, 0)),
@@ -50,7 +50,7 @@ DX12::RenderSurface& DX12::RenderSurface::operator=(RenderSurface&& other) noexc
 {
 	CRITICAL_ASSERT(this != &other, "Moving RenderSurface to itself.");
 
-	std::swap(_linkedCommandExecutor, other._linkedCommandExecutor);
+	std::swap(_linkedRendererCommand, other._linkedRendererCommand);
 	std::swap(_swapChain, other._swapChain);
 	std::swap(_window, other._window);
 	std::swap(_currentBackBufferIndex, other._currentBackBufferIndex);
@@ -67,24 +67,24 @@ DX12::RenderSurface& DX12::RenderSurface::operator=(RenderSurface&& other) noexc
 
 void DX12::RenderSurface::Resize()
 {
-	if (_linkedCommandExecutor)
-		_linkedCommandExecutor->Flush();
+	if (_linkedRendererCommand)
+		_linkedRendererCommand->Flush();
 
 	// body
 }
 
 void DX12::RenderSurface::PreRender()
 {
-	CRITICAL_ASSERT(_linkedCommandExecutor, "Cannot prepare render without valid command executor.");
+	CRITICAL_ASSERT(_linkedRendererCommand, "Cannot prepare render without valid command executor.");
 
-	_linkedCommandExecutor->PreRender();
+	_linkedRendererCommand->PreRender();
 }
 
 void DX12::RenderSurface::PostRender()
 {
-	CRITICAL_ASSERT(_linkedCommandExecutor, "Cannot finish render without valid command executor.");
+	CRITICAL_ASSERT(_linkedRendererCommand, "Cannot finish render without valid command executor.");
 
-	_linkedCommandExecutor->PostRender();
+	_linkedRendererCommand->PostRender();
 }
 
 void DX12::RenderSurface::Present() const
@@ -95,12 +95,19 @@ void DX12::RenderSurface::Present() const
 	_currentBackBufferIndex = _swapChain->GetCurrentBackBufferIndex();
 }
 
-void DX12::RenderSurface::ResetSwapChain(DX12::GfxCommandExecutor& commandExecutor, DXGI_FORMAT format)
+void DX12::RenderSurface::UpdateViewport()
 {
-	if (_linkedCommandExecutor)
-		_linkedCommandExecutor->Flush();
+	ID3D12GraphicsCommandList6* commandList = _linkedRendererCommand->GetCommandList();
+	commandList->RSSetViewports(1, &_viewport);
+	commandList->RSSetScissorRects(1, &_scissorRect);
+}
 
-	_linkedCommandExecutor = &commandExecutor;
+void DX12::RenderSurface::ResetSwapChain(DX12::RendererCommand& rendererCommand, DXGI_FORMAT format)
+{
+	if (_linkedRendererCommand)
+		_linkedRendererCommand->Flush();
+
+	_linkedRendererCommand = &rendererCommand;
 
 	RECT windowDimensions = GetWindowDimensions();
 	const int width = windowDimensions.right - windowDimensions.left;
@@ -119,7 +126,7 @@ void DX12::RenderSurface::ResetSwapChain(DX12::GfxCommandExecutor& commandExecut
 		Microsoft::WRL::ComPtr<IDXGISwapChain1> swapChain = nullptr;
 		HRESULT_CHECK_FALLBACK(
 			DX12::GetDxgiFactory()->CreateSwapChainForHwnd(
-				_linkedCommandExecutor->GetCommandQueue(), _window, &desc, nullptr, nullptr, &swapChain),,
+				_linkedRendererCommand->GetCommandQueue(), _window, &desc, nullptr, nullptr, &swapChain),,
 			assert(false),
 			"Could not create a swap chain.");
 

@@ -49,7 +49,7 @@ namespace DX12
 		using SubepthStencil2 = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL2, D3D12_DEPTH_STENCIL_DESC2>;
 		using SubRasterizer1 = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_RASTERIZER1, D3D12_RASTERIZER_DESC1>;
 		using SubRasterizer2 = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_RASTERIZER2, D3D12_RASTERIZER_DESC2>;
-		using SubSerializedRootSignature = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_SERIALIZED_ROOT_SIGNATURE, D3D12_SERIALIZED_ROOT_SIGNATURE_DESC>;		
+		using SubSerializedRootSignature = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_SERIALIZED_ROOT_SIGNATURE, D3D12_SERIALIZED_ROOT_SIGNATURE_DESC>;
 	} // PipelineStream;
 
 	struct DescriptorHandleView
@@ -96,7 +96,7 @@ namespace DX12
 
 		NO_COPY(RenderTargetData);
 
-		void Release() { if(_rtvHandle._owner) *this = RenderTargetData(); }
+		void Release() { if (_rtvHandle._owner) *this = RenderTargetData(); }
 	};
 
 	struct DescriptorRange : public D3D12_DESCRIPTOR_RANGE1
@@ -108,8 +108,9 @@ namespace DX12
 			unsigned int space = 0,
 			D3D12_DESCRIPTOR_RANGE_FLAGS flags = D3D12_DESCRIPTOR_RANGE_FLAG_NONE,
 			unsigned int offsetFromTable = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND)
-		: D3D12_DESCRIPTOR_RANGE1{ rangeType, descriptorCount, shaderRegister, space, flags, offsetFromTable }
-		{};
+			: D3D12_DESCRIPTOR_RANGE1{ rangeType, descriptorCount, shaderRegister, space, flags, offsetFromTable }
+		{
+		};
 	};
 
 	struct RootParameter : public D3D12_ROOT_PARAMETER1
@@ -154,11 +155,11 @@ namespace DX12
 
 		void SetNext(RenderPassBase& pass) { _next = &pass; };
 		void UnsetNext() { _next = nullptr; };
-		void BakeCommands(ID3D12GraphicsCommandList6* commandList);
+		void AccummulateCommands(ID3D12GraphicsCommandList6* commandList);
 
 	protected:
 
-		virtual void RenderPass(ID3D12GraphicsCommandList6* commandList) = 0;
+		virtual void AccummulatePassCommands(ID3D12GraphicsCommandList6* commandList) = 0;
 
 		const char* _name = "";
 
@@ -166,4 +167,6 @@ namespace DX12
 
 		RenderPassBase* _next = nullptr;
 	};
+
+
 }

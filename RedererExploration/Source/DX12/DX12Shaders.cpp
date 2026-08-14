@@ -16,6 +16,12 @@ namespace
 		static Microsoft::WRL::ComPtr<IDxcUtils> g_DXCUtils = nullptr;
 		static Microsoft::WRL::ComPtr<IDxcIncludeHandler> g_DXCInlcudeHandler = nullptr;
 
+		static std::filesystem::path k_shaderFilePrefix(".\\Shaders");
+		static std::filesystem::path k_precompiledShaderPrefix(".\\Shaders\\bin");
+		static std::filesystem::path k_precompiledGenericShaderFilePath = ".\\Shaders\\bin\\shaders.bin";
+		constexpr const wchar_t* k_shaderBinaryExtension = L".shad";
+		constexpr const wchar_t* k_shaderSourceExtension = L".hlsl";
+
 		static const wchar_t* k_shaderStageNames[] = {
 			L"vs_6_5",
 			L"hs_6_5",
@@ -46,9 +52,9 @@ namespace
 					"Could not instantiate Dxc Include handler.");
 
 			std::filesystem::path filename = spec._filename;
-			filename += DX12::CC::k_shaderSourceExtension;
+			filename += ::Compiler::k_shaderSourceExtension;
 
-			std::filesystem::path path = DX12::CC::k_shaderFilePrefix;
+			std::filesystem::path path = ::Compiler::k_shaderFilePrefix;
 			path.append(filename.c_str());
 
 			Microsoft::WRL::ComPtr<IDxcBlobEncoding> blobEncoding = nullptr;
@@ -145,7 +151,7 @@ namespace
 
 		CRITICAL_ASSERT(offset == shaderHeapSize, "Parsing shaders to raw heap was not successful.")
 
-		Utils::System::SaveFile(DX12::CC::k_precompiledGenericShaderFilePath, g_genericShadersArena.get(), shaderHeapSize);
+		Utils::System::SaveFile(::Compiler::k_precompiledGenericShaderFilePath, g_genericShadersArena.get(), shaderHeapSize);
 
 		return shaderHeapSize;
 	}
@@ -156,16 +162,16 @@ namespace
 		CRITICAL_ASSERT(!g_genericShadersArena, "Loading new generic shaders while their heap is not empty.");
 		CRITICAL_ASSERT(!g_genericShaderViews, "There are already generic shader views despite the call to make them again.");
 
-		if (!Utils::System::FileExists(DX12::CC::k_precompiledGenericShaderFilePath))
+		if (!Utils::System::FileExists(::Compiler::k_precompiledGenericShaderFilePath))
 		{
 			shaderHeapSize = ::CompileAndSaveGenericShaders();
 		}
 		else
 		{
-			shaderHeapSize = Utils::System::FileSizeOf(DX12::CC::k_precompiledGenericShaderFilePath);
+			shaderHeapSize = Utils::System::FileSizeOf(::Compiler::k_precompiledGenericShaderFilePath);
 			g_genericShadersArena = std::make_unique<char[]>(shaderHeapSize);
 			char* bufferProxy = g_genericShadersArena.get();
-			Utils::System::LoadFile(DX12::CC::k_precompiledGenericShaderFilePath, bufferProxy, shaderHeapSize);
+			Utils::System::LoadFile(::Compiler::k_precompiledGenericShaderFilePath, bufferProxy, shaderHeapSize);
 		}
 
 		CRITICAL_ASSERT(g_genericShadersArena && shaderHeapSize > 0, "Failed to load or compile generic shaders or allocate shader heap.");
@@ -253,9 +259,9 @@ const DX12::Shaders::ShaderView DX12::Shaders::LoadOrCompile(const DX12::Shaders
 {
 	DX12::Shaders::TryReleaseShader(specs);
 	DX12::Shaders::Shader& out = ::g_shaders[specs._filename];
-	std::filesystem::path precompiledPath = DX12::CC::k_precompiledShaderPrefix;
+	std::filesystem::path precompiledPath = ::Compiler::k_precompiledShaderPrefix;
 	precompiledPath.append(specs._filename);
-	precompiledPath += DX12::CC::k_shaderBinaryExtension;
+	precompiledPath += ::Compiler::k_shaderBinaryExtension;
 
 	if (Utils::System::FileExists(precompiledPath))
 	{

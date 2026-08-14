@@ -6,15 +6,34 @@
 
 namespace DX12
 {
-	class GfxCommandExecutor
+	void TransitionResourceBarrier(
+		ID3D12GraphicsCommandList6* commandList,
+		ID3D12Resource* resource,
+		D3D12_RESOURCE_STATES before,
+		D3D12_RESOURCE_STATES after,
+		D3D12_RESOURCE_BARRIER_FLAGS flags = D3D12_RESOURCE_BARRIER_FLAG_NONE,
+		unsigned int subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
+
+	void UAVResourceBarrier(
+		ID3D12GraphicsCommandList6* commandList,
+		ID3D12Resource* resource,
+		D3D12_RESOURCE_BARRIER_FLAGS flags = D3D12_RESOURCE_BARRIER_FLAG_NONE);
+
+	void AliasingResourceBarrier(
+		ID3D12GraphicsCommandList6* commandList,
+		ID3D12Resource* resourceBefore,
+		ID3D12Resource* resourceAfter,
+		D3D12_RESOURCE_BARRIER_FLAGS flags = D3D12_RESOURCE_BARRIER_FLAG_NONE);
+
+	class RendererCommand
 	{
 	public:
 
-		explicit GfxCommandExecutor(D3D12_COMMAND_LIST_TYPE type);
-		~GfxCommandExecutor() { Release(); };
+		RendererCommand(D3D12_COMMAND_LIST_TYPE type);
+		~RendererCommand() { Release(); };
 
-		NO_COPY(GfxCommandExecutor);
-		NO_MOVE(GfxCommandExecutor);
+		NO_COPY(RendererCommand);
+		NO_MOVE(RendererCommand);
 
 		void PreRender();
 		void PostRender();

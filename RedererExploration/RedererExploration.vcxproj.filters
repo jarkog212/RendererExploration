@@ -94,5 +94,8 @@
     <ClInclude Include="Source\DX12\DX12Math.h">
       <Filter>Source Files\DX12</Filter>
     </ClInclude>
+    <ClInclude Include="Source\DX12\DX12Utils.h">
+      <Filter>Source Files\DX12</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

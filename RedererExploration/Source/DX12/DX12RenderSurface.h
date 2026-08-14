@@ -4,13 +4,13 @@
 
 namespace DX12
 {
-	class GfxCommandExecutor;
+	class RendererCommand;
 
 	class RenderSurface
 	{
 	public:
 
-		RenderSurface(const HWND window, DXGI_FORMAT format, DX12::GfxCommandExecutor& commandExecutor);
+		RenderSurface(const HWND window, DXGI_FORMAT format, DX12::RendererCommand& rendererCommand);
 		~RenderSurface();
 		RenderSurface(RenderSurface&& other) noexcept;
 		RenderSurface& operator=(RenderSurface&& other) noexcept;
@@ -21,10 +21,11 @@ namespace DX12
 		void PreRender();
 		void PostRender();
 		void Present() const;
+		void UpdateViewport();
 
-		void ResetSwapChain(DX12::GfxCommandExecutor& commandExecutor, DXGI_FORMAT format);
+		void ResetSwapChain(DX12::RendererCommand& rendererCommand, DXGI_FORMAT format);
 
-		DX12::GfxCommandExecutor* GetLinkedCommandExecutor() const { return _linkedCommandExecutor; }
+		DX12::RendererCommand* GetLinkedRendererCommand() const { return _linkedRendererCommand; }
 		constexpr HWND GetWindow() const { return _window; }
 		RECT GetWindowDimensions() const;
 		constexpr unsigned int GetWidth() const { return _viewport.Width; }
@@ -40,7 +41,7 @@ namespace DX12
 
 		static constexpr int _k_swapChainBuffers = 3;
 
-		DX12::GfxCommandExecutor* _linkedCommandExecutor = nullptr; // non-owning
+		DX12::RendererCommand* _linkedRendererCommand = nullptr; // non-owning
 		Microsoft::WRL::ComPtr<IDXGISwapChain4> _swapChain = nullptr;
 		HWND _window = NULL;
 		mutable unsigned int _currentBackBufferIndex = 0;

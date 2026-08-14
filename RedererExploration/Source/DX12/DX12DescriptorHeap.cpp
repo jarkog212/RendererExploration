@@ -130,7 +130,7 @@ void DX12::DescriptorHeap::Free(DescriptorHandle& handle)
 		CRITICAL_ASSERT(index == handle._index, "Called Free for handle whose index is not matching what it got initialised with.");
 #endif
 
-		const int currentFrame = DX12::GetMainCommandExecutor()->GetCurrentFrame();
+		const int currentFrame = DX12::GetMainRendererCommand()->GetCurrentFrame();
 		_deferredResourceFreeing[currentFrame].push_back(index);
 		DX12::SetPendingResourceFreeingFlag();
 	}

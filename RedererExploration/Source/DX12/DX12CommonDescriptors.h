@@ -1,35 +1,6 @@
 #pragma once
 
-#include "DX12Core.h"
-
-namespace DX12
-{
-	inline DXGI_FORMAT ConvertDepthDSVtoSRVFormat(DXGI_FORMAT dsv)
-	{
-		switch (dsv)
-		{
-			case DXGI_FORMAT_D32_FLOAT:
-				return DXGI_FORMAT_R32_FLOAT;
-			case DXGI_FORMAT_D24_UNORM_S8_UINT:
-				return DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
-			case DXGI_FORMAT_D16_UNORM:
-				return DXGI_FORMAT_R16_UNORM;
-			default:
-				return DXGI_FORMAT_UNKNOWN;
-		}
-	}
-
-	inline DXGI_FORMAT ConvertStencilDSVtoSRVFormat(DXGI_FORMAT dsv)
-	{
-		switch (dsv)
-		{
-			case DXGI_FORMAT_D24_UNORM_S8_UINT:
-				return DXGI_FORMAT_X24_TYPELESS_G8_UINT;
-			default:
-				return DXGI_FORMAT_UNKNOWN;
-		}
-	}
-}
+#include "DX12CommonConstants.h"
 
 namespace DX12::CC::Desc
 {

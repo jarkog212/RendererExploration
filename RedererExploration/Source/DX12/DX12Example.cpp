@@ -1,4 +1,4 @@
-#include "DX12Core.h"
+#include "DX12Utils.h"
 #include "DX12DescriptorHeap.h"
 #include "DX12Renderer.h"
 #include "DX12CommonDescriptors.h"
@@ -27,7 +27,7 @@ ID3D12RootSignature* GetRootSignature()
 		desc.NumParameters = _countof(rootParams);
 		desc.pParameters = rootParams;
 
-		::COMRenderRootSignature = DX12::CreateRootSignature(desc);
+		::COMRenderRootSignature = DX12::Helpers::CreateRootSignature(desc);
 
 		return ::COMRenderRootSignature.Get();
 }
@@ -42,7 +42,7 @@ ID3D12PipelineState* GetPipelineState()
 			SubRootSignature rs{ GetRootSignature() };
 		}stream;
 
-		::COMRenderPipelineState = DX12::CreatePipelineState(&stream, sizeof(stream));
+		::COMRenderPipelineState = DX12::Helpers::CreatePipelineState(&stream, sizeof(stream));
 
 		return ::COMRenderPipelineState.Get();
 }
@@ -51,7 +51,7 @@ ID3D12GraphicsCommandList6* ExampleRenderBuild()
 {
 	DX12::DescriptorHeap* srvHeap = DX12::GetSRVHeap();
 
-	ID3D12GraphicsCommandList6* commandList = DX12::GetMainCommandExecutor()->GetCommandList();
+	ID3D12GraphicsCommandList6* commandList = DX12::GetMainRendererCommand()->GetCommandList();
 
 	commandList->SetGraphicsRootSignature(GetRootSignature());
 	commandList->SetPipelineState(GetPipelineState());

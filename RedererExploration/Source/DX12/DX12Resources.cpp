@@ -102,7 +102,15 @@ void DX12::RenderPassBase::AccummulateCommands(ID3D12GraphicsCommandList6* comma
 {
 	CRITICAL_ASSERT(commandList, "Cannot render the pass without a valid command list.");
 
+	PrePassResourceBarriers();
+	if (_submitBarriers[0])
+		DX12::SubmitPendingBarriers(commandList);
+
 	AccummulatePassCommands(commandList);
+
+	PostPassResourceBarriers();
+	if (_submitBarriers[1])
+		DX12::SubmitPendingBarriers(commandList);
 
 	if (_next)
 		_next->AccummulateCommands(commandList);

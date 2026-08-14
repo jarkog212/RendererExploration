@@ -6,25 +6,6 @@
 
 namespace DX12
 {
-	void TransitionResourceBarrier(
-		ID3D12GraphicsCommandList6* commandList,
-		ID3D12Resource* resource,
-		D3D12_RESOURCE_STATES before,
-		D3D12_RESOURCE_STATES after,
-		D3D12_RESOURCE_BARRIER_FLAGS flags = D3D12_RESOURCE_BARRIER_FLAG_NONE,
-		unsigned int subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
-
-	void UAVResourceBarrier(
-		ID3D12GraphicsCommandList6* commandList,
-		ID3D12Resource* resource,
-		D3D12_RESOURCE_BARRIER_FLAGS flags = D3D12_RESOURCE_BARRIER_FLAG_NONE);
-
-	void AliasingResourceBarrier(
-		ID3D12GraphicsCommandList6* commandList,
-		ID3D12Resource* resourceBefore,
-		ID3D12Resource* resourceAfter,
-		D3D12_RESOURCE_BARRIER_FLAGS flags = D3D12_RESOURCE_BARRIER_FLAG_NONE);
-
 	class RendererCommand
 	{
 	public:

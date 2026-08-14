@@ -156,16 +156,23 @@ namespace DX12
 		void SetNext(RenderPassBase& pass) { _next = &pass; };
 		void UnsetNext() { _next = nullptr; };
 		void AccummulateCommands(ID3D12GraphicsCommandList6* commandList);
+		void SetAutoBarrierSubmits(bool prePass, bool postPass) { _submitBarriers[0] = prePass; _submitBarriers[1] = postPass; };
 
 	protected:
 
+		virtual void PrePassResourceBarriers() = 0;
 		virtual void AccummulatePassCommands(ID3D12GraphicsCommandList6* commandList) = 0;
+		virtual void PostPassResourceBarriers() = 0;
 
 		const char* _name = "";
 
 	private:
 
 		RenderPassBase* _next = nullptr;
+
+		// true, false as we expect the post pass resource
+		//   barriers and pre pass resource barriers can be grouped usually.
+		bool _submitBarriers[2] = { true, false };
 	};
 
 

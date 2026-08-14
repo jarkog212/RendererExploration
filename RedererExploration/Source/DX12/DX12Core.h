@@ -30,6 +30,24 @@ namespace DX12
 	void SetPendingResourceFreeingFlag();
 	bool TestPendingResourceFreeingFlag(const unsigned int frame);
 
+	void PendingTransitionResourceBarrier(
+		ID3D12Resource* resource,
+		D3D12_RESOURCE_STATES before,
+		D3D12_RESOURCE_STATES after,
+		D3D12_RESOURCE_BARRIER_FLAGS flags = D3D12_RESOURCE_BARRIER_FLAG_NONE,
+		unsigned int subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
+
+	void PendingUAVResourceBarrier(
+		ID3D12Resource* resource,
+		D3D12_RESOURCE_BARRIER_FLAGS flags = D3D12_RESOURCE_BARRIER_FLAG_NONE);
+
+	void PendingAliasingResourceBarrier(
+		ID3D12Resource* resourceBefore,
+		ID3D12Resource* resourceAfter,
+		D3D12_RESOURCE_BARRIER_FLAGS flags = D3D12_RESOURCE_BARRIER_FLAG_NONE);
+
+	void SubmitPendingBarriers(ID3D12GraphicsCommandList6* commandList);
+
 	bool Initialize(HWND hwnd);
 	void Render(DX12::RenderSurface& surface, DX12::RenderPassBase* root = nullptr );
 	void Render();

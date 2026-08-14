@@ -20,7 +20,6 @@ namespace DX12
 		void Resize();
 		void PreRender();
 		void PostRender();
-		void Present() const;
 		void UpdateViewport();
 
 		void ResetSwapChain(DX12::RendererCommand& rendererCommand, DXGI_FORMAT format);

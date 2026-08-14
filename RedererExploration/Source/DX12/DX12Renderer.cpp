@@ -3,6 +3,7 @@
 #include "DX12RenderSurface.h"
 #include "DX12Shaders.h"
 #include "DX12GPass.h"
+#include "DX12PostProcessPass.h"
 #include "DX12Utils.h"
 
 namespace
@@ -54,9 +55,15 @@ namespace
 
 	namespace ResourceBarriers
 	{
-		static D3D12_RESOURCE_BARRIER g_resourceBarriers[DX12::CC::k_maxResourceBarriers];
-		static unsigned int g_usedResourceBarriers = 0;
+		static D3D12_RESOURCE_BARRIER g_bulkResourceBarriers[DX12::CC::k_maxResourceBarriers];
+		static unsigned int g_pendingBulkResourceBarriers = 0;
 	} // ResourceBarriers
+
+	void BuildRenderGraph()
+	{
+		g_rootRenderNode = DX12::GPassSpace::GetHeadNode();
+		DX12::GPassSpace::GetTailNode()->SetAutoBarrierSubmits(true, true);
+	}
 }
 
 void UtilsImpl::COM::Release(IUnknown* resource)
@@ -212,15 +219,68 @@ bool DX12::TestPendingResourceFreeingFlag(const unsigned int frame)
 	return (bool)(::DefferedFree::g_deferredResourceFreeingFlag & (1ull << frame));
 }
 
+void DX12::PendingTransitionResourceBarrier(
+	ID3D12Resource* resource,
+	D3D12_RESOURCE_STATES before,
+	D3D12_RESOURCE_STATES after,
+	D3D12_RESOURCE_BARRIER_FLAGS flags,
+	unsigned int subresource)
+{
+	CRITICAL_ASSERT(resource, "No resource to create a barrier for.");
+	CRITICAL_ASSERT(::ResourceBarriers::g_pendingBulkResourceBarriers < DX12::CC::k_maxResourceBarriers, "No more space for resource barrier.");
+
+	D3D12_RESOURCE_BARRIER& barrier = ::ResourceBarriers::g_bulkResourceBarriers[::ResourceBarriers::g_pendingBulkResourceBarriers++];
+	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+	barrier.Flags = flags;
+	barrier.Transition.pResource = resource;
+	barrier.Transition.StateBefore = before;
+	barrier.Transition.StateAfter = after;
+	barrier.Transition.Subresource = subresource;
+}
+
+void DX12::PendingUAVResourceBarrier(ID3D12Resource* resource, D3D12_RESOURCE_BARRIER_FLAGS flags)
+{
+	CRITICAL_ASSERT(resource, "No resource to create a barrier for.");
+	CRITICAL_ASSERT(::ResourceBarriers::g_pendingBulkResourceBarriers < DX12::CC::k_maxResourceBarriers, "No more space for resource barrier.");
+
+	D3D12_RESOURCE_BARRIER& barrier = ::ResourceBarriers::g_bulkResourceBarriers[::ResourceBarriers::g_pendingBulkResourceBarriers++];
+	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+	barrier.Flags = flags;
+	barrier.UAV.pResource = resource;
+}
+
+void DX12::PendingAliasingResourceBarrier(ID3D12Resource* resourceBefore, ID3D12Resource* resourceAfter, D3D12_RESOURCE_BARRIER_FLAGS flags)
+{
+	CRITICAL_ASSERT(resourceBefore, "No resource to alias FROM.");
+	CRITICAL_ASSERT(resourceAfter, "No resource to alias INTO.");
+	CRITICAL_ASSERT(::ResourceBarriers::g_pendingBulkResourceBarriers < DX12::CC::k_maxResourceBarriers, "No more space for resource barrier.");
+
+	D3D12_RESOURCE_BARRIER& barrier = ::ResourceBarriers::g_bulkResourceBarriers[::ResourceBarriers::g_pendingBulkResourceBarriers++];
+	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_ALIASING;
+	barrier.Flags = flags;
+	barrier.Aliasing.pResourceBefore = resourceBefore;
+	barrier.Aliasing.pResourceAfter = resourceAfter;
+}
+
+void DX12::SubmitPendingBarriers(ID3D12GraphicsCommandList6* commandList)
+{
+	if (::ResourceBarriers::g_pendingBulkResourceBarriers == 0)
+		return;
+
+	commandList->ResourceBarrier(::ResourceBarriers::g_pendingBulkResourceBarriers, ::ResourceBarriers::g_bulkResourceBarriers);
+	::ResourceBarriers::g_pendingBulkResourceBarriers = 0;
+}
+
 bool DX12::Initialize(HWND hwnd)
 {
 	// Things are written lazy init style mostly (encapsulation purposes),
 	// warmup efectively moakes the initialization controlled.
 	DX12::Shaders::WarmUp();
 	DX12::GPassSpace::WarmUp();
+	DX12::PostProcessSpace::WarmUp();
 
 	// Build the pass tree
-	g_rootRenderNode = DX12::GPassSpace::GetHeadNode();
+	::BuildRenderGraph();
 
 	DX12::GetMainRenderSurface(
 		hwnd,
@@ -239,8 +299,6 @@ void DX12::Render(DX12::RenderSurface& surface, DX12::RenderPassBase* root)
 {
 	surface.PreRender();
 	
-	surface.Present();
-
 	surface.UpdateViewport();
 
 	DX12::RendererCommand* rendererCommand = surface.GetLinkedRendererCommand();
@@ -262,8 +320,7 @@ void DX12::Render(DX12::RenderSurface& surface, DX12::RenderPassBase* root)
 	DX12::Math::Vector2u32 size{ surface.GetWidth(), surface.GetHeight() };
 	DX12::GPassSpace::SetDimensions(size);
 
-	DX12::TransitionResourceBarrier(
-		commandList,
+	DX12::PendingTransitionResourceBarrier(
 		surface.GetBackbuffer(),
 		D3D12_RESOURCE_STATE_PRESENT,
 		D3D12_RESOURCE_STATE_RENDER_TARGET);
@@ -273,8 +330,7 @@ void DX12::Render(DX12::RenderSurface& surface, DX12::RenderPassBase* root)
 
 	// Post Process
 
-	DX12::TransitionResourceBarrier(
-		commandList,
+	DX12::PendingTransitionResourceBarrier(
 		surface.GetBackbuffer(),
 		D3D12_RESOURCE_STATE_RENDER_TARGET,
 		D3D12_RESOURCE_STATE_PRESENT);
@@ -293,6 +349,7 @@ void DX12::Release()
 	static auto cleaner = []()
 		{
 			DX12::GPassSpace::Release();
+			DX12::PostProcessSpace::Release();
 			DX12::Shaders::Release();
 
 			::g_mainRenderSurface.reset();
@@ -332,62 +389,6 @@ void DX12::Release()
 #else
 	cleaner();
 #endif
-}
-
-void DX12::TransitionResourceBarrier(
-	ID3D12GraphicsCommandList6* commandList,
-	ID3D12Resource* resource,
-	D3D12_RESOURCE_STATES before,
-	D3D12_RESOURCE_STATES after,
-	D3D12_RESOURCE_BARRIER_FLAGS flags,
-	unsigned int subresource)
-{
-	CRITICAL_ASSERT(commandList, "No command list to create a barrier into.");
-	CRITICAL_ASSERT(resource, "No resource to create a barrier for.");
-	CRITICAL_ASSERT(::ResourceBarriers::g_usedResourceBarriers < DX12::CC::k_maxResourceBarriers, "No more space for resource barrier.");
-
-	D3D12_RESOURCE_BARRIER& barrier = ::ResourceBarriers::g_resourceBarriers[::ResourceBarriers::g_usedResourceBarriers++];
-	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-	barrier.Flags = flags;
-	barrier.Transition.pResource = resource;
-	barrier.Transition.StateBefore = before;
-	barrier.Transition.StateAfter = after;
-	barrier.Transition.Subresource = subresource;
-
-	commandList->ResourceBarrier(1, &barrier);
-}
-
-void DX12::UAVResourceBarrier(
-	ID3D12GraphicsCommandList6* commandList,
-	ID3D12Resource* resource,
-	D3D12_RESOURCE_BARRIER_FLAGS flags)
-{
-	CRITICAL_ASSERT(commandList, "No command list to create a barrier into.");
-	CRITICAL_ASSERT(resource, "No resource to create a barrier for.");
-	CRITICAL_ASSERT(::ResourceBarriers::g_usedResourceBarriers < DX12::CC::k_maxResourceBarriers, "No more space for resource barrier.");
-
-	D3D12_RESOURCE_BARRIER& barrier = ::ResourceBarriers::g_resourceBarriers[::ResourceBarriers::g_usedResourceBarriers++];
-	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-	barrier.Flags = flags;
-	barrier.UAV.pResource = resource;
-
-	commandList->ResourceBarrier(1, &barrier);
-}
-
-void DX12::AliasingResourceBarrier(ID3D12GraphicsCommandList6* commandList, ID3D12Resource* resourceBefore, ID3D12Resource* resourceAfter, D3D12_RESOURCE_BARRIER_FLAGS flags)
-{
-	CRITICAL_ASSERT(commandList, "No command list to create a barrier into.");
-	CRITICAL_ASSERT(resourceBefore, "No resource to alias FROM.");
-	CRITICAL_ASSERT(resourceAfter, "No resource to alias INTO.");
-	CRITICAL_ASSERT(::ResourceBarriers::g_usedResourceBarriers < DX12::CC::k_maxResourceBarriers, "No more space for resource barrier.");
-
-	D3D12_RESOURCE_BARRIER& barrier = ::ResourceBarriers::g_resourceBarriers[::ResourceBarriers::g_usedResourceBarriers++];
-	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_ALIASING;
-	barrier.Flags = flags;
-	barrier.Aliasing.pResourceBefore = resourceBefore;
-	barrier.Aliasing.pResourceAfter = resourceAfter;
-
-	commandList->ResourceBarrier(1, &barrier);
 }
 
 DX12::RendererCommand::RendererCommand(D3D12_COMMAND_LIST_TYPE type)

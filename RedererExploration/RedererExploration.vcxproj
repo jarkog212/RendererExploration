@@ -142,6 +142,7 @@
     <ClCompile Include="Source\DX12\DX12DescriptorHeap.cpp" />
     <ClCompile Include="Source\DX12\DX12Example.cpp" />
     <ClCompile Include="Source\DX12\DX12GPass.cpp" />
+    <ClCompile Include="Source\DX12\DX12PostProcessPass.cpp" />
     <ClCompile Include="Source\DX12\DX12Renderer.cpp" />
     <ClCompile Include="Source\DX12\DX12RenderSurface.cpp" />
     <ClCompile Include="Source\DX12\DX12RenderTargetTexture.cpp" />
@@ -160,6 +161,7 @@
     <ClInclude Include="Source\DX12\DX12DescriptorHeap.h" />
     <ClInclude Include="Source\DX12\DX12GPass.h" />
     <ClInclude Include="Source\DX12\DX12Math.h" />
+    <ClInclude Include="Source\DX12\DX12PostProcessPass.h" />
     <ClInclude Include="Source\DX12\DX12RenderSurface.h" />
     <ClInclude Include="Source\DX12\DX12RenderTargetTexture.h" />
     <ClInclude Include="Source\DX12\DX12Resources.h" />

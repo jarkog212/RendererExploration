@@ -15,6 +15,22 @@ namespace
 
 	static std::unique_ptr<DX12::DepthPass> g_DepthPass = nullptr;
 	static std::unique_ptr<DX12::GPassRT> g_GPassRTPass = nullptr;
+
+	constexpr D3D12_RESOURCE_STATES k_depthReadOnly =
+		D3D12_RESOURCE_STATE_DEPTH_READ |
+		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE |
+		D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+
+	constexpr D3D12_RESOURCE_STATES k_depthWriteOnly = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+
+	static bool g_GPassLinked = false;
+
+	void LinkGPassTree()
+	{
+		DX12::GPassSpace::GetDepthPass()->SetNext(*DX12::GPassSpace::GetGPassRTPass());
+		DX12::GPassSpace::GetGPassRTPass()->LinkDepthPass(DX12::GPassSpace::GetDepthPass());
+		::g_GPassLinked = true;
+	}
 }
 
 void DX12::GPassSpace::WarmUp()
@@ -31,6 +47,7 @@ void DX12::GPassSpace::Release()
 	Utils::COM::SafeDeferredRenderThreadRelease(::g_GPassPipelineState);
 	::g_DepthPass.reset();
 	::g_GPassRTPass.reset();
+	::g_GPassLinked = false;
 }
 
 ID3D12RootSignature* DX12::GPassSpace::GetRootSignature()
@@ -104,9 +121,22 @@ DX12::GPassRT* DX12::GPassSpace::GetGPassRTPass(DX12::Math::Vector2u32 size)
 
 DX12::RenderPassBase* DX12::GPassSpace::GetHeadNode()
 {
-	DX12::GPassSpace::GetDepthPass()->SetNext(*DX12::GPassSpace::GetGPassRTPass());
-	DX12::GPassSpace::GetGPassRTPass()->LinkDepthPass(DX12::GPassSpace::GetDepthPass());
+	if(::g_GPassLinked) [[likely]]
+		return DX12::GPassSpace::GetDepthPass();
+
+	::LinkGPassTree();
+
 	return DX12::GPassSpace::GetDepthPass();
+}
+
+DX12::RenderPassBase* DX12::GPassSpace::GetTailNode()
+{
+	if (::g_GPassLinked) [[likely]]
+		return DX12::GPassSpace::GetGPassRTPass();
+
+	::LinkGPassTree();
+
+	return DX12::GPassSpace::GetGPassRTPass();
 }
 
 void DX12::GPassSpace::SetDimensions(const DX12::Math::Vector2u32& size)
@@ -145,24 +175,24 @@ DX12::DepthPass& DX12::DepthPass::operator=(DepthPass&& other) noexcept
 	return *this;
 }
 
+void DX12::DepthPass::PrePassResourceBarriers()
+{
+	DX12::PendingTransitionResourceBarrier(_depthBuffer.GetResource(), ::k_depthReadOnly, k_depthWriteOnly);
+}
+
 void DX12::DepthPass::AccummulatePassCommands(ID3D12GraphicsCommandList6* commandList)
 {
-	constexpr D3D12_RESOURCE_STATES readOnly =
-		D3D12_RESOURCE_STATE_DEPTH_READ |
-		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE |
-		D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-
-	constexpr D3D12_RESOURCE_STATES writeOnly = D3D12_RESOURCE_STATE_DEPTH_WRITE;
-
-	DX12::TransitionResourceBarrier(commandList, _depthBuffer.GetResource(), readOnly, writeOnly);
-
 	const D3D12_CPU_DESCRIPTOR_HANDLE dsv = _depthBuffer.GetDSVCpuHandle();
 	commandList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 0.f, 0, 0, nullptr);
 	commandList->OMSetRenderTargets(0, nullptr, false, &dsv);
 
 	// Further pass code here
 
-	DX12::TransitionResourceBarrier(commandList, _depthBuffer.GetResource(), writeOnly, readOnly);
+}
+
+void DX12::DepthPass::PostPassResourceBarriers()
+{
+	DX12::PendingTransitionResourceBarrier(_depthBuffer.GetResource(), k_depthWriteOnly, k_depthReadOnly);
 }
 
 void DX12::DepthPass::SetDimensions(const DX12::Math::Vector2u32& dimensions)
@@ -228,15 +258,17 @@ DX12::GPassRT& DX12::GPassRT::operator=(GPassRT&& other) noexcept
 	return *this;
 }
 
+void DX12::GPassRT::PrePassResourceBarriers()
+{
+	DX12::PendingTransitionResourceBarrier(
+		_mainBuffer.GetResource(),
+		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+		D3D12_RESOURCE_STATE_RENDER_TARGET);
+}
+
 void DX12::GPassRT::AccummulatePassCommands(ID3D12GraphicsCommandList6* commandList)
 {
 	CRITICAL_ASSERT(_linkToDepthPass, "Cannot render without a valid depth pass.")
-
-	DX12::TransitionResourceBarrier(
-		commandList, 
-		_mainBuffer.GetResource(), 
-		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-		D3D12_RESOURCE_STATE_RENDER_TARGET);
 
 	const D3D12_CPU_DESCRIPTOR_HANDLE rtv = _mainBuffer.GetRTVCPUHandle(0);
 	const D3D12_CPU_DESCRIPTOR_HANDLE dsv = _linkToDepthPass->GetDepthBuffer()->GetDSVCpuHandle();
@@ -252,9 +284,11 @@ void DX12::GPassRT::AccummulatePassCommands(ID3D12GraphicsCommandList6* commandL
 
 	commandList->IASetPrimitiveTopology(D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	commandList->DrawInstanced(3, 1, 0, 0);
+}
 
-	DX12::TransitionResourceBarrier(
-		commandList,
+void DX12::GPassRT::PostPassResourceBarriers()
+{
+	DX12::PendingTransitionResourceBarrier(
 		_mainBuffer.GetResource(),
 		D3D12_RESOURCE_STATE_RENDER_TARGET,
 		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);

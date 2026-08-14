@@ -27,6 +27,7 @@ namespace DX12
 		GPassRT* GetGPassRTPass(DX12::Math::Vector2u32 size = { 0, 0 });
 
 		RenderPassBase* GetHeadNode();
+		RenderPassBase* GetTailNode();
 
 		void SetDimensions(const DX12::Math::Vector2u32& size);
 	}
@@ -43,7 +44,9 @@ namespace DX12
 
 		NO_COPY(DepthPass);
 
-		void AccummulatePassCommands(ID3D12GraphicsCommandList6* commandList) final override;
+		void PrePassResourceBarriers() override;
+		void AccummulatePassCommands(ID3D12GraphicsCommandList6* commandList) override;
+		void PostPassResourceBarriers() override;
 
 		const DX12::DepthBufferTexture* GetDepthBuffer() const { return &_depthBuffer; }
 		void SetDimensions(const DX12::Math::Vector2u32& dimensions);
@@ -68,7 +71,9 @@ namespace DX12
 
 		NO_COPY(GPassRT);
 
-		void AccummulatePassCommands(ID3D12GraphicsCommandList6* commandList) final override;
+		void PrePassResourceBarriers() override;
+		void AccummulatePassCommands(ID3D12GraphicsCommandList6* commandList) override;
+		void PostPassResourceBarriers() override;
 
 		void LinkDepthPass(const DX12::DepthPass* pass) { _linkToDepthPass = pass; }
 		void UnlinkDepthPass() { _linkToDepthPass = nullptr; }

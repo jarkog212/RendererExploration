@@ -82,17 +82,13 @@ void DX12::RenderSurface::PreRender()
 
 void DX12::RenderSurface::PostRender()
 {
-	CRITICAL_ASSERT(_linkedRendererCommand, "Cannot finish render without valid command executor.");
-
-	_linkedRendererCommand->PostRender();
-}
-
-void DX12::RenderSurface::Present() const
-{
 	CRITICAL_ASSERT(_swapChain, "Trying to present an invalid swap chain.");
+	CRITICAL_ASSERT(_linkedRendererCommand, "Cannot finish render without valid command executor.");
 
 	_swapChain->Present(0, _presentFlags);
 	_currentBackBufferIndex = _swapChain->GetCurrentBackBufferIndex();
+
+	_linkedRendererCommand->PostRender();
 }
 
 void DX12::RenderSurface::UpdateViewport()

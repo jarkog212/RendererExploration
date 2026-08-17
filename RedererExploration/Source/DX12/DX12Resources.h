@@ -160,8 +160,8 @@ namespace DX12
 
 		RenderPassBase* _next = nullptr;
 
-		// true, false as we expect the post pass resource
-		//   barriers and pre pass resource barriers can be grouped usually.
+		// true, false as we expect the current post pass resource
+		//   barriers and next pre pass resource barriers to be grouped usually.
 		bool _submitBarriers[2] = { true, false };
 	};
 

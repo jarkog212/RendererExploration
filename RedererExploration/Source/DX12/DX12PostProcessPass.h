@@ -27,9 +27,9 @@ namespace DX12
 
 		NO_COPY(PostProcessPass);
 
-		void PrePassResourceBarriers() override;
-		void AccummulatePassCommands(ID3D12GraphicsCommandList6* commandList) override;
-		void PostPassResourceBarriers() override;
+		void PrePassResourceBarriers() final override;
+		void AccummulatePassCommands(ID3D12GraphicsCommandList6* commandList) final override;
+		void PostPassResourceBarriers() final override;
 
 		void LinkRenderTargetRTV(DX12::DescriptorHandleView rtv) { _renderTagetRTV = rtv; }
 		void UnlinkRenderTargetRTV() { _renderTagetRTV = {}; }

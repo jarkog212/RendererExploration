@@ -241,7 +241,7 @@ void DX12::Shaders::Release()
 
 D3D12_SHADER_BYTECODE DX12::Shaders::GetGenericShader(DX12::Shaders::GenericShader::Type type)
 {
-	if (g_genericShaderViews)
+	if (g_genericShaderViews) [[likely]]
 	{
 		const DX12::Shaders::ShaderView const* shader = g_genericShaderViews[type]._shader;
 		D3D12_SHADER_BYTECODE out;
@@ -263,7 +263,7 @@ const DX12::Shaders::ShaderView DX12::Shaders::LoadOrCompile(const DX12::Shaders
 	precompiledPath.append(specs._filename);
 	precompiledPath += ::Compiler::k_shaderBinaryExtension;
 
-	if (Utils::System::FileExists(precompiledPath))
+	if (Utils::System::FileExists(precompiledPath)) [[likely]]
 	{
 		Utils::System::LoadFile(precompiledPath, out._byteCode, out._size);
 		return out.CreateView();
@@ -294,7 +294,7 @@ bool DX12::Shaders::TryReleaseShader(const DX12::Shaders::ShaderSpecs& specs)
 
 D3D12_SHADER_BYTECODE DX12::Shaders::GetShader(const DX12::Shaders::ShaderSpecs& specs)
 {
-	if (auto it = ::g_shaders.find(specs._filename); it != ::g_shaders.end())
+	if (auto it = ::g_shaders.find(specs._filename); it != ::g_shaders.end()) [[likely]]
 		return it->second.AsDX12Bytecode();
 
 	DX12::Shaders::ShaderView view = DX12::Shaders::LoadOrCompile(specs);

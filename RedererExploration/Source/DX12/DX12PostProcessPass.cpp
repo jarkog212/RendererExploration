@@ -43,24 +43,24 @@ ID3D12RootSignature* DX12::PostProcessSpace::GetRootSignature()
 	if (::RootSignature::g_instance) [[likely]]
 		return ::RootSignature::g_instance;
 
-		DX12::RootParameter params[::RootSignature::Params::Count]{};
-		params[::RootSignature::Params::Constants].AsConstants(1, D3D12_SHADER_VISIBILITY_PIXEL, 0);
+	DX12::RootParameter params[::RootSignature::Params::Count]{};
+	params[::RootSignature::Params::Constants].AsConstants(1, D3D12_SHADER_VISIBILITY_PIXEL, 0);
 
-		DX12::DescriptorRange srvDescriptors = DX12::GetSRVHeap()->AsDescriptorRange();
-		srvDescriptors.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE;
-		params[::RootSignature::Params::DescriptorTables].AsDescriptorTable(D3D12_SHADER_VISIBILITY_PIXEL, &srvDescriptors, 1);
+	DX12::DescriptorRange srvDescriptors = DX12::GetSRVHeap()->AsDescriptorRange();
+	srvDescriptors.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE;
+	params[::RootSignature::Params::DescriptorTables].AsDescriptorTable(D3D12_SHADER_VISIBILITY_PIXEL, &srvDescriptors, 1);
 
-		D3D12_ROOT_SIGNATURE_DESC1 desc = DX12::CC::Desc::RootSignature::k_vertexPixelTemplate;
-		desc.NumParameters = _countof(params);
-		desc.pParameters = params;
+	D3D12_ROOT_SIGNATURE_DESC1 desc = DX12::CC::Desc::RootSignature::k_vertexPixelTemplate;
+	desc.NumParameters = _countof(params);
+	desc.pParameters = params;
 
-		::RootSignature::g_instance = DX12::Helpers::CreateRootSignature(desc);
+	::RootSignature::g_instance = DX12::Helpers::CreateRootSignature(desc);
 
-		HRESULT_CHECK_CRITICAL(
-			::RootSignature::g_instance->SetName(L"Post Process Root Signature."),
-			"Could not name Post Process root signature.");
+	HRESULT_CHECK_CRITICAL(
+		::RootSignature::g_instance->SetName(L"Post Process Root Signature."),
+		"Could not name Post Process root signature.");
 
-		return ::RootSignature::g_instance;
+	return ::RootSignature::g_instance;
 }
 
 ID3D12PipelineState* DX12::PostProcessSpace::GetPipelineState()
@@ -68,25 +68,25 @@ ID3D12PipelineState* DX12::PostProcessSpace::GetPipelineState()
 	if (::g_PPPipelineState) [[likely]]
 		return ::g_PPPipelineState;
 
-		using namespace DX12::PipelineStream;
-		struct {
-			SubRootSignature rs{ DX12::PostProcessSpace::GetRootSignature() };
-			SubVertexShader vs{ DX12::Shaders::GetGenericShader(DX12::Shaders::GenericShader::FullscreenTri_VS) };
-			SubPixelShader ps{ DX12::Shaders::GetGenericShader(DX12::Shaders::GenericShader::PostProcess_PS) };
-			SubPrimitiveTopology primitiveTopoliogy{ D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE };
-			SubRenderTargetFormats renderTargetFormats{};
-			SubRasterizer rasterizer{ DX12::CC::Desc::Rasterizer::k_noCullTemplate };
-		}stream;
-		stream.renderTargetFormats._sub.NumRenderTargets = 1;
-		stream.renderTargetFormats._sub.RTFormats[0] = DX12::CC::k_defaultRenderTargetFormat;
+	using namespace DX12::PipelineStream;
+	struct {
+		SubRootSignature rs{ DX12::PostProcessSpace::GetRootSignature() };
+		SubVertexShader vs{ DX12::Shaders::GetGenericShader(DX12::Shaders::GenericShader::FullscreenTri_VS) };
+		SubPixelShader ps{ DX12::Shaders::GetGenericShader(DX12::Shaders::GenericShader::PostProcess_PS) };
+		SubPrimitiveTopology primitiveTopoliogy{ D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE };
+		SubRenderTargetFormats renderTargetFormats{};
+		SubRasterizer rasterizer{ DX12::CC::Desc::Rasterizer::k_noCullTemplate };
+	}stream;
+	stream.renderTargetFormats._sub.NumRenderTargets = 1;
+	stream.renderTargetFormats._sub.RTFormats[0] = DX12::CC::k_defaultRenderTargetFormat;
 
-		::g_PPPipelineState = DX12::Helpers::CreatePipelineState(&stream, sizeof(stream));
+	::g_PPPipelineState = DX12::Helpers::CreatePipelineState(&stream, sizeof(stream));
 
-		HRESULT_CHECK_CRITICAL(
-			::g_PPPipelineState->SetName(L"Post process PSO."),
-			"Could not name Post process PSO.");
+	HRESULT_CHECK_CRITICAL(
+		::g_PPPipelineState->SetName(L"Post process PSO."),
+		"Could not name Post process PSO.");
 
-		return ::g_PPPipelineState;
+	return ::g_PPPipelineState;
 }
 
 DX12::PostProcessPass* DX12::PostProcessSpace::GetPostProcessPass()
@@ -96,6 +96,22 @@ DX12::PostProcessPass* DX12::PostProcessSpace::GetPostProcessPass()
 		
 	g_postProcessPass = std::make_unique<DX12::PostProcessPass>();
 	return  g_postProcessPass.get();
+}
+
+DX12::PostProcessPass::PostProcessPass(PostProcessPass&& other) noexcept :
+	_renderTagetRTV(std::move(other._renderTagetRTV)),
+	_inputSRV(std::move(other._inputSRV))
+{
+}
+
+DX12::PostProcessPass& DX12::PostProcessPass::operator=(PostProcessPass&& other) noexcept
+{
+	CRITICAL_ASSERT(this != &other, "Trying to move Post process pass to itself.");
+
+	std::swap(_renderTagetRTV, other._renderTagetRTV);
+	std::swap(_inputSRV, other._inputSRV);
+
+	return *this;
 }
 
 void DX12::PostProcessPass::PrePassResourceBarriers()

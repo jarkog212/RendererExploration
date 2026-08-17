@@ -51,5 +51,5 @@ namespace DX12
 	bool Initialize(HWND hwnd);
 	void Render(DX12::RenderSurface& surface, DX12::RenderPassBase* root = nullptr );
 	void Render();
-	void Release();
+	void ReleaseAll();
 }

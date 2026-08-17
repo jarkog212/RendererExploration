@@ -345,7 +345,7 @@ void DX12::Render()
 	DX12::Render(*DX12::GetMainRenderSurface() /*, root pass will go here */);
 }
 
-void DX12::Release()
+void DX12::ReleaseAll()
 {
 	// intended to be called only once at shutdown, reinit is not possible due to static nature of things?
 	static auto cleaner = []()

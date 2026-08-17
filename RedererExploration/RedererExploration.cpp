@@ -21,7 +21,7 @@ namespace
     {
         if (::g_mainWindow == hwnd)
         {
-            DX12::Release();
+            DX12::ReleaseAll();
             ::g_running = false;
         }
 

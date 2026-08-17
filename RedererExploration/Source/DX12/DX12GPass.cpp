@@ -296,7 +296,7 @@ void DX12::GPassRT::PostPassResourceBarriers()
 void DX12::GPassRT::SetDimensions(const DX12::Math::Vector2u32& dimensions)
 {
 	DX12::Math::Vector2u32 newDimensions = dimensions;
-	if (dimensions.X() > _dimensions.X() || dimensions.X() > _dimensions.Y())
+	if (dimensions.X() > _dimensions.X() || dimensions.Y() > _dimensions.Y())
 	{
 		newDimensions = { std::max(dimensions.X(), _dimensions.X()), std::max(dimensions.Y(), _dimensions.Y()) };
 		_mainBuffer = DX12::GPassRT::CreateRenderTarget(newDimensions);

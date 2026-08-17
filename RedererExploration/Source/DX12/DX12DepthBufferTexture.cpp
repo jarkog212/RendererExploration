@@ -42,10 +42,8 @@ DX12::DepthBufferTexture& DX12::DepthBufferTexture::operator=(DepthBufferTexture
 {
 	CRITICAL_ASSERT(this != &other, "Moving Depth buffer to itself.");
 
-	Release();
-
-	_texture = std::move(other._texture);
-	_dsvHandle = std::move(other._dsvHandle);
+	std::swap(_texture, other._texture);
+	std::swap(_dsvHandle, other._dsvHandle);
 
 	return *this;
 }

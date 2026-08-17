@@ -30,7 +30,7 @@ namespace DX12
 		constexpr unsigned int GetWidth() const { return _viewport.Width; }
 		constexpr unsigned int GetHeight() const { return _viewport.Height; }
 		ID3D12Resource* GetBackbuffer() const { return _renderTargetData[_currentBackBufferIndex]._resource.Get(); }
-		constexpr D3D12_CPU_DESCRIPTOR_HANDLE GetBackbufferCPUHandle() const { return _renderTargetData[_currentBackBufferIndex]._rtvHandle._cpu; }
+		DX12::DescriptorHandleView GetBackbufferHandle() const { return _renderTargetData[_currentBackBufferIndex]._rtvHandle.CreateView(); }
 		constexpr const D3D12_VIEWPORT& GetViewport() const { return _viewport; }
 		constexpr const D3D12_RECT& GetScissor() const { return _scissorRect; }
 

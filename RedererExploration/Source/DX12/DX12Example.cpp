@@ -16,10 +16,9 @@ ID3D12RootSignature* GetRootSignature()
 
 		// Create signature = memory layout for buffers
 		DX12::RootParameter rootParams[2]{};
-		DX12::DescriptorRange descriptorRanges[]{
-			DX12::DescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, DX12::GetSRVHeap()->GetCapacity(), 0) };
 
-		rootParams[0].AsDescriptorTable(D3D12_SHADER_VISIBILITY_PIXEL, descriptorRanges, 1);
+		DX12::DescriptorRange descriptorRange = DX12::GetSRVHeap()->AsDescriptorRange();
+		rootParams[0].AsDescriptorTable(D3D12_SHADER_VISIBILITY_PIXEL, &descriptorRange, 1);
 
 		rootParams[1].AsConstants(2, D3D12_SHADER_VISIBILITY_PIXEL, 0);
 
@@ -49,16 +48,14 @@ ID3D12PipelineState* GetPipelineState()
 
 ID3D12GraphicsCommandList6* ExampleRenderBuild()
 {
-	DX12::DescriptorHeap* srvHeap = DX12::GetSRVHeap();
-
 	ID3D12GraphicsCommandList6* commandList = DX12::GetMainRendererCommand()->GetCommandList();
 
 	commandList->SetGraphicsRootSignature(GetRootSignature());
 	commandList->SetPipelineState(GetPipelineState());
 
+	DX12::DescriptorHeap* srvHeap = DX12::GetSRVHeap();
 	ID3D12DescriptorHeap* heaps[]{ srvHeap->GetHeap() };
 	commandList->SetDescriptorHeaps(1, heaps);
-
 	commandList->SetGraphicsRootDescriptorTable(0, srvHeap->GetGpuPtr());
 
 	commandList->SetGraphicsRoot32BitConstant(1, (int)Utils::GetFPS(), 0);

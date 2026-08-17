@@ -53,6 +53,7 @@ namespace DX12
 	{
 		D3D12_CPU_DESCRIPTOR_HANDLE _cpu{ 0 };
 		D3D12_GPU_DESCRIPTOR_HANDLE _gpu{ 0 };
+		unsigned int _index = 0;
 
 		constexpr bool IsValid() const { return _cpu.ptr != 0; }
 		constexpr bool IsShaderVisible() const { return _gpu.ptr != 0; }
@@ -72,14 +73,6 @@ namespace DX12
 		const DX12::DescriptorHandleView CreateView() const { return { _cpu , _gpu }; };
 
 		DX12::DescriptorHeap* _owner = nullptr;
-
-#ifdef _DEBUG
-	private:
-
-		friend class DX12::DescriptorHeap;
-
-		unsigned int _index = 0;
-#endif
 	};
 
 	struct RenderTargetData
@@ -150,7 +143,7 @@ namespace DX12
 	{
 	public:
 
-		void SetNext(RenderPassBase& pass) { _next = &pass; };
+		RenderPassBase* SetNext(RenderPassBase& pass) { _next = &pass; return _next; };
 		void UnsetNext() { _next = nullptr; };
 		void AccummulateCommands(ID3D12GraphicsCommandList6* commandList);
 		void SetAutoBarrierSubmits(bool prePass, bool postPass) { _submitBarriers[0] = prePass; _submitBarriers[1] = postPass; };

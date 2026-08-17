@@ -15,17 +15,23 @@ DX12::DescriptorHeap* DX12::GetDSVHeap()
 
 DX12::DescriptorHeap* DX12::GetSRVHeap()
 {
-	static DX12::DescriptorHeap instance(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 4096, true);
+	static DX12::DescriptorHeap instance(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 4096, true, D3D12_DESCRIPTOR_RANGE_TYPE_SRV);
 	return &instance;
 }
 
 DX12::DescriptorHeap* DX12::GetUAVHeap()
 {
-	static DX12::DescriptorHeap instance(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 512, false);
+	static DX12::DescriptorHeap instance(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 512, false, D3D12_DESCRIPTOR_RANGE_TYPE_UAV);
 	return &instance;
 }
 
-DX12::DescriptorHeap::DescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type, unsigned int capacity, bool isShaderVisible) : _type(type)
+DX12::DescriptorHeap::DescriptorHeap(
+	D3D12_DESCRIPTOR_HEAP_TYPE type,
+	unsigned int capacity,
+	bool isShaderVisible,
+	D3D12_DESCRIPTOR_RANGE_TYPE rangeType) : 
+	_type(type),
+	_rangeType(rangeType)
 {
 	CRITICAL_ASSERT(
 		capacity != 0
@@ -33,7 +39,7 @@ DX12::DescriptorHeap::DescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type, unsigned i
 		&& (_type != D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER || capacity <= D3D12_MAX_SHADER_VISIBLE_SAMPLER_HEAP_SIZE),
 		"Bad capacity for a heap.");
 
-	isShaderVisible &= (_type == D3D12_DESCRIPTOR_HEAP_TYPE_DSV || _type == D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	isShaderVisible &= !(_type == D3D12_DESCRIPTOR_HEAP_TYPE_DSV || _type == D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
 	{
 		std::lock_guard lock(_mutex);
@@ -91,19 +97,14 @@ DX12::DescriptorHandle DX12::DescriptorHeap::Allocate()
 		out._gpu.ptr = _mainHandles._gpu.ptr + offset;
 
 	out._owner = this;
-
-#ifdef _DEBUG
-	{
-		out._index = index;
-	}
-#endif
+	out._index = index;
 
 	return out;
 }
 
 void DX12::DescriptorHeap::Free(DescriptorHandle& handle)
 {
-	if (!handle.IsValid())
+	if (!handle.IsValid()) [[unlikely]]
 		return;
 
 	{
@@ -115,20 +116,13 @@ void DX12::DescriptorHeap::Free(DescriptorHandle& handle)
 			handle._cpu.ptr >= _mainHandles._cpu.ptr
 			|| handle._cpu.ptr < (_mainHandles._cpu.ptr + _descriptorSize * _capacity);
 
-#ifdef _DEBUG
 		CRITICAL_ASSERT(handle._owner == this && isHandleManagedByUs, "Called Free for handle not managed by this heap.");
-#elif
-		CRITICAL_ASSERT(isHandleManagedByUs, "Called Free for handle not managed by this heap.");
-#endif
 		CRITICAL_ASSERT(
 			(handle._cpu.ptr - _mainHandles._cpu.ptr) % _descriptorSize == 0,
 			"Called Free for handle whose addresses are not aligned correctly.");
 
 		unsigned int index = (handle._cpu.ptr - _mainHandles._cpu.ptr) / _descriptorSize;
-
-#ifdef _DEBUG
 		CRITICAL_ASSERT(index == handle._index, "Called Free for handle whose index is not matching what it got initialised with.");
-#endif
 
 		const int currentFrame = DX12::GetMainRendererCommand()->GetCurrentFrame();
 		_deferredResourceFreeing[currentFrame].push_back(index);
@@ -164,4 +158,10 @@ void DX12::DescriptorHeap::ProcessPendingResourceFreeing(const int currentFrame)
 	}
 
 	cleaner(currentFrame);
+}
+
+DX12::DescriptorRange DX12::DescriptorHeap::AsDescriptorRange() const
+{
+	CRITICAL_ASSERT(IsShaderVisible(), "Creating a range for a descriptor heap which is not shader visible.");
+	return DX12::DescriptorRange(_rangeType, _capacity, 0, 0);
 }

@@ -1,43 +1,66 @@
 #include "DX12PostProcessPass.h"
 #include "DX12CommonDescriptors.h"
 #include "DX12Utils.h"
+#include "DX12Shaders.h"
+#include "DX12DescriptorHeap.h"
 #include "Utils.h"
-
 
 namespace 
 {
-	static ID3D12RootSignature* g_PPRootSignature = nullptr; // raw as it's cleanup is deferred
+	namespace RootSignature
+	{
+		static ID3D12RootSignature* g_instance = nullptr; // raw as it's cleanup is deferred
+		enum Params : unsigned int
+		{
+			Constants,
+			DescriptorTables,
+
+			Count
+		};
+	}
+	
 	static ID3D12PipelineState* g_PPPipelineState = nullptr; // raw as it's cleanup is deferred
+
+	static std::unique_ptr<DX12::PostProcessPass> g_postProcessPass = nullptr;
 }
 
 void DX12::PostProcessSpace::WarmUp()
 {
 	DX12::PostProcessSpace::GetRootSignature();
 	DX12::PostProcessSpace::GetPipelineState();
+	DX12::PostProcessSpace::GetPostProcessPass();
 }
 
 void DX12::PostProcessSpace::Release()
 {
-	Utils::COM::SafeDeferredRenderThreadRelease(::g_PPRootSignature);
-	Utils::COM::SafeDeferredRenderThreadRelease(::g_PPRootSignature);
+	Utils::COM::SafeDeferredRenderThreadRelease(::RootSignature::g_instance);
+	Utils::COM::SafeDeferredRenderThreadRelease(::g_PPPipelineState);
+	g_postProcessPass.reset();
 }
 
 ID3D12RootSignature* DX12::PostProcessSpace::GetRootSignature()
 {
-	if (::g_PPRootSignature) [[likely]]
-		return ::g_PPRootSignature;
+	if (::RootSignature::g_instance) [[likely]]
+		return ::RootSignature::g_instance;
 
-		//D3D12_ROOT_SIGNATURE_DESC2 desc = DX12::CC::Desc::RootSignature::k_vertexPixelTemplate;
-		//desc.NumParameters = _countof(params);
-		//desc.pParameters = params;
+		DX12::RootParameter params[::RootSignature::Params::Count]{};
+		params[::RootSignature::Params::Constants].AsConstants(1, D3D12_SHADER_VISIBILITY_PIXEL, 0);
 
-		//::g_PPRootSignature = DX12::Helpers::CreateRootSignature(desc);
+		DX12::DescriptorRange srvDescriptors = DX12::GetSRVHeap()->AsDescriptorRange();
+		srvDescriptors.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE;
+		params[::RootSignature::Params::DescriptorTables].AsDescriptorTable(D3D12_SHADER_VISIBILITY_PIXEL, &srvDescriptors, 1);
+
+		D3D12_ROOT_SIGNATURE_DESC1 desc = DX12::CC::Desc::RootSignature::k_vertexPixelTemplate;
+		desc.NumParameters = _countof(params);
+		desc.pParameters = params;
+
+		::RootSignature::g_instance = DX12::Helpers::CreateRootSignature(desc);
 
 		HRESULT_CHECK_CRITICAL(
-			::g_PPRootSignature->SetName(L"Post Process Root Signature."),
-			"Could not name Post Process roost signature.");
+			::RootSignature::g_instance->SetName(L"Post Process Root Signature."),
+			"Could not name Post Process root signature.");
 
-		return ::g_PPRootSignature;
+		return ::RootSignature::g_instance;
 }
 
 ID3D12PipelineState* DX12::PostProcessSpace::GetPipelineState()
@@ -45,21 +68,17 @@ ID3D12PipelineState* DX12::PostProcessSpace::GetPipelineState()
 	if (::g_PPPipelineState) [[likely]]
 		return ::g_PPPipelineState;
 
-		//D3D12_RT_FORMAT_ARRAY renderTargetFormats;
-		//renderTargetFormats.NumRenderTargets = 1;
-		//renderTargetFormats.RTFormats[0] = DX12::CC::Desc::GPassRes::k_mainTextureTemplate.Format;
-
 		using namespace DX12::PipelineStream;
 		struct {
 			SubRootSignature rs{ DX12::PostProcessSpace::GetRootSignature() };
-			//SubVertexShader vs{ DX12::Shaders::GetGenericShader(DX12::Shaders::GenericShader::FullscreenTri_VS) };
-			//SubPixelShader ps{ DX12::Shaders::GetGenericShader(DX12::Shaders::GenericShader::FillColor_PS) };
-			//SubPrimitiveTopology primitiveTopoliogy{ D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE };
-			//SubRenderTargetFormats renderTargetFormats{ renderTargetFormats };
-			//SubDepthStencilFormat depthStencilFormat{ DX12::CC::Desc::GPassRes::k_depthTextureTemplate.Format };
-			//SubRasterizer rasterizer{ DX12::CC::Desc::Rasterizer::k_noCullTemplate };
-			//SubDepthStencil1 depth{ DX12::CC::Desc::DepthStencil::k_disabledBothTemplate };
+			SubVertexShader vs{ DX12::Shaders::GetGenericShader(DX12::Shaders::GenericShader::FullscreenTri_VS) };
+			SubPixelShader ps{ DX12::Shaders::GetGenericShader(DX12::Shaders::GenericShader::PostProcess_PS) };
+			SubPrimitiveTopology primitiveTopoliogy{ D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE };
+			SubRenderTargetFormats renderTargetFormats{};
+			SubRasterizer rasterizer{ DX12::CC::Desc::Rasterizer::k_noCullTemplate };
 		}stream;
+		stream.renderTargetFormats._sub.NumRenderTargets = 1;
+		stream.renderTargetFormats._sub.RTFormats[0] = DX12::CC::k_defaultRenderTargetFormat;
 
 		::g_PPPipelineState = DX12::Helpers::CreatePipelineState(&stream, sizeof(stream));
 
@@ -70,12 +89,37 @@ ID3D12PipelineState* DX12::PostProcessSpace::GetPipelineState()
 		return ::g_PPPipelineState;
 }
 
+DX12::PostProcessPass* DX12::PostProcessSpace::GetPostProcessPass()
+{
+	if (g_postProcessPass) [[likely]]
+		return g_postProcessPass.get();
+		
+	g_postProcessPass = std::make_unique<DX12::PostProcessPass>();
+	return  g_postProcessPass.get();
+}
+
 void DX12::PostProcessPass::PrePassResourceBarriers()
 {
 }
 
 void DX12::PostProcessPass::AccummulatePassCommands(ID3D12GraphicsCommandList6* commandList)
 {
+	CRITICAL_ASSERT(_renderTagetRTV.IsValid(), "Cannot do post process pass without valid output RTV");
+	CRITICAL_ASSERT(_inputSRV.IsValid(), "Cannot do post process pass without valid input SRV");
+
+	commandList->SetGraphicsRootSignature(DX12::PostProcessSpace::GetRootSignature());
+	commandList->SetPipelineState(DX12::PostProcessSpace::GetPipelineState());
+
+	DX12::DescriptorHeap* srvHeap = DX12::GetSRVHeap();
+	ID3D12DescriptorHeap* heaps[]{ srvHeap->GetHeap() };
+	commandList->SetDescriptorHeaps(1, heaps);
+
+	commandList->SetGraphicsRoot32BitConstant(::RootSignature::Params::Constants, _inputSRV._index, 0);
+	commandList->SetGraphicsRootDescriptorTable(::RootSignature::Params::DescriptorTables, srvHeap->GetGpuPtr());
+
+	commandList->IASetPrimitiveTopology(D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	commandList->OMSetRenderTargets(1, &_renderTagetRTV._cpu, true, nullptr);
+	commandList->DrawInstanced(3, 1, 0, 0);
 }
 
 void DX12::PostProcessPass::PostPassResourceBarriers()

@@ -15,7 +15,12 @@ namespace DX12
 	{
 	public:
 
-		DescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type, unsigned int capacity, bool isShaderVisible);
+		DescriptorHeap(
+			D3D12_DESCRIPTOR_HEAP_TYPE type,
+			unsigned int capacity,
+			bool isShaderVisible,
+			D3D12_DESCRIPTOR_RANGE_TYPE rangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV);
+
 		~DescriptorHeap() { Release(); };
 
 		NO_COPY(DescriptorHeap);
@@ -36,6 +41,7 @@ namespace DX12
 		constexpr unsigned int GetDescriptorSize() const { return _descriptorSize; }
 
 		constexpr bool IsShaderVisible() const { return _mainHandles.IsShaderVisible(); }
+		DX12::DescriptorRange AsDescriptorRange() const;
 
 	private:
 
@@ -46,6 +52,7 @@ namespace DX12
 		unsigned int _size = 0;
 		unsigned int _descriptorSize = 0;
 		const D3D12_DESCRIPTOR_HEAP_TYPE _type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+		const D3D12_DESCRIPTOR_RANGE_TYPE _rangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 		std::mutex _mutex;
 		std::vector<unsigned int> _deferredResourceFreeing[DX12::CC::k_frameBuffers];
 	};

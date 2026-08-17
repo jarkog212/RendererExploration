@@ -10,7 +10,17 @@
 
 namespace 
 {
-	static ID3D12RootSignature* g_GPassRootSignature = nullptr; // raw as it's cleanup is deferred
+	namespace RootSignature 
+	{
+		static ID3D12RootSignature* g_instance = nullptr; // raw as it's cleanup is deferred
+		enum Params : unsigned int
+		{
+			Constants,
+
+			Count
+		};
+	}
+	
 	static ID3D12PipelineState* g_GPassPipelineState = nullptr; // raw as it's cleanup is deferred
 
 	static std::unique_ptr<DX12::DepthPass> g_DepthPass = nullptr;
@@ -25,7 +35,7 @@ namespace
 
 	static bool g_GPassLinked = false;
 
-	void LinkGPassTree()
+	void LinkGPassSubGraph()
 	{
 		DX12::GPassSpace::GetDepthPass()->SetNext(*DX12::GPassSpace::GetGPassRTPass());
 		DX12::GPassSpace::GetGPassRTPass()->LinkDepthPass(DX12::GPassSpace::GetDepthPass());
@@ -43,7 +53,7 @@ void DX12::GPassSpace::WarmUp()
 
 void DX12::GPassSpace::Release()
 {
-	Utils::COM::SafeDeferredRenderThreadRelease(::g_GPassRootSignature);
+	Utils::COM::SafeDeferredRenderThreadRelease(::RootSignature::g_instance);
 	Utils::COM::SafeDeferredRenderThreadRelease(::g_GPassPipelineState);
 	::g_DepthPass.reset();
 	::g_GPassRTPass.reset();
@@ -52,24 +62,24 @@ void DX12::GPassSpace::Release()
 
 ID3D12RootSignature* DX12::GPassSpace::GetRootSignature()
 {
-	if (::g_GPassRootSignature) [[likely]]
-		return ::g_GPassRootSignature;
+	if (::RootSignature::g_instance) [[likely]]
+		return ::RootSignature::g_instance;
 
-	DX12::RootParameter params[1]{};
-	params[0].AsConstants(1, D3D12_SHADER_VISIBILITY_PIXEL, 0);
+	DX12::RootParameter params[::RootSignature::Params::Count]{};
+	params[::RootSignature::Params::Constants].AsConstants(1, D3D12_SHADER_VISIBILITY_PIXEL, 0);
 	
 	D3D12_ROOT_SIGNATURE_DESC1 desc = DX12::CC::Desc::RootSignature::k_vertexPixelTemplate;
 	desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
 	desc.NumParameters = _countof(params);
 	desc.pParameters = params;
 
-	::g_GPassRootSignature = DX12::Helpers::CreateRootSignature(desc);
+	::RootSignature::g_instance = DX12::Helpers::CreateRootSignature(desc);
 
 	HRESULT_CHECK_CRITICAL(
-		::g_GPassRootSignature->SetName(L"GPass Root Signature."),
-		"Could not name GPass roost signature.");
+		::RootSignature::g_instance->SetName(L"GPass Root Signature."),
+		"Could not name GPass root signature.");
 
-	return ::g_GPassRootSignature;
+	return ::RootSignature::g_instance;
 }
 
 ID3D12PipelineState* DX12::GPassSpace::GetPipelineState()
@@ -123,7 +133,7 @@ DX12::RenderPassBase* DX12::GPassSpace::GetHeadNode()
 	if(::g_GPassLinked) [[likely]]
 		return DX12::GPassSpace::GetDepthPass();
 
-	::LinkGPassTree();
+	::LinkGPassSubGraph();
 
 	return DX12::GPassSpace::GetDepthPass();
 }
@@ -133,7 +143,7 @@ DX12::RenderPassBase* DX12::GPassSpace::GetTailNode()
 	if (::g_GPassLinked) [[likely]]
 		return DX12::GPassSpace::GetGPassRTPass();
 
-	::LinkGPassTree();
+	::LinkGPassSubGraph();
 
 	return DX12::GPassSpace::GetGPassRTPass();
 }
@@ -185,6 +195,9 @@ void DX12::DepthPass::AccummulatePassCommands(ID3D12GraphicsCommandList6* comman
 	commandList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 0.f, 0, 0, nullptr);
 	commandList->OMSetRenderTargets(0, nullptr, false, &dsv);
 
+	commandList->SetGraphicsRootSignature(DX12::GPassSpace::GetRootSignature());
+	commandList->SetPipelineState(DX12::GPassSpace::GetPipelineState());
+
 	// Further pass code here
 
 }
@@ -197,7 +210,7 @@ void DX12::DepthPass::PostPassResourceBarriers()
 void DX12::DepthPass::SetDimensions(const DX12::Math::Vector2u32& dimensions)
 {
 	DX12::Math::Vector2u32 newDimensions = dimensions;
-	if (dimensions.X() > _dimensions.X() || dimensions.X() > _dimensions.Y())
+	if (dimensions.X() > _dimensions.X() || dimensions.Y() > _dimensions.Y())
 	{
 		newDimensions = { std::max(dimensions.X(), _dimensions.X()), std::max(dimensions.Y(), _dimensions.Y()) };
 		_depthBuffer = DX12::DepthPass::CreateDepthBuffer(newDimensions);
@@ -274,12 +287,9 @@ void DX12::GPassRT::AccummulatePassCommands(ID3D12GraphicsCommandList6* commandL
 
 	commandList->ClearRenderTargetView(rtv, DX12::CC::k_clearValue, 0, nullptr);
 	commandList->OMSetRenderTargets(1, &rtv, false, &dsv);
-
-	commandList->SetGraphicsRootSignature(DX12::GPassSpace::GetRootSignature());
-	commandList->SetPipelineState(DX12::GPassSpace::GetPipelineState());
 	
 	static unsigned int call = 0;
-	commandList->SetGraphicsRoot32BitConstant(0, ++call, 0);
+	commandList->SetGraphicsRoot32BitConstant(::RootSignature::Params::Constants, ++call, 0);
 
 	commandList->IASetPrimitiveTopology(D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	commandList->DrawInstanced(3, 1, 0, 0);

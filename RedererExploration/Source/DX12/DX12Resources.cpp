@@ -10,12 +10,10 @@ DX12::DescriptorHandle::~DescriptorHandle()
 
 DX12::DescriptorHandle::DescriptorHandle(DescriptorHandle&& other) noexcept :
 	_owner(std::exchange(other._owner, nullptr))
-#ifdef _DEBUG
-	,_index(std::exchange(other._index, 0))
-#endif
 {
 	_cpu = std::exchange(other._cpu, { 0 });
 	_gpu = std::exchange(other._gpu, { 0 });
+	_index = std::exchange(other._index, 0);
 }
 
 DX12::DescriptorHandle& DX12::DescriptorHandle::operator=(DescriptorHandle&& other) noexcept
@@ -25,12 +23,7 @@ DX12::DescriptorHandle& DX12::DescriptorHandle::operator=(DescriptorHandle&& oth
 	std::swap(_cpu, other._cpu);
 	std::swap(_gpu, other._gpu);
 	std::swap(_owner, other._owner);
-
-#ifdef _DEBUG
-	{
-		std::swap(_index, other._index);
-	}
-#endif
+	std::swap(_index, other._index);
 
 	return *this;
 }

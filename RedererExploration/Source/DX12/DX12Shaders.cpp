@@ -121,6 +121,7 @@ namespace
 	{
 		{L"FullscreenTri", L"FullscreenTri", DX12::Shaders::GenericShader::Type::FullscreenTri_VS, DX12::Shaders::Stage::Vertex},
 		{L"FillColor", L"FillColor", DX12::Shaders::GenericShader::Type::FillColor_PS, DX12::Shaders::Stage::Pixel},
+		{L"PostProcess", L"PostProcess", DX12::Shaders::GenericShader::Type::PostProcess_PS, DX12::Shaders::Stage::Pixel},
 	};
 	static_assert(_countof(k_genericShaderSpecs) == DX12::Shaders::GenericShader::Type::Count, "Missing file specification of at least one generic shader.");
 

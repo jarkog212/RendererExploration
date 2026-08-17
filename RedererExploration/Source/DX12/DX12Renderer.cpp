@@ -12,7 +12,7 @@ namespace
 	static Microsoft::WRL::ComPtr<IDXGIFactory7> COMDxgiFactory = nullptr;
 	static Microsoft::WRL::ComPtr<IDXGIAdapter4> COMDxgiAdapter = nullptr;
 
-	static DX12::RenderPassBase* g_rootRenderNode = nullptr;
+	static DX12::RenderPassBase* g_rootRenderNode = nullptr; //raw non-owning
 	static std::unique_ptr<DX12::RenderSurface> g_mainRenderSurface = nullptr;
 	static D3D_FEATURE_LEVEL g_expectedMinimumFeatureLevel{ D3D_FEATURE_LEVEL_11_0 };
 
@@ -61,8 +61,16 @@ namespace
 
 	void BuildRenderGraph()
 	{
+		DX12::RenderPassBase* current = nullptr;
+
 		g_rootRenderNode = DX12::GPassSpace::GetHeadNode();
-		DX12::GPassSpace::GetTailNode()->SetAutoBarrierSubmits(true, true);
+		current = DX12::GPassSpace::GetTailNode();
+
+		current->SetAutoBarrierSubmits(true, true);
+
+		DX12::PostProcessPass* postProcessPass = DX12::PostProcessSpace::GetPostProcessPass();
+		postProcessPass->LinkInputSRV(DX12::GPassSpace::GetGPassRTPass()->GetMainBufferHandleView());
+		current = current->SetNext(*postProcessPass);
 	}
 }
 
@@ -273,8 +281,8 @@ void DX12::SubmitPendingBarriers(ID3D12GraphicsCommandList6* commandList)
 
 bool DX12::Initialize(HWND hwnd)
 {
-	// Things are written lazy init style mostly (encapsulation purposes),
-	// warmup efectively moakes the initialization controlled.
+	// Things are written lazy-init style mostly (encapsulation purposes),
+	// warmup efectively makes the initialization controlled.
 	DX12::Shaders::WarmUp();
 	DX12::GPassSpace::WarmUp();
 	DX12::PostProcessSpace::WarmUp();
@@ -324,6 +332,9 @@ void DX12::Render(DX12::RenderSurface& surface, DX12::RenderPassBase* root)
 		surface.GetBackbuffer(),
 		D3D12_RESOURCE_STATE_PRESENT,
 		D3D12_RESOURCE_STATE_RENDER_TARGET);
+
+	if (DX12::PostProcessPass* ppp = DX12::PostProcessSpace::GetPostProcessPass())
+		ppp->LinkRenderTargetRTV(surface.GetBackbufferHandle());
 
 	if (g_rootRenderNode)
 		g_rootRenderNode->AccummulateCommands(commandList);

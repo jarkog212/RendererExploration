@@ -49,6 +49,7 @@ namespace DX12::Shaders
 		{
 			FullscreenTri_VS = 0,
 			FillColor_PS,
+			PostProcess_PS,
 
 			Count, 
 		}_type;

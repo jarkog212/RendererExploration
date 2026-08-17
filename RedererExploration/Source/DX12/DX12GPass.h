@@ -78,6 +78,7 @@ namespace DX12
 		void LinkDepthPass(const DX12::DepthPass* pass) { _linkToDepthPass = pass; }
 		void UnlinkDepthPass() { _linkToDepthPass = nullptr; }
 		void SetDimensions(const DX12::Math::Vector2u32& dimensions);
+		DX12::DescriptorHandleView GetMainBufferHandleView() const { return _mainBuffer.GetSRVHandle(); }
 
 	private:
 

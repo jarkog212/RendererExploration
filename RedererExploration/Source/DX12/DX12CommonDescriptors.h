@@ -23,7 +23,7 @@ namespace DX12::CC::Desc
 			D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING,
 			{.Texture2D = D3D12_TEX2D_SRV{
 				0,		// MostDetailedMip
-				0,		// MipLevels
+				1,		// MipLevels
 				0,		// PlaneSlice
 				0.f		// ResourceMinLODClamp
 			}}
@@ -191,7 +191,7 @@ namespace DX12::CC::Desc
 
 	namespace RootSignature
 	{
-		constexpr D3D12_ROOT_SIGNATURE_DESC2 k_vertexPixelTemplate {
+		constexpr D3D12_ROOT_SIGNATURE_DESC1 k_vertexPixelTemplate {
 			0, // NumParameters
 			nullptr, // pParameters
 			0, // NumStaticSamplers

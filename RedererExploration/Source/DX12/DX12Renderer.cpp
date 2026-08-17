@@ -335,6 +335,8 @@ void DX12::Render(DX12::RenderSurface& surface, DX12::RenderPassBase* root)
 		D3D12_RESOURCE_STATE_RENDER_TARGET,
 		D3D12_RESOURCE_STATE_PRESENT);
 
+	DX12::SubmitPendingBarriers(commandList);
+
 	surface.PostRender();
 }
 

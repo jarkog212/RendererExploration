@@ -179,9 +179,8 @@ namespace
 		g_genericShaderViews = std::make_unique<DX12::Shaders::GenericShader[]>(DX12::Shaders::GenericShader::Count);
 
 		unsigned long long int offset = 0;
-		unsigned int index = 0;
 
-		while (offset < shaderHeapSize)
+		for (unsigned int index = 0; offset < shaderHeapSize; index++)
 		{
 			g_genericShaderViews[index]._type = static_cast<DX12::Shaders::GenericShader::Type>(index);
 			DX12::Shaders::ShaderView const*& shader = g_genericShaderViews[index]._shader;

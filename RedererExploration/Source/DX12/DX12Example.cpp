@@ -23,7 +23,7 @@ ID3D12RootSignature* GetRootSignature()
 
 		rootParams[1].AsConstants(2, D3D12_SHADER_VISIBILITY_PIXEL, 0);
 
-		D3D12_ROOT_SIGNATURE_DESC2 desc = DX12::CC::Desc::RootSignature::k_vertexPixelTemplate;
+		D3D12_ROOT_SIGNATURE_DESC1 desc = DX12::CC::Desc::RootSignature::k_vertexPixelTemplate;
 		desc.NumParameters = _countof(rootParams);
 		desc.pParameters = rootParams;
 

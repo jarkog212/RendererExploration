@@ -31,11 +31,14 @@ namespace DX12::Helpers
 		}
 	}
 
-	inline ID3D12RootSignature* CreateRootSignature(const D3D12_ROOT_SIGNATURE_DESC2& desc)
+	// Max mem 64 DWORDS:
+	// descriptor table = 1 DWORD
+	// root constants = 1 DWORD (per constant)
+	inline ID3D12RootSignature* CreateRootSignature(const D3D12_ROOT_SIGNATURE_DESC1& desc)
 	{
 		D3D12_VERSIONED_ROOT_SIGNATURE_DESC versionedDesc{};
-		versionedDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_2;
-		versionedDesc.Desc_1_2 = desc;
+		versionedDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
+		versionedDesc.Desc_1_1 = desc;
 
 		Microsoft::WRL::ComPtr<ID3DBlob> rootSignatureBlob = nullptr;
 		Microsoft::WRL::ComPtr<ID3DBlob> errorBlob = nullptr;

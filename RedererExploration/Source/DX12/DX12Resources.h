@@ -9,17 +9,14 @@ namespace DX12
 	namespace PipelineStream
 	{
 		template<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type, typename T>
-		class alignas(void*) PipelineSubobjectType
+		struct alignas(void*) PipelineSubobjectType
 		{
-		public:
-
 			PipelineSubobjectType() = default;
-			PipelineSubobjectType(T subobject) : _type(type), _subobject(subobject) {}
-			PipelineSubobjectType& operator=(const T& subobject) { _subobject = subobject; return *this; }
+			PipelineSubobjectType(T subobject) : _type(type), _sub(subobject) {}
+			PipelineSubobjectType& operator=(const T& subobject) { _sub = subobject; return *this; }
 
-		private:
 			const D3D12_PIPELINE_STATE_SUBOBJECT_TYPE _type{ type };
-			T _subobject;
+			T _sub;
 		};
 
 		using SubRootSignature = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_ROOT_SIGNATURE, ID3D12RootSignature*>;
@@ -46,7 +43,7 @@ namespace DX12
 		using SubCachedPipelineStateObject = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_CACHED_PSO, D3D12_CACHED_PIPELINE_STATE>;
 		using SubDepthStencil1 = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL1, D3D12_DEPTH_STENCIL_DESC1>;
 		using SubViewInstancing = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_VIEW_INSTANCING, D3D12_VIEW_INSTANCING_DESC>;
-		using SubepthStencil2 = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL2, D3D12_DEPTH_STENCIL_DESC2>;
+		using SubDepthStencil2 = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL2, D3D12_DEPTH_STENCIL_DESC2>;
 		using SubRasterizer1 = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_RASTERIZER1, D3D12_RASTERIZER_DESC1>;
 		using SubRasterizer2 = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_RASTERIZER2, D3D12_RASTERIZER_DESC2>;
 		using SubSerializedRootSignature = PipelineSubobjectType<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_SERIALIZED_ROOT_SIGNATURE, D3D12_SERIALIZED_ROOT_SIGNATURE_DESC>;

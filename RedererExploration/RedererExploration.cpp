@@ -47,12 +47,12 @@ int WINAPI wWinMain(
     ::g_winClass.lpszClassName = L"BaseWindowClass";
 
     FALLBACK_ASSERT(
-        RegisterClassExW(&::g_winClass),
+        RegisterClassExW(&::g_winClass),,
         return 0,
         "Window class registration failed.");
 
     ::g_mainWindow = Utils::System::CreateWindowsWindow(::k_winTitle, 1920, 1080, &::g_winClass);
-    FALLBACK_ASSERT(::g_mainWindow, return 0, "Window creation failed.");
+    FALLBACK_ASSERT(::g_mainWindow,, return 0, "Window creation failed.");
 
     ShowWindow(::g_mainWindow, nCmdShow);
     UpdateWindow(::g_mainWindow);
@@ -189,13 +189,19 @@ void UtilsImpl::System::SaveFile(std::filesystem::path& path, const char* buffer
     std::ofstream file(path, std::ios::out | std::ios::binary);
 
     FALLBACK_ASSERT(
-        file && Utils::System::FileExists(path),
+        file && Utils::System::FileExists(path),,
         file.close(); assert(false),
         "Could not save file: %s",
         path.string().c_str());
 
     file.write(buffer, size);
     file.close();
+}
+
+void UtilsImpl::System::FileDelete(std::filesystem::path& path)
+{
+    CRITICAL_ASSERT(!path.empty(), "Cannot delete file if the file does not exist.");
+    std::filesystem::remove(path);
 }
 
 float UtilsImpl::GetFps() 

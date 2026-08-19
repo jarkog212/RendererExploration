@@ -70,7 +70,7 @@ namespace DX12
 
 		constexpr bool IsValid() const { return _cpu.ptr != 0; }
 		constexpr bool IsShaderVisible() const { return _gpu.ptr != 0; }
-		const DX12::DescriptorHandleView CreateView() const { return { _cpu , _gpu }; };
+		DX12::DescriptorHandleView CreateView() const { return { _cpu , _gpu, _index }; };
 
 		DX12::DescriptorHeap* _owner = nullptr;
 	};

@@ -99,9 +99,11 @@ namespace
 				"Could not access shader compilation output logs (errors): %ls",
 				spec._filename);
 
-			CRITICAL_ASSERT(
+			FALLBACK_ASSERT(
 				errors && errors->GetStringLength() == 0,
-				"[ERROR] Shader compilation error: \n -- %s", errors->GetStringPointer());
+				const char* error = errors->GetStringPointer(),
+				assert(false),
+				"[ERROR] Shader compilation error: \n -- %s", error);
 
 			DISPLAY_RAW_OUTPUT("[COMPILED]");
 
@@ -163,6 +165,10 @@ namespace
 		CRITICAL_ASSERT(!g_genericShadersArena, "Loading new generic shaders while their heap is not empty.");
 		CRITICAL_ASSERT(!g_genericShaderViews, "There are already generic shader views despite the call to make them again.");
 
+#ifdef _FORCE_GENERIC_SHADER_COMPILATION
+		Utils::System::TryDeleteFile(::Compiler::k_precompiledGenericShaderFilePath);
+		shaderHeapSize = ::CompileAndSaveGenericShaders();
+#else
 		if (!Utils::System::FileExists(::Compiler::k_precompiledGenericShaderFilePath))
 		{
 			shaderHeapSize = ::CompileAndSaveGenericShaders();
@@ -174,6 +180,7 @@ namespace
 			char* bufferProxy = g_genericShadersArena.get();
 			Utils::System::LoadFile(::Compiler::k_precompiledGenericShaderFilePath, bufferProxy, shaderHeapSize);
 		}
+#endif
 
 		CRITICAL_ASSERT(g_genericShadersArena && shaderHeapSize > 0, "Failed to load or compile generic shaders or allocate shader heap.");
 

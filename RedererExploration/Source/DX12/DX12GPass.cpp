@@ -12,7 +12,7 @@ namespace
 {
 	namespace RootSignature 
 	{
-		static ID3D12RootSignature* g_instance = nullptr; // raw as it's cleanup is deferred
+		static Microsoft::WRL::ComPtr<ID3D12RootSignature> g_instance = nullptr;
 		enum Params : unsigned int
 		{
 			Constants,
@@ -21,7 +21,7 @@ namespace
 		};
 	}
 	
-	static ID3D12PipelineState* g_GPassPipelineState = nullptr; // raw as it's cleanup is deferred
+	static Microsoft::WRL::ComPtr<ID3D12PipelineState> g_GPassPipelineState = nullptr;
 
 	static std::unique_ptr<DX12::DepthPass> g_DepthPass = nullptr;
 	static std::unique_ptr<DX12::GPassRT> g_GPassRTPass = nullptr;
@@ -45,16 +45,14 @@ namespace
 
 void DX12::GPassSpace::WarmUp()
 {
-	DX12::GPassSpace::GetRootSignature();
 	DX12::GPassSpace::GetPipelineState();
-	DX12::GPassSpace::GetDepthPass(::k_defaultDimensions);
-	DX12::GPassSpace::GetGPassRTPass(::k_defaultDimensions);
+	DX12::GPassSpace::GetHeadNode();
 }
 
 void DX12::GPassSpace::Release()
 {
-	Utils::COM::SafeDeferredRenderThreadRelease(::RootSignature::g_instance);
-	Utils::COM::SafeDeferredRenderThreadRelease(::g_GPassPipelineState);
+	::RootSignature::g_instance.Reset();
+	::g_GPassPipelineState.Reset();
 	::g_DepthPass.reset();
 	::g_GPassRTPass.reset();
 	::g_GPassLinked = false;
@@ -63,7 +61,7 @@ void DX12::GPassSpace::Release()
 ID3D12RootSignature* DX12::GPassSpace::GetRootSignature()
 {
 	if (::RootSignature::g_instance) [[likely]]
-		return ::RootSignature::g_instance;
+		return ::RootSignature::g_instance.Get();
 
 	DX12::RootParameter params[::RootSignature::Params::Count]{};
 	params[::RootSignature::Params::Constants].AsConstants(1, D3D12_SHADER_VISIBILITY_PIXEL, 0);
@@ -79,13 +77,13 @@ ID3D12RootSignature* DX12::GPassSpace::GetRootSignature()
 		::RootSignature::g_instance->SetName(L"GPass Root Signature."),
 		"Could not name GPass root signature.");
 
-	return ::RootSignature::g_instance;
+	return ::RootSignature::g_instance.Get();
 }
 
 ID3D12PipelineState* DX12::GPassSpace::GetPipelineState()
 {
 	if (::g_GPassPipelineState) [[likely]]
-		return ::g_GPassPipelineState;
+		return ::g_GPassPipelineState.Get();
 
 	using namespace DX12::PipelineStream;
 	struct {	
@@ -107,24 +105,24 @@ ID3D12PipelineState* DX12::GPassSpace::GetPipelineState()
 		::g_GPassPipelineState->SetName(L"GPass PSO."),
 		"Could not name GPass PSO.");
 
-	return ::g_GPassPipelineState;
+	return ::g_GPassPipelineState.Get();
 }
 
-DX12::DepthPass* DX12::GPassSpace::GetDepthPass(DX12::Math::Vector2u32 size)
+DX12::DepthPass* DX12::GPassSpace::GetDepthPass(DX12::Math::Vector2u32 initSize)
 {
 	if (::g_DepthPass) [[likely]]
 		return ::g_DepthPass.get();
 
-	::g_DepthPass = std::make_unique<DX12::DepthPass>(DX12::DepthPass::Create(size));
+	::g_DepthPass = std::make_unique<DX12::DepthPass>(DX12::DepthPass::Create(initSize));
 	return ::g_DepthPass.get();
 }
 
-DX12::GPassRT* DX12::GPassSpace::GetGPassRTPass(DX12::Math::Vector2u32 size)
+DX12::GPassRT* DX12::GPassSpace::GetGPassRTPass(DX12::Math::Vector2u32 initSize)
 {
 	if (::g_GPassRTPass) [[likely]]
 		return ::g_GPassRTPass.get();
 
-	::g_GPassRTPass = std::make_unique<DX12::GPassRT>(DX12::GPassRT::Create(size));
+	::g_GPassRTPass = std::make_unique<DX12::GPassRT>(DX12::GPassRT::Create(initSize));
 	return ::g_GPassRTPass.get();
 }
 
@@ -162,6 +160,9 @@ DX12::DepthPass DX12::DepthPass::Create(const DX12::Math::Vector2u32& size)
 DX12::DepthPass::DepthPass(DX12::DepthBufferTexture&& depthBuffer) : 
 	_depthBuffer(std::move(depthBuffer))
 {
+	HRESULT_CHECK_CRITICAL(
+		_depthBuffer.GetResource()->SetName(L"Depth Buffer"), "Could not name depthbuffer resource");
+	
 	_name = "GPass - Depth buffer";
 }
 
@@ -198,7 +199,7 @@ void DX12::DepthPass::AccummulatePassCommands(ID3D12GraphicsCommandList6* comman
 	commandList->SetGraphicsRootSignature(DX12::GPassSpace::GetRootSignature());
 	commandList->SetPipelineState(DX12::GPassSpace::GetPipelineState());
 
-	// Further pass code here
+	// Further pass code here sending input to input assembler and then drawing the scene
 
 }
 
@@ -246,6 +247,9 @@ DX12::GPassRT DX12::GPassRT::Create(const DX12::Math::Vector2u32& size)
 DX12::GPassRT::GPassRT(DX12::RenderTargetTexture&& mainBuffer) :
 	_mainBuffer(std::move(mainBuffer))
 {
+	HRESULT_CHECK_CRITICAL(
+		_mainBuffer.GetResource()->SetName(L"GPass Main Buffer"), "Could not name gpass main buffer resource");
+
 	_name = "GPass - Render Target";
 }
 

@@ -12,7 +12,7 @@ namespace DX12::Math
 		Base(const Base<T>& o) : _data(o._data) {}
 		Base<T>& operator=(const Base<T>& o) { _data = o._data; return *this; }
 		Base(Base<T>&& o) : _data(std::move(o._data)) {}
-		Base<T>& operator=(Base<T>&& o) { _data = std::move(o._data); return *this; }
+		Base<T>& operator=(Base<T>&& o) { std::swap(_data, o._data); return *this; }
 
 		T _data{};
 	};

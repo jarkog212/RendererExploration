@@ -5,6 +5,7 @@
 namespace DX12
 {
 	class PostProcessPass;
+	class GPassRT;
 
 	namespace PostProcessSpace
 	{
@@ -31,14 +32,14 @@ namespace DX12
 		void AccummulatePassCommands(ID3D12GraphicsCommandList6* commandList) final override;
 		void PostPassResourceBarriers() final override;
 
-		void LinkRenderTargetRTV(DX12::DescriptorHandleView rtv) { _renderTagetRTV = rtv; }
-		void UnlinkRenderTargetRTV() { _renderTagetRTV = {}; }
-		void LinkInputSRV(DX12::DescriptorHandleView srvView) { _inputSRV = srvView; }
-		void UnlinkInputRTV() { _inputSRV = {}; }
+		void LinkRenderSurface(DX12::RenderSurface& surface) { _renderSurface = &surface; }
+		void UnlinkRenderSurface() { _renderSurface = nullptr; }
+		void LinkInputGPass(DX12::GPassRT* gPass) { _inputGPass = gPass; }
+		void UnlinkInputGPass() { _inputGPass = nullptr; }
 
 	private:
 
-		DX12::DescriptorHandleView _renderTagetRTV{};
-		DX12::DescriptorHandleView _inputSRV{};
+		const DX12::RenderSurface* _renderSurface = nullptr; //non-owning
+		const DX12::GPassRT* _inputGPass = nullptr; // non-owning
 	};
 }

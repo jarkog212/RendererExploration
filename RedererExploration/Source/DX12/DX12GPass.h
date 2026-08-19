@@ -23,8 +23,8 @@ namespace DX12
 		ID3D12RootSignature* GetRootSignature();
 		ID3D12PipelineState* GetPipelineState();
 
-		DepthPass* GetDepthPass(DX12::Math::Vector2u32 size = { 0, 0 });
-		GPassRT* GetGPassRTPass(DX12::Math::Vector2u32 size = { 0, 0 });
+		DepthPass* GetDepthPass(DX12::Math::Vector2u32 size = ::k_defaultDimensions);
+		GPassRT* GetGPassRTPass(DX12::Math::Vector2u32 size = ::k_defaultDimensions);
 
 		RenderPassBase* GetHeadNode();
 		RenderPassBase* GetTailNode();

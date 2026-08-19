@@ -13,8 +13,9 @@
 	MessageBoxW(nullptr, buffer, L"Error", MB_ICONERROR); \
 }
 
-#define FALLBACK_ASSERT(instruction, fallback, format, ...)\
+#define FALLBACK_ASSERT(instruction, premsg, fallback, format, ...)\
 if (!(##instruction)) [[unlikely]] {\
+	##premsg;\
 	DISPLAY_ERROR(format, __VA_ARGS__); \
 	##fallback; \
 }
@@ -78,6 +79,7 @@ namespace UtilsImpl
 		unsigned long long int FileSizeOf(std::filesystem::path& path);
 		void LoadFile(std::filesystem::path& path, char*& buffer, unsigned long long int& size);
 		void SaveFile(std::filesystem::path& path, const char* buffer, const unsigned long long int size);
+		void FileDelete(std::filesystem::path& path);
 	} // System
 
 	float GetFps();
@@ -122,6 +124,15 @@ namespace Utils
 		inline bool FileExists(std::filesystem::path& path)
 		{
 			return UtilsImpl::System::FileExists(path);
+		}
+
+		inline bool TryDeleteFile(std::filesystem::path& path) 
+		{
+			if (!Utils::System::FileExists(path)) [[unlikely]]
+				return false;
+
+			UtilsImpl::System::FileDelete(path);
+			return true;
 		}
 
 		inline unsigned long long int FileSizeOf(std::filesystem::path& path)

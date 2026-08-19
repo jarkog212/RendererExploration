@@ -33,6 +33,10 @@ namespace DX12
 		public:
 
 			GfxCommandFrame() = default;
+			~GfxCommandFrame() { Reset(); }
+
+			NO_COPY(GfxCommandFrame);
+			NO_MOVE(GfxCommandFrame);
 
 			bool Setup(D3D12_COMMAND_LIST_TYPE type, int index = -1);
 			void Reset();
@@ -50,7 +54,7 @@ namespace DX12
 
 		Microsoft::WRL::ComPtr<ID3D12CommandQueue> _commandQueue = nullptr;
 		Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList6> _commandList = nullptr;
-		GfxCommandFrame _frame[DX12::CC::k_frameBuffers];
+		GfxCommandFrame _frame[DX12::CC::k_commandFrameBuffers];
 		Microsoft::WRL::ComPtr<ID3D12Fence1> _fence = nullptr;
 		HANDLE _fenceEvent = 0;
 		unsigned int _currentFrame = 0;

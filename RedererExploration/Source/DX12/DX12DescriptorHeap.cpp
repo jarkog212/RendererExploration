@@ -151,7 +151,7 @@ void DX12::DescriptorHeap::ProcessPendingResourceFreeing(const int currentFrame)
 
 	if (currentFrame == DX12::CC::k_forAllFrames)
 	{
-		for (int i = 0; i < DX12::CC::k_frameBuffers; i++)
+		for (int i = 0; i < DX12::CC::k_commandFrameBuffers; i++)
 			cleaner(i);
 
 		return;

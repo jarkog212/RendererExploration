@@ -54,6 +54,6 @@ namespace DX12
 		const D3D12_DESCRIPTOR_HEAP_TYPE _type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 		const D3D12_DESCRIPTOR_RANGE_TYPE _rangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 		std::mutex _mutex;
-		std::vector<unsigned int> _deferredResourceFreeing[DX12::CC::k_frameBuffers];
+		std::vector<unsigned int> _deferredResourceFreeing[DX12::CC::k_commandFrameBuffers];
 	};
 }

@@ -29,7 +29,7 @@ namespace DX12
 		NO_COPY(Texture);
 
 		ID3D12Resource* GetResource() const { return _resource; }
-		const DX12::DescriptorHandleView GetSRVHandle() const { return _srvHandle.CreateView(); }
+		DX12::DescriptorHandleView GetSRVHandle() const { return _srvHandle.CreateView(); }
 
 	private:
 

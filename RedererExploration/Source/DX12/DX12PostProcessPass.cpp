@@ -3,13 +3,15 @@
 #include "DX12Utils.h"
 #include "DX12Shaders.h"
 #include "DX12DescriptorHeap.h"
+#include "DX12RenderSurface.h"
+#include "DX12GPass.h"
 #include "Utils.h"
 
 namespace 
 {
 	namespace RootSignature
 	{
-		static ID3D12RootSignature* g_instance = nullptr; // raw as it's cleanup is deferred
+		static Microsoft::WRL::ComPtr<ID3D12RootSignature> g_instance = nullptr;
 		enum Params : unsigned int
 		{
 			Constants,
@@ -19,35 +21,36 @@ namespace
 		};
 	}
 	
-	static ID3D12PipelineState* g_PPPipelineState = nullptr; // raw as it's cleanup is deferred
+	static Microsoft::WRL::ComPtr<ID3D12PipelineState> g_PPPipelineState = nullptr;
 
 	static std::unique_ptr<DX12::PostProcessPass> g_postProcessPass = nullptr;
 }
 
 void DX12::PostProcessSpace::WarmUp()
 {
-	DX12::PostProcessSpace::GetRootSignature();
 	DX12::PostProcessSpace::GetPipelineState();
 	DX12::PostProcessSpace::GetPostProcessPass();
 }
 
 void DX12::PostProcessSpace::Release()
 {
-	Utils::COM::SafeDeferredRenderThreadRelease(::RootSignature::g_instance);
-	Utils::COM::SafeDeferredRenderThreadRelease(::g_PPPipelineState);
+	::RootSignature::g_instance.Reset();
+	::g_PPPipelineState.Reset();
 	g_postProcessPass.reset();
 }
 
 ID3D12RootSignature* DX12::PostProcessSpace::GetRootSignature()
 {
 	if (::RootSignature::g_instance) [[likely]]
-		return ::RootSignature::g_instance;
+		return ::RootSignature::g_instance.Get();
 
 	DX12::RootParameter params[::RootSignature::Params::Count]{};
 	params[::RootSignature::Params::Constants].AsConstants(1, D3D12_SHADER_VISIBILITY_PIXEL, 0);
 
 	DX12::DescriptorRange srvDescriptors = DX12::GetSRVHeap()->AsDescriptorRange();
 	srvDescriptors.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE;
+	srvDescriptors.BaseShaderRegister = 0;
+	srvDescriptors.RegisterSpace = 0;
 	params[::RootSignature::Params::DescriptorTables].AsDescriptorTable(D3D12_SHADER_VISIBILITY_PIXEL, &srvDescriptors, 1);
 
 	D3D12_ROOT_SIGNATURE_DESC1 desc = DX12::CC::Desc::RootSignature::k_vertexPixelTemplate;
@@ -60,13 +63,13 @@ ID3D12RootSignature* DX12::PostProcessSpace::GetRootSignature()
 		::RootSignature::g_instance->SetName(L"Post Process Root Signature."),
 		"Could not name Post Process root signature.");
 
-	return ::RootSignature::g_instance;
+	return ::RootSignature::g_instance.Get();
 }
 
 ID3D12PipelineState* DX12::PostProcessSpace::GetPipelineState()
 {
 	if (::g_PPPipelineState) [[likely]]
-		return ::g_PPPipelineState;
+		return ::g_PPPipelineState.Get();
 
 	using namespace DX12::PipelineStream;
 	struct {
@@ -86,7 +89,7 @@ ID3D12PipelineState* DX12::PostProcessSpace::GetPipelineState()
 		::g_PPPipelineState->SetName(L"Post process PSO."),
 		"Could not name Post process PSO.");
 
-	return ::g_PPPipelineState;
+	return ::g_PPPipelineState.Get();
 }
 
 DX12::PostProcessPass* DX12::PostProcessSpace::GetPostProcessPass()
@@ -99,8 +102,8 @@ DX12::PostProcessPass* DX12::PostProcessSpace::GetPostProcessPass()
 }
 
 DX12::PostProcessPass::PostProcessPass(PostProcessPass&& other) noexcept :
-	_renderTagetRTV(std::move(other._renderTagetRTV)),
-	_inputSRV(std::move(other._inputSRV))
+	_renderSurface(std::exchange(other._renderSurface, nullptr)),
+	_inputGPass(std::exchange(other._inputGPass, nullptr))
 {
 }
 
@@ -108,8 +111,8 @@ DX12::PostProcessPass& DX12::PostProcessPass::operator=(PostProcessPass&& other)
 {
 	CRITICAL_ASSERT(this != &other, "Trying to move Post process pass to itself.");
 
-	std::swap(_renderTagetRTV, other._renderTagetRTV);
-	std::swap(_inputSRV, other._inputSRV);
+	std::swap(_renderSurface, other._renderSurface);
+	std::swap(_inputGPass, other._inputGPass);
 
 	return *this;
 }
@@ -120,8 +123,8 @@ void DX12::PostProcessPass::PrePassResourceBarriers()
 
 void DX12::PostProcessPass::AccummulatePassCommands(ID3D12GraphicsCommandList6* commandList)
 {
-	CRITICAL_ASSERT(_renderTagetRTV.IsValid(), "Cannot do post process pass without valid output RTV");
-	CRITICAL_ASSERT(_inputSRV.IsValid(), "Cannot do post process pass without valid input SRV");
+	CRITICAL_ASSERT(_renderSurface, "Cannot do post process pass without valid output surface.");
+	CRITICAL_ASSERT(_inputGPass, "Cannot do post process pass without valid GPass");
 
 	commandList->SetGraphicsRootSignature(DX12::PostProcessSpace::GetRootSignature());
 	commandList->SetPipelineState(DX12::PostProcessSpace::GetPipelineState());
@@ -130,11 +133,13 @@ void DX12::PostProcessPass::AccummulatePassCommands(ID3D12GraphicsCommandList6* 
 	ID3D12DescriptorHeap* heaps[]{ srvHeap->GetHeap() };
 	commandList->SetDescriptorHeaps(1, heaps);
 
-	commandList->SetGraphicsRoot32BitConstant(::RootSignature::Params::Constants, _inputSRV._index, 0);
+	commandList->SetGraphicsRoot32BitConstant(::RootSignature::Params::Constants, _inputGPass->GetMainBufferHandleView()._index, 0);
 	commandList->SetGraphicsRootDescriptorTable(::RootSignature::Params::DescriptorTables, srvHeap->GetGpuPtr());
 
 	commandList->IASetPrimitiveTopology(D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	commandList->OMSetRenderTargets(1, &_renderTagetRTV._cpu, true, nullptr);
+
+	const DX12::DescriptorHandleView surfaceRTHandle = _renderSurface->GetBackbufferHandle();
+	commandList->OMSetRenderTargets(1, &surfaceRTHandle._cpu, true, nullptr);
 	commandList->DrawInstanced(3, 1, 0, 0);
 }
 

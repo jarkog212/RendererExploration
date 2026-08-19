@@ -6,13 +6,15 @@
 #include "DX12PostProcessPass.h"
 #include "DX12Utils.h"
 
+	#include <string>
+	#include <format>
+
 namespace
 {
 	static Microsoft::WRL::ComPtr<ID3D12Device8> COMRendererDevice = nullptr;
 	static Microsoft::WRL::ComPtr<IDXGIFactory7> COMDxgiFactory = nullptr;
 	static Microsoft::WRL::ComPtr<IDXGIAdapter4> COMDxgiAdapter = nullptr;
 
-	static DX12::RenderPassBase* g_rootRenderNode = nullptr; //raw non-owning
 	static std::unique_ptr<DX12::RenderSurface> g_mainRenderSurface = nullptr;
 	static D3D_FEATURE_LEVEL g_expectedMinimumFeatureLevel{ D3D_FEATURE_LEVEL_11_0 };
 
@@ -21,8 +23,8 @@ namespace
 		// This should be connected with DX12::RendererCommand - likely inside it.
 
 		static int g_deferredResourceFreeingFlag = 0;
-		static_assert(sizeof(g_deferredResourceFreeingFlag) * sizeof(char) > DX12::CC::k_frameBuffers, "Flag bit-buffer needs to be wide enough for frame buffer count.");
-		static std::vector<IUnknown*> g_deferredCOMReleases[DX12::CC::k_frameBuffers];
+		static_assert(sizeof(g_deferredResourceFreeingFlag) * sizeof(char) > DX12::CC::k_commandFrameBuffers, "Flag bit-buffer needs to be wide enough for frame buffer count.");
+		static std::vector<IUnknown*> g_deferredCOMReleases[DX12::CC::k_commandFrameBuffers];
 
 		static void FreePendingResources(const int currentFrame = DX12::CC::k_forAllFrames)
 		{
@@ -46,7 +48,7 @@ namespace
 				};
 
 			if (currentFrame == DX12::CC::k_forAllFrames)
-				for (int i = 0; i < DX12::CC::k_frameBuffers; i++)
+				for (int i = 0; i < DX12::CC::k_commandFrameBuffers; i++)
 					cleaner(i);
 			else
 				cleaner(currentFrame);
@@ -59,18 +61,43 @@ namespace
 		static unsigned int g_pendingBulkResourceBarriers = 0;
 	} // ResourceBarriers
 
-	void BuildRenderGraph()
+	namespace RenderGraph
 	{
-		DX12::RenderPassBase* current = nullptr;
+		DX12::RenderPassBase*& GetHead()
+		{
+			static DX12::RenderPassBase* root = nullptr; //raw non-owning
+			if (root) [[likely]]
+				return root;
 
-		g_rootRenderNode = DX12::GPassSpace::GetHeadNode();
-		current = DX12::GPassSpace::GetTailNode();
+			// mo head means we rebuild the entire graph
+			DX12::RenderPassBase* current = nullptr;
 
-		current->SetAutoBarrierSubmits(true, true);
+			root = DX12::GPassSpace::GetHeadNode();
+			current = DX12::GPassSpace::GetTailNode();
 
-		DX12::PostProcessPass* postProcessPass = DX12::PostProcessSpace::GetPostProcessPass();
-		postProcessPass->LinkInputSRV(DX12::GPassSpace::GetGPassRTPass()->GetMainBufferHandleView());
-		current = current->SetNext(*postProcessPass);
+			current->SetAutoBarrierSubmits(true, true);
+			
+			DX12::PostProcessPass* postProcessPass = DX12::PostProcessSpace::GetPostProcessPass();
+			postProcessPass->LinkInputGPass(DX12::GPassSpace::GetGPassRTPass());
+			postProcessPass->LinkRenderSurface(*DX12::GetMainRenderSurface());
+			current = current->SetNext(*postProcessPass);
+		}
+
+		void WarmUp()
+		{
+			DX12::GPassSpace::WarmUp();
+			DX12::PostProcessSpace::WarmUp();
+
+			::RenderGraph::GetHead();
+		}
+
+		void Release()
+		{
+			DX12::GPassSpace::Release();
+			DX12::PostProcessSpace::Release();
+
+			::RenderGraph::GetHead() = nullptr;
+		}
 	}
 }
 
@@ -92,8 +119,22 @@ ID3D12Device8* DX12::GetRendererDevice()
 	if (device) [[likely]]
 		return device;
 
+#ifdef _DEBUG
+	{
+		Microsoft::WRL::ComPtr<ID3D12Debug1> debugController;
+		HRESULT_CHECK_CRITICAL(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController)), "Couldn't gather debufg controller interface.");
+		debugController->EnableDebugLayer();
+		debugController->SetEnableGPUBasedValidation(TRUE); // Catches out-of-bounds shader access
+
+		Microsoft::WRL::ComPtr<ID3D12DeviceRemovedExtendedDataSettings1> dredSettings;
+		HRESULT_CHECK_CRITICAL(D3D12GetDebugInterface(IID_PPV_ARGS(&dredSettings)), "Couldn't gather removed device data interface.");
+		dredSettings->SetAutoBreadcrumbsEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
+		dredSettings->SetPageFaultEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
+	}
+#endif
+
 	HRESULT_CHECK_CRITICAL(
-		D3D12CreateDevice(DX12::GetDxgiAdapter(), g_expectedMinimumFeatureLevel, __uuidof(ID3D12Device8), (void**)&device),
+		D3D12CreateDevice(DX12::GetDxgiAdapter(), ::g_expectedMinimumFeatureLevel, __uuidof(ID3D12Device8), (void**)&device),
 		"Could not create Dx12 device with selected adapter.")
 
 	// Technically adapter interface is no longer needed
@@ -104,7 +145,7 @@ ID3D12Device8* DX12::GetRendererDevice()
 #ifdef _DEBUG
 	{
 		Microsoft::WRL::ComPtr<ID3D12InfoQueue> infoQueueInterface = nullptr;
-		HRESULT_CHECK_CRITICAL(device->QueryInterface(IID_PPV_ARGS(&infoQueueInterface)), "Couldn't gather queue interface.");
+		HRESULT_CHECK_CRITICAL(device->QueryInterface(IID_PPV_ARGS(&infoQueueInterface)), "Couldn't gather info queue interface.");
 		infoQueueInterface->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true);
 		infoQueueInterface->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, true);
 		infoQueueInterface->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);
@@ -149,7 +190,7 @@ IDXGIAdapter4* DX12::GetDxgiAdapter()
 		DX12::GetDxgiFactory()->EnumAdapterByGpuPreference(i, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, __uuidof(IDXGIAdapter4), (void**)&adapter) != DXGI_ERROR_NOT_FOUND;
 		++i)
 	{
-		if (SUCCEEDED(D3D12CreateDevice(adapter, g_expectedMinimumFeatureLevel, __uuidof(ID3D12Device), nullptr)))
+		if (SUCCEEDED(D3D12CreateDevice(adapter, ::g_expectedMinimumFeatureLevel, __uuidof(ID3D12Device), nullptr)))
 		{
 			break;
 		}
@@ -159,7 +200,7 @@ IDXGIAdapter4* DX12::GetDxgiAdapter()
 		}
 	}
 
-	FALLBACK_ASSERT(adapter, return nullptr, "No good GPU adapter.");
+	FALLBACK_ASSERT(adapter,, return nullptr, "No good GPU adapter.");
 
 	constexpr D3D_FEATURE_LEVEL featureLevels[4]
 	{
@@ -183,7 +224,7 @@ IDXGIAdapter4* DX12::GetDxgiAdapter()
 		"Could not access Dx12 device's feature support information.");
 
 	FALLBACK_ASSERT(
-		featureLevelsData.MaxSupportedFeatureLevel >= ::g_expectedMinimumFeatureLevel,
+		featureLevelsData.MaxSupportedFeatureLevel >= ::g_expectedMinimumFeatureLevel,,
 		{
 			Utils::COM::SafeRelease(adapter);
 			return nullptr;
@@ -283,22 +324,18 @@ bool DX12::Initialize(HWND hwnd)
 {
 	// Things are written lazy-init style mostly (encapsulation purposes),
 	// warmup efectively makes the initialization controlled.
-	DX12::Shaders::WarmUp();
-	DX12::GPassSpace::WarmUp();
-	DX12::PostProcessSpace::WarmUp();
 
-	// Build the pass tree
-	::BuildRenderGraph();
+	HRESULT_CHECK_FALLBACK(DX12::GetRTVHeap()->GetHeap()->SetName(L"RTV Heap"), , , "Could not name RTV Heap.");
+	HRESULT_CHECK_FALLBACK(DX12::GetDSVHeap()->GetHeap()->SetName(L"DSV Heap"), , , "Could not name DSV Heap.");
+	HRESULT_CHECK_FALLBACK(DX12::GetSRVHeap()->GetHeap()->SetName(L"SRV Heap"), , , "Could not name SRV Heap.");
+	HRESULT_CHECK_FALLBACK(DX12::GetUAVHeap()->GetHeap()->SetName(L"UAV Heap"), , , "Could not name UAV Heap.");
 
 	DX12::GetMainRenderSurface(
 		hwnd,
 		DX12::CC::k_defaultRenderTargetFormat,
 		DX12::GetMainRendererCommand());
 
-	HRESULT_CHECK_FALLBACK(DX12::GetRTVHeap()->GetHeap()->SetName(L"RTV Heap"),,, "Could not name RTV Heap.");
-	HRESULT_CHECK_FALLBACK(DX12::GetDSVHeap()->GetHeap()->SetName(L"DSV Heap"),,, "Could not name DSV Heap.");
-	HRESULT_CHECK_FALLBACK(DX12::GetDSVHeap()->GetHeap()->SetName(L"SRV Heap"),,, "Could not name SRV Heap.");
-	HRESULT_CHECK_FALLBACK(DX12::GetDSVHeap()->GetHeap()->SetName(L"UAV Heap"),,, "Could not name UAV Heap.");
+	::RenderGraph::WarmUp();
 
 	return true;
 }
@@ -318,11 +355,11 @@ void DX12::Render(DX12::RenderSurface& surface, DX12::RenderPassBase* root)
 	// MOVING COM POINTER RELEASES IS SIMPLE ENOUGH: MOVE THEIR PENDING RELASE MANAGEMENT INTO THE RENDERER COMMAND OBJECT.
 	// MOVING HEAP RELEASES REQUIRES A BIT MORE WORK IN HEAPS TO SOMEHOW LET THEM KNOW HANDLES BEING USED BY WHICH COMMAND.
 	static DX12::RendererCommand* mainCommand = DX12::GetMainRendererCommand();
-	CRITICAL_ASSERT(rendererCommand == mainCommand, "You're about to start freeing resources which may be protected. Currently only one render command is supported.");
+	CRITICAL_ASSERT(rendererCommand == mainCommand, "You're about to start freeing resources which may be protected. Currently only ONE (Main) render command is supported.");
 #endif
 
 	const unsigned int currentFrame = rendererCommand->GetCurrentFrame();
-	if (TestPendingResourceFreeingFlag(currentFrame))
+	if (DX12::TestPendingResourceFreeingFlag(currentFrame))
 		::DefferedFree::FreePendingResources(currentFrame);
 
 	DX12::Math::Vector2u32 size{ surface.GetWidth(), surface.GetHeight() };
@@ -333,13 +370,7 @@ void DX12::Render(DX12::RenderSurface& surface, DX12::RenderPassBase* root)
 		D3D12_RESOURCE_STATE_PRESENT,
 		D3D12_RESOURCE_STATE_RENDER_TARGET);
 
-	if (DX12::PostProcessPass* ppp = DX12::PostProcessSpace::GetPostProcessPass())
-		ppp->LinkRenderTargetRTV(surface.GetBackbufferHandle());
-
-	if (g_rootRenderNode)
-		g_rootRenderNode->AccummulateCommands(commandList);
-
-	// Post Process
+	::RenderGraph::GetHead()->AccummulateCommands(commandList);
 
 	DX12::PendingTransitionResourceBarrier(
 		surface.GetBackbuffer(),
@@ -361,14 +392,19 @@ void DX12::ReleaseAll()
 	// intended to be called only once at shutdown, reinit is not possible due to static nature of things?
 	static auto cleaner = []()
 		{
-			DX12::GPassSpace::Release();
-			DX12::PostProcessSpace::Release();
+			DX12::GetMainRendererCommand()->Flush();
+
+			::RenderGraph::Release();
 			DX12::Shaders::Release();
+			
+			// Render Graph passes hold textures and stuff
+			::DefferedFree::FreePendingResources(DX12::CC::k_forAllFrames);
 
 			::g_mainRenderSurface.reset();
 
 			DX12::GetMainRendererCommand()->Release();
 
+			// Render surface containes RTVs that hav ebeen deferred
 			::DefferedFree::FreePendingResources(DX12::CC::k_forAllFrames);
 
 			DX12::GetRTVHeap()->Release();
@@ -404,6 +440,58 @@ void DX12::ReleaseAll()
 #endif
 }
 
+#ifdef _DEBUG
+void DX12::DEBUG::PrintDeviceRemovedReason(HRESULT hr)
+{
+	if (hr != DXGI_ERROR_DEVICE_REMOVED && hr != DXGI_ERROR_DEVICE_HUNG)
+		return;
+	
+	ID3D12Device8* device = DX12::GetRendererDevice();
+	HRESULT removeReason = device->GetDeviceRemovedReason();
+	std::string output;
+	output.reserve(2500);
+	output.append("[REMOVAL][%x] Device Removed.\n");
+
+	Microsoft::WRL::ComPtr<ID3D12DeviceRemovedExtendedData1> dred;
+	HRESULT_CHECK_CRITICAL(device->QueryInterface(IID_PPV_ARGS(&dred)), "Couldn't gather DRED.");
+	
+	D3D12_DRED_AUTO_BREADCRUMBS_OUTPUT1 breadcrumbsOutput;
+	if (SUCCEEDED(dred->GetAutoBreadcrumbsOutput1(&breadcrumbsOutput)))
+	{
+		output.append("== = DRED AUTO - BREADCRUMBS DUMP == =\n");
+		const D3D12_AUTO_BREADCRUMB_NODE1* pNode = breadcrumbsOutput.pHeadAutoBreadcrumbNode;
+		while (pNode != nullptr)
+		{
+			UINT completedOps = *pNode->pLastBreadcrumbValue;
+			UINT totalOps = pNode->BreadcrumbCount;
+			unsigned long long int address = (unsigned long long int)pNode->pCommandList;
+
+			output.append(std::format("Command List: 0x{:x}\n", address));
+			output.append(std::format("Completed Ops: {} / {} \n", completedOps, totalOps));
+	
+			if (completedOps < totalOps)
+			{
+				// The operation immediately following completedOps is the one that HUNG
+				D3D12_AUTO_BREADCRUMB_OP failedOp = pNode->pCommandHistory[completedOps];
+				output.append(std::format("LAST FAILED/HANGING OP INDEX: {} (Op Code: {})\n", completedOps, static_cast<int>(failedOp)));
+			}
+
+			pNode = pNode->pNext;
+		}
+	}
+
+	D3D12_DRED_PAGE_FAULT_OUTPUT pageFaultOutput;
+	if (SUCCEEDED(dred->GetPageFaultAllocationOutput(&pageFaultOutput))
+		&& pageFaultOutput.PageFaultVA != 0)
+	{
+		output.append("== = DRED PAGE FAULT DUMP == =\n");
+		output.append(std::format("Faulting GPU Virtual Address: 0x{:x}\n", pageFaultOutput.PageFaultVA));
+	}
+	
+	CRITICAL_ASSERT(false, "%s", output.c_str());
+}
+#endif
+
 DX12::RendererCommand::RendererCommand(D3D12_COMMAND_LIST_TYPE type)
 {
 	D3D12_COMMAND_QUEUE_DESC cq;
@@ -427,7 +515,7 @@ DX12::RendererCommand::RendererCommand(D3D12_COMMAND_LIST_TYPE type)
 		goto _error,
 		"Could not create command queue.");
 
-	for (int i = 0; i < DX12::CC::k_frameBuffers; i++)
+	for (int i = 0; i < DX12::CC::k_commandFrameBuffers; i++)
 		_frame[i].Setup(type, i);
 
 	HRESULT_CHECK_FALLBACK(
@@ -451,7 +539,7 @@ DX12::RendererCommand::RendererCommand(D3D12_COMMAND_LIST_TYPE type)
 	HRESULT_CHECK_FALLBACK(_commandList->SetName(L"D3D12 Fence"),,, "Could not set (%ls) to command list.", commandListName);
 
 	_fenceEvent = CreateEventEx(nullptr, nullptr, 0, EVENT_ALL_ACCESS);
-	FALLBACK_ASSERT(_fenceEvent,,"Could not create fence event.");
+	FALLBACK_ASSERT(_fenceEvent,,,"Could not create fence event.");
 
 	return;
 
@@ -472,19 +560,30 @@ void DX12::RendererCommand::PostRender()
 {
 	_commandList->Close();
 	ID3D12CommandList* const lists[] = { _commandList.Get() };
+	
 	_commandQueue->ExecuteCommandLists(_countof(lists), lists);
 
 	_issuableFenceValue++;
 	_frame[_currentFrame].IssueFenceValue(_issuableFenceValue);
 	_commandQueue->Signal(_fence.Get(), _issuableFenceValue);
 
-	_currentFrame = ++_currentFrame % DX12::CC::k_frameBuffers;
+#ifdef _DEBUG_CPU_GPU_SYNCHRONISED
+	// forced synchronisation
+	_frame[_currentFrame].WaitForGPU(_fenceEvent, _fence.Get());
+	HRESULT deviceFailHR = DX12::GetRendererDevice()->GetDeviceRemovedReason();
+	if (FAILED(deviceFailHR))
+		DX12::DEBUG::PrintDeviceRemovedReason(deviceFailHR);
+#endif
+	_currentFrame = ++_currentFrame % DX12::CC::k_commandFrameBuffers;
 }
 
 void DX12::RendererCommand::Flush()
 {
-	for (int i = 0; i < DX12::CC::k_frameBuffers; i++)
+	for (int i = 0; i < DX12::CC::k_commandFrameBuffers; i++)
+	{
 		_frame[i].WaitForGPU(_fenceEvent, _fence.Get());
+		_frame[i].GetAllocator()->Reset();
+	}
 
 	_issuableFenceValue = 0;
 }
@@ -494,7 +593,7 @@ void DX12::RendererCommand::Release()
 	if (_fence)
 	{
 		Flush();
-		_fence.Reset();
+
 		if (_fenceEvent)
 		{
 			CloseHandle(_fenceEvent);
@@ -502,10 +601,13 @@ void DX12::RendererCommand::Release()
 		}
 	}
 
+	_fence.Reset();
+
+	for (int i = 0; i < DX12::CC::k_commandFrameBuffers; i++)
+		_frame[i].Reset();
+
 	_commandList.Reset();
 	_commandQueue.Reset();
-	for (int i = 0; i < DX12::CC::k_frameBuffers; i++)
-		_frame[i].Reset();
 
 	_currentFrame = 0;
 }
@@ -534,7 +636,7 @@ void DX12::RendererCommand::GfxCommandFrame::WaitForGPU(HANDLE fenceEvent, ID3D1
 {
 	assert(fenceEvent && fence);
 
-	if (fence->GetCompletedValue() >= _fenceValue)
+	if (fence->GetCompletedValue() >= _fenceValue) [[likely]]
 		return;
 	
 	HRESULT_CHECK_CRITICAL(fence->SetEventOnCompletion(_fenceValue, fenceEvent), "Could not assign fence signal to event handle.");

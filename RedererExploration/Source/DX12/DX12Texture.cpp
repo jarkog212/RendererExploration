@@ -22,28 +22,26 @@ DX12::Texture::Texture(TextureSpecs& specs)
 	}
 	else if (specs._heap)
 	{
-		HRESULT_CHECK_FALLBACK(
+		HRESULT_CHECK_CRITICAL(
 			device->CreatePlacedResource(
 				specs._heap,
 				specs._allocationInfo.Offset,
 				specs._resourceDesc,
 				specs._initialState,
 				clearValue,
-				IID_PPV_ARGS(&_resource)),,
-			assert(false),
+				IID_PPV_ARGS(&_resource)),
 			"Could not create a placed texture resource.");
 	}
 	else
 	{
-		HRESULT_CHECK_FALLBACK(
+		HRESULT_CHECK_CRITICAL(
 			device->CreateCommittedResource(
 				&DX12::CC::Desc::Heap::k_propertiesTemplate,
 				D3D12_HEAP_FLAG_NONE,
 				specs._resourceDesc,
 				specs._initialState,
 				clearValue,
-				IID_PPV_ARGS(&_resource)),,
-			assert(false),
+				IID_PPV_ARGS(&_resource)),
 			"Could not create a committed texture resource.");
 	}
 

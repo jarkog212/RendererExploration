@@ -26,12 +26,6 @@ DX12::RenderSurface::RenderSurface(const HWND window, DXGI_FORMAT format, DX12::
 	Finalize(format);
 }
 
-DX12::RenderSurface::~RenderSurface()
-{
-	// Stall out the GPU
-	_linkedRendererCommand->Flush();
-}
-
 DX12::RenderSurface::RenderSurface(RenderSurface&& other) noexcept :
 	_linkedRendererCommand(std::exchange(other._linkedRendererCommand, nullptr)),
 	_swapChain(std::move(other._swapChain)),
@@ -42,7 +36,7 @@ DX12::RenderSurface::RenderSurface(RenderSurface&& other) noexcept :
 	_presentFlags(std::exchange(other._presentFlags, 0)),
 	_allowTearing(std::exchange(other._allowTearing, 0))
 {
-	for (int i = 0; i < _k_swapChainBuffers; i++)
+	for (int i = 0; i < DX12::CC::k_swapChainBuffers; i++)
 		_renderTargetData[i] = std::move(other._renderTargetData[i]);
 }
 
@@ -59,7 +53,7 @@ DX12::RenderSurface& DX12::RenderSurface::operator=(RenderSurface&& other) noexc
 	std::swap(_presentFlags, other._presentFlags);
 	std::swap(_allowTearing, other._allowTearing);
 
-	for (int i = 0; i < _k_swapChainBuffers; i++)
+	for (int i = 0; i < DX12::CC::k_swapChainBuffers; i++)
 		std::swap(_renderTargetData[i], other._renderTargetData[i]);
 
 	return *this;
@@ -87,7 +81,15 @@ void DX12::RenderSurface::PostRender()
 
 	_linkedRendererCommand->PostRender();
 
+#ifdef _DEBUG
+	HRESULT_CHECK_FALLBACK(
+		_swapChain->Present(0, _presentFlags), ,
+		DX12::DEBUG::PrintDeviceRemovedReason(hr); assert(false),
+		"Present of a swap chain failed.");
+#else
 	_swapChain->Present(0, _presentFlags);
+#endif
+
 	_currentBackBufferIndex = _swapChain->GetCurrentBackBufferIndex();
 }
 
@@ -110,7 +112,7 @@ void DX12::RenderSurface::ResetSwapChain(DX12::RendererCommand& rendererCommand,
 	const int height = windowDimensions.bottom - windowDimensions.top;
 
 	DXGI_SWAP_CHAIN_DESC1 desc = DX12::CC::Desc::SwapChain::k_descTemplate;
-	desc.BufferCount = _k_swapChainBuffers;
+	desc.BufferCount = DX12::CC::k_swapChainBuffers;
 	desc.Flags = (bool)_allowTearing ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
 	desc.Format = format == DXGI_FORMAT_R8G8B8A8_UNORM_SRGB ?
 		DXGI_FORMAT_R8G8B8A8_UNORM :
@@ -134,7 +136,7 @@ void DX12::RenderSurface::ResetSwapChain(DX12::RendererCommand& rendererCommand,
 
 	_currentBackBufferIndex = _swapChain->GetCurrentBackBufferIndex();
 
-	for (int i = 0; i < _k_swapChainBuffers; i++)
+	for (int i = 0; i < DX12::CC::k_swapChainBuffers; i++)
 	{
 		_renderTargetData[i].Release();
 		_renderTargetData[i]._rtvHandle = DX12::GetRTVHeap()->Allocate();
@@ -146,18 +148,21 @@ void DX12::RenderSurface::ResetSwapChain(DX12::RendererCommand& rendererCommand,
 RECT DX12::RenderSurface::GetWindowDimensions() const
 {
 	RECT rect;
-	FALLBACK_ASSERT(GetWindowRect(_window, &rect), ,"Error getting window dimensions.")
+	FALLBACK_ASSERT(GetWindowRect(_window, &rect),,,"Error getting window dimensions.")
 	return rect;
 }
 
 void DX12::RenderSurface::Finalize(DXGI_FORMAT format)
 {
-	for (int i = 0; i < _k_swapChainBuffers; i++)
+	for (int i = 0; i < DX12::CC::k_swapChainBuffers; i++)
 	{
 		RenderTargetData& data = _renderTargetData[i];
 		HRESULT_CHECK_CRITICAL(
 			_swapChain->GetBuffer(i, IID_PPV_ARGS(&data._resource)),
 			"Could not get a hold of the swap chain internal buffer.");
+
+		const std::wstring name(std::format(L"Render surface buffer {}", i));
+		HRESULT_CHECK_CRITICAL(data._resource->SetName(name.c_str()), "Could not name render surface buffer %d", i);
 
 		D3D12_RENDER_TARGET_VIEW_DESC desc = DX12::CC::Desc::RTView::k_descTemplate;
 		desc.Format = format;

@@ -68,6 +68,7 @@ namespace
 				filename.c_str(),
 				L"-E", spec._function,
 				L"-T", ::Compiler::k_shaderStageNames[(int)spec._stage],
+				L"-I", ::Compiler::k_shaderFilePrefix.c_str(),
 				DXC_ARG_ALL_RESOURCES_BOUND,
 #ifdef _DEBUG
 				DXC_ARG_DEBUG,
@@ -191,10 +192,11 @@ namespace
 		for (unsigned int index = 0; offset < shaderHeapSize; index++)
 		{
 			g_genericShaderViews[index]._type = static_cast<DX12::Shaders::GenericShader::Type>(index);
-			DX12::Shaders::ShaderView const*& shader = g_genericShaderViews[index]._shader;
-			shader = reinterpret_cast<DX12::Shaders::ShaderView const*>(&g_genericShadersArena[offset]);
+			DX12::Shaders::ShaderView& shader = g_genericShaderViews[index]._shader;
+			memcpy((void*)(&shader._size), (void*)(&g_genericShadersArena[offset]), DX12::Shaders::ShaderView::_k_headerSize);
+			shader._byteCode = &g_genericShadersArena[offset + DX12::Shaders::ShaderView::_k_headerSize];
 
-			offset += shader->_size + DX12::Shaders::ShaderView::_k_headerSize;
+			offset += shader._size + DX12::Shaders::ShaderView::_k_headerSize;
 		}
 
 		CRITICAL_ASSERT(offset == shaderHeapSize, "Converting heap to objects led to incorrect final offset.")
@@ -227,7 +229,7 @@ D3D12_SHADER_BYTECODE DX12::Shaders::ShaderView::AsDX12Bytecode() const
 {
 	D3D12_SHADER_BYTECODE out;
 	out.BytecodeLength = _size;
-	out.pShaderBytecode = &_byteCode;
+	out.pShaderBytecode = _byteCode;
 	return out;
 }
 
@@ -250,10 +252,10 @@ D3D12_SHADER_BYTECODE DX12::Shaders::GetGenericShader(DX12::Shaders::GenericShad
 {
 	if (g_genericShaderViews) [[likely]]
 	{
-		const DX12::Shaders::ShaderView const* shader = g_genericShaderViews[type]._shader;
+		const DX12::Shaders::ShaderView& shader = g_genericShaderViews[type]._shader;
 		D3D12_SHADER_BYTECODE out;
-		out.BytecodeLength = shader->_size;
-		out.pShaderBytecode = &shader->_byteCode;
+		out.BytecodeLength = shader._size;
+		out.pShaderBytecode = shader._byteCode;
 		return out;
 	}
 

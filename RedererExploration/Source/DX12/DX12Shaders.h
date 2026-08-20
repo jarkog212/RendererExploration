@@ -51,10 +51,11 @@ namespace DX12::Shaders
 			FillColor_PS,
 			PostProcess_PS,
 
-			Count, 
+			Count,
+			NotGeneric
 		}_type;
 
-		DX12::Shaders::ShaderView const* _shader = nullptr;
+		DX12::Shaders::ShaderView _shader = {};
 	};
 
 	struct ShaderSpecs

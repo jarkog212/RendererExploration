@@ -87,17 +87,17 @@ ID3D12PipelineState* DX12::GPassSpace::GetPipelineState()
 
 	using namespace DX12::PipelineStream;
 	struct {	
-		SubRootSignature rs{ DX12::GPassSpace::GetRootSignature() };
-		SubVertexShader vs{ DX12::Shaders::GetGenericShader(DX12::Shaders::GenericShader::FullscreenTri_VS) };
-		SubPixelShader ps{DX12::Shaders::GetGenericShader(DX12::Shaders::GenericShader::FillColor_PS) };
-		SubPrimitiveTopology primitiveTopoliogy{ D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE };
-		SubRenderTargetFormats renderTargetFormats{};
-		SubDepthStencilFormat depthStencilFormat{ DX12::CC::Desc::GPassRes::k_depthTextureTemplate.Format };
-		SubRasterizer rasterizer{ DX12::CC::Desc::Rasterizer::k_noCullTemplate };
-		SubDepthStencil1 depth{ DX12::CC::Desc::DepthStencil::k_disabledBothTemplate };
+		SubRootSignature _rs{ DX12::GPassSpace::GetRootSignature() };
+		SubVertexShader _vs{ DX12::Shaders::GetGenericShader(DX12::Shaders::GenericShader::FullscreenTri_VS) };
+		SubPixelShader _ps{DX12::Shaders::GetGenericShader(DX12::Shaders::GenericShader::FillColor_PS) };
+		SubPrimitiveTopology _primitiveTopoliogy{ D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE };
+		SubRenderTargetFormats _renderTargetFormats{};
+		SubDepthStencilFormat _depthStencilFormat{ DX12::CC::Desc::GPassRes::k_depthTextureTemplate.Format };
+		SubRasterizer _rasterizer{ DX12::CC::Desc::Rasterizer::k_noCullTemplate };
+		SubDepthStencil1 _depth{ DX12::CC::Desc::DepthStencil::k_disabledBothTemplate };
 	}stream;
-	stream.renderTargetFormats._sub.NumRenderTargets = 1;
-	stream.renderTargetFormats._sub.RTFormats[0] = DX12::CC::Desc::GPassRes::k_mainTextureTemplate.Format;
+	stream._renderTargetFormats._sub.NumRenderTargets = 1;
+	stream._renderTargetFormats._sub.RTFormats[0] = DX12::CC::Desc::GPassRes::k_mainTextureTemplate.Format;
 
 	::g_GPassPipelineState = DX12::Helpers::CreatePipelineState(&stream, sizeof(stream));
 

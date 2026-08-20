@@ -36,7 +36,7 @@ void DX12::PostProcessSpace::Release()
 {
 	::RootSignature::g_instance.Reset();
 	::g_PPPipelineState.Reset();
-	g_postProcessPass.reset();
+	::g_postProcessPass.reset();
 }
 
 ID3D12RootSignature* DX12::PostProcessSpace::GetRootSignature()
@@ -73,15 +73,15 @@ ID3D12PipelineState* DX12::PostProcessSpace::GetPipelineState()
 
 	using namespace DX12::PipelineStream;
 	struct {
-		SubRootSignature rs{ DX12::PostProcessSpace::GetRootSignature() };
-		SubVertexShader vs{ DX12::Shaders::GetGenericShader(DX12::Shaders::GenericShader::FullscreenTri_VS) };
-		SubPixelShader ps{ DX12::Shaders::GetGenericShader(DX12::Shaders::GenericShader::PostProcess_PS) };
-		SubPrimitiveTopology primitiveTopoliogy{ D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE };
-		SubRenderTargetFormats renderTargetFormats{};
-		SubRasterizer rasterizer{ DX12::CC::Desc::Rasterizer::k_noCullTemplate };
+		SubRootSignature _rs{ DX12::PostProcessSpace::GetRootSignature() };
+		SubVertexShader _vs{ DX12::Shaders::GetGenericShader(DX12::Shaders::GenericShader::FullscreenTri_VS) };
+		SubPixelShader _ps{ DX12::Shaders::GetGenericShader(DX12::Shaders::GenericShader::PostProcess_PS) };
+		SubPrimitiveTopology _primitiveTopoliogy{ D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE };
+		SubRenderTargetFormats _renderTargetFormats{};
+		SubRasterizer _rasterizer{ DX12::CC::Desc::Rasterizer::k_noCullTemplate };
 	}stream;
-	stream.renderTargetFormats._sub.NumRenderTargets = 1;
-	stream.renderTargetFormats._sub.RTFormats[0] = DX12::CC::k_defaultRenderTargetFormat;
+	stream._renderTargetFormats._sub.NumRenderTargets = 1;
+	stream._renderTargetFormats._sub.RTFormats[0] = DX12::CC::k_defaultRenderTargetFormat;
 
 	::g_PPPipelineState = DX12::Helpers::CreatePipelineState(&stream, sizeof(stream));
 
@@ -94,11 +94,11 @@ ID3D12PipelineState* DX12::PostProcessSpace::GetPipelineState()
 
 DX12::PostProcessPass* DX12::PostProcessSpace::GetPostProcessPass()
 {
-	if (g_postProcessPass) [[likely]]
-		return g_postProcessPass.get();
+	if (::g_postProcessPass) [[likely]]
+		return ::g_postProcessPass.get();
 		
-	g_postProcessPass = std::make_unique<DX12::PostProcessPass>();
-	return  g_postProcessPass.get();
+	::g_postProcessPass = std::make_unique<DX12::PostProcessPass>();
+	return  ::g_postProcessPass.get();
 }
 
 DX12::PostProcessPass::PostProcessPass(PostProcessPass&& other) noexcept :

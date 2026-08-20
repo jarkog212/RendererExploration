@@ -108,7 +108,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NOMINMAX;_DEBUG;_FORCE_GENERIC_SHADER_COMPILATION;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NOMINMAX;_DEBUG;_MANDELBROT_TEST;_FORCE_GENERIC_SHADER_COMPILATION;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>.\Source;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
@@ -143,6 +143,7 @@
     <ClCompile Include="Source\DX12\DX12DescriptorHeap.cpp" />
     <ClCompile Include="Source\DX12\DX12Example.cpp" />
     <ClCompile Include="Source\DX12\DX12GPass.cpp" />
+    <ClCompile Include="Source\DX12\DX12MandelbrotPass.cpp" />
     <ClCompile Include="Source\DX12\DX12PostProcessPass.cpp" />
     <ClCompile Include="Source\DX12\DX12Renderer.cpp" />
     <ClCompile Include="Source\DX12\DX12RenderSurface.cpp" />
@@ -161,6 +162,7 @@
     <ClInclude Include="Source\DX12\DX12DepthBufferTexture.h" />
     <ClInclude Include="Source\DX12\DX12DescriptorHeap.h" />
     <ClInclude Include="Source\DX12\DX12GPass.h" />
+    <ClInclude Include="Source\DX12\DX12MandelbrotPass.h" />
     <ClInclude Include="Source\DX12\DX12Math.h" />
     <ClInclude Include="Source\DX12\DX12PostProcessPass.h" />
     <ClInclude Include="Source\DX12\DX12RenderSurface.h" />

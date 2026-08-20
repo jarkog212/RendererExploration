@@ -4,10 +4,11 @@
 #include "DX12Shaders.h"
 #include "DX12GPass.h"
 #include "DX12PostProcessPass.h"
+#include "DX12MandelbrotPass.h"
 #include "DX12Utils.h"
 
-	#include <string>
-	#include <format>
+#include <string>
+#include <format>
 
 namespace
 {
@@ -76,17 +77,29 @@ namespace
 			current = DX12::GPassSpace::GetTailNode();
 
 			current->SetAutoBarrierSubmits(true, true);
-			
+
+#ifdef _MANDELBROT_TEST
+			DX12::MandelbrotPass* mandelbrotPass = DX12::MandelbrotSpace::GetMandelbrotPass();
+			mandelbrotPass->LinkRenderSurface(*DX12::GetMainRenderSurface());
+			current = current->SetNext(*mandelbrotPass);
+
+			return root;
+			// end the graph here if testing mandelbrot
+#endif
+
 			DX12::PostProcessPass* postProcessPass = DX12::PostProcessSpace::GetPostProcessPass();
 			postProcessPass->LinkInputGPass(DX12::GPassSpace::GetGPassRTPass());
 			postProcessPass->LinkRenderSurface(*DX12::GetMainRenderSurface());
 			current = current->SetNext(*postProcessPass);
+
+			return root;
 		}
 
 		void WarmUp()
 		{
 			DX12::GPassSpace::WarmUp();
 			DX12::PostProcessSpace::WarmUp();
+			DX12::MandelbrotSpace::WarmUp();
 
 			::RenderGraph::GetHead();
 		}
@@ -95,6 +108,7 @@ namespace
 		{
 			DX12::GPassSpace::Release();
 			DX12::PostProcessSpace::Release();
+			DX12::MandelbrotSpace::Release();
 
 			::RenderGraph::GetHead() = nullptr;
 		}

@@ -180,9 +180,21 @@ IDXGIFactory7* DX12::GetDxgiFactory()
 
 #ifdef _DEBUG
 	{
-		Microsoft::WRL::ComPtr<ID3D12Debug6> debugInterface = nullptr;
-		HRESULT_CHECK_CRITICAL(D3D12GetDebugInterface(IID_PPV_ARGS(&debugInterface)), "Failed to get debug interface.");
-		debugInterface->EnableDebugLayer();
+		Microsoft::WRL::ComPtr<ID3D12Debug6> debugInterface6 = nullptr;
+		Microsoft::WRL::ComPtr<ID3D12Debug3> debugInterface3 = nullptr;
+
+		HRESULT_CHECK_FALLBACK(D3D12GetDebugInterface(IID_PPV_ARGS(&debugInterface6)),,,
+			"Failed to get debug interface v6. Will try v3...");
+
+		if (debugInterface6)
+		{
+			debugInterface6->EnableDebugLayer();
+		}
+		else
+		{
+			HRESULT_CHECK_CRITICAL(D3D12GetDebugInterface(IID_PPV_ARGS(&debugInterface3)), "Failed to get debug interface 3.");
+			debugInterface3->EnableDebugLayer();
+		}
 
 		flags |= DXGI_CREATE_FACTORY_DEBUG;
 	}

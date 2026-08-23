@@ -58,6 +58,13 @@ if (!(##instruction)) [[unlikely]] {\
 	T(T&&) = delete; \
 	T& operator=(T&&) = delete;
 
+#ifdef _DEBUG
+#define DEBUG_DESTRUCTOR_BODY(clss, format, ...) DISPLAY_RAW_OUTPUT("["#clss"'s destructor][%p] "##format, this, __VA_ARGS__);
+#define DEBUG_DESTRUCTOR(clss, format, ...) ~##clss() { DEBUG_DESTRUCTOR_BODY(clss, format, __VA_ARGS__); }
+#else
+#define DEBUG_DESTRUCTOR_BODY(...)
+#define DEBUG_DESTRUCTOR(...)
+#endif
 // implement these within appropriate places
 namespace UtilsImpl
 {

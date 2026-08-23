@@ -11,6 +11,7 @@ namespace DX12
 	public:
 
 		RenderSurface(const HWND window, DXGI_FORMAT format, DX12::RendererCommand& rendererCommand);
+		DEBUG_DESTRUCTOR(RenderSurface)
 		RenderSurface(RenderSurface&& other) noexcept;
 		RenderSurface& operator=(RenderSurface&& other) noexcept;
 

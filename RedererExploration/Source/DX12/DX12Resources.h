@@ -81,6 +81,7 @@ namespace DX12
 		DX12::DescriptorHandle _rtvHandle = {};
 
 		RenderTargetData() = default;
+		DEBUG_DESTRUCTOR(RenderTargetData, "Clearing render target data (resource %p and handle.)", _resource.Get());
 		RenderTargetData(RenderTargetData&& other) noexcept;
 		RenderTargetData& operator=(RenderTargetData&& other) noexcept;
 

@@ -11,6 +11,7 @@ namespace DX12
 		static RenderTargetTexture Create(DX12::TextureSpecs& specs);
 
 		RenderTargetTexture(RenderTargetTexture&& other) noexcept;
+		DEBUG_DESTRUCTOR(RenderTargetTexture)
 		RenderTargetTexture& operator=(RenderTargetTexture&& other) noexcept;
 		
 		NO_COPY(RenderTargetTexture);

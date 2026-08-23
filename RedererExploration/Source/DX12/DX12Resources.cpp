@@ -4,6 +4,8 @@
 
 DX12::DescriptorHandle::~DescriptorHandle()
 {
+	DEBUG_DESTRUCTOR_BODY(DescriptorHandle)
+
 	if (_owner)
 		_owner->Free(*this);
 }

@@ -23,6 +23,7 @@ namespace DX12
 	public:
 
 		PostProcessPass() = default;
+		DEBUG_DESTRUCTOR(PostProcessPass);
 		PostProcessPass(PostProcessPass&& other) noexcept;
 		PostProcessPass& operator=(PostProcessPass&& other) noexcept;
 

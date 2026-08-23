@@ -10,6 +10,8 @@ namespace DX12
 
 		static DepthBufferTexture Create(DX12::TextureSpecs& specs);
 
+		DEBUG_DESTRUCTOR(DepthBufferTexture);
+
 		DepthBufferTexture(DepthBufferTexture&& other) noexcept;
 		DepthBufferTexture& operator=(DepthBufferTexture&& other) noexcept;
 

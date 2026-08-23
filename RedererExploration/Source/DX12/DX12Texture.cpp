@@ -51,6 +51,8 @@ DX12::Texture::Texture(TextureSpecs& specs)
 
 DX12::Texture::~Texture()
 {
+	DEBUG_DESTRUCTOR_BODY(Texture)
+
 	Utils::COM::SafeDeferredRenderThreadRelease(_resource);
 }
 

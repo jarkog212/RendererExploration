@@ -22,6 +22,7 @@ namespace DX12
 	public:
 
 		MandelbrotPass() = default;
+		DEBUG_DESTRUCTOR(MandelbrotPass);
 		MandelbrotPass(MandelbrotPass&& other) noexcept;
 		MandelbrotPass& operator=(MandelbrotPass&& other) noexcept;
 

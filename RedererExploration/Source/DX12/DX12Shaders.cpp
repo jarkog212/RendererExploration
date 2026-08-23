@@ -205,6 +205,8 @@ namespace
 
 DX12::Shaders::Shader::~Shader()
 {
+	DEBUG_DESTRUCTOR_BODY(Shader)
+
 	_size = 0;
 	delete[] _byteCode;
 }

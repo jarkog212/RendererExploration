@@ -11,7 +11,7 @@ namespace DX12
 	public:
 
 		RendererCommand(D3D12_COMMAND_LIST_TYPE type);
-		~RendererCommand() { Release(); };
+		~RendererCommand() { DEBUG_DESTRUCTOR_BODY(RendererCommand) Release(); };
 
 		NO_COPY(RendererCommand);
 		NO_MOVE(RendererCommand);
@@ -33,7 +33,7 @@ namespace DX12
 		public:
 
 			GfxCommandFrame() = default;
-			~GfxCommandFrame() { Reset(); }
+			~GfxCommandFrame() { DEBUG_DESTRUCTOR_BODY(GfxCommandFrame) Reset(); }
 
 			NO_COPY(GfxCommandFrame);
 			NO_MOVE(GfxCommandFrame);

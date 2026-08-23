@@ -39,6 +39,7 @@ namespace DX12
 		static DepthPass Create(const DX12::Math::Vector2u32& size);
 
 		DepthPass(DX12::DepthBufferTexture&& depthBuffer);
+		DEBUG_DESTRUCTOR(DepthPass);
 		DepthPass(DepthPass&& other) noexcept;
 		DepthPass& operator=(DepthPass&& other) noexcept;
 
@@ -66,6 +67,7 @@ namespace DX12
 		static GPassRT Create(const DX12::Math::Vector2u32& size);
 
 		GPassRT(DX12::RenderTargetTexture&& mainBuffer);
+		DEBUG_DESTRUCTOR(GPassRT);
 		GPassRT(GPassRT&& other) noexcept;
 		GPassRT& operator=(GPassRT&& other) noexcept;
 

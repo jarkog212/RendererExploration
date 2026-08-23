@@ -21,7 +21,7 @@ namespace DX12
 			bool isShaderVisible,
 			D3D12_DESCRIPTOR_RANGE_TYPE rangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV);
 
-		~DescriptorHeap() { Release(); };
+		~DescriptorHeap() { DEBUG_DESTRUCTOR_BODY(DescriptorHeap) Release(); };
 
 		NO_COPY(DescriptorHeap);
 		NO_MOVE(DescriptorHeap);

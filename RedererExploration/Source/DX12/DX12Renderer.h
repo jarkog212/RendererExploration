@@ -22,7 +22,11 @@ namespace DX12
 		ID3D12CommandQueue* GetCommandQueue() const { return _commandQueue.Get(); };
 		ID3D12GraphicsCommandList6* GetCommandList() const { return _commandList.Get(); };
 		constexpr unsigned int GetCurrentFrame() const { return _currentFrame; };
+		constexpr void LinkRenderSurface(DX12::RenderSurface* surface) { _linkedSurface = surface; }
+		constexpr void UnlinkSurface() { _linkedSurface = nullptr; }
+		constexpr DX12::RenderSurface* GetLinkedSurface() const { return _linkedSurface; }
 
+		void UpdateSurfaceViewport();
 		void Release();
 		void Flush();
 
@@ -59,5 +63,6 @@ namespace DX12
 		HANDLE _fenceEvent = 0;
 		unsigned int _currentFrame = 0;
 		unsigned int _issuableFenceValue = 0;
+		DX12::RenderSurface* _linkedSurface = nullptr; //non-owning
 	};
 };

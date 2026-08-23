@@ -17,6 +17,7 @@ DX12::RenderSurface::RenderSurface(const HWND window, DXGI_FORMAT format, DX12::
 		_presentFlags = DXGI_PRESENT_ALLOW_TEARING;
 
 	ResetSwapChain(rendererCommand, format);
+	rendererCommand.LinkRenderSurface(this);
 
 	HRESULT_CHECK_FALLBACK(
 		factory->MakeWindowAssociation(_window, DXGI_MWA_NO_ALT_ENTER), ,
@@ -27,7 +28,6 @@ DX12::RenderSurface::RenderSurface(const HWND window, DXGI_FORMAT format, DX12::
 }
 
 DX12::RenderSurface::RenderSurface(RenderSurface&& other) noexcept :
-	_linkedRendererCommand(std::exchange(other._linkedRendererCommand, nullptr)),
 	_swapChain(std::move(other._swapChain)),
 	_window(std::exchange(other._window, HWND(NULL))),
 	_currentBackBufferIndex(std::exchange(other._currentBackBufferIndex, 0)),
@@ -44,7 +44,6 @@ DX12::RenderSurface& DX12::RenderSurface::operator=(RenderSurface&& other) noexc
 {
 	CRITICAL_ASSERT(this != &other, "Moving RenderSurface to itself.");
 
-	std::swap(_linkedRendererCommand, other._linkedRendererCommand);
 	std::swap(_swapChain, other._swapChain);
 	std::swap(_window, other._window);
 	std::swap(_currentBackBufferIndex, other._currentBackBufferIndex);
@@ -67,19 +66,9 @@ void DX12::RenderSurface::Resize()
 	// body
 }
 
-void DX12::RenderSurface::PreRender()
+void DX12::RenderSurface::Present()
 {
-	CRITICAL_ASSERT(_linkedRendererCommand, "Cannot prepare render without valid command executor.");
-
-	_linkedRendererCommand->PreRender();
-}
-
-void DX12::RenderSurface::PostRender()
-{
-	CRITICAL_ASSERT(_swapChain, "Trying to present an invalid swap chain.");
-	CRITICAL_ASSERT(_linkedRendererCommand, "Cannot finish render without valid command executor.");
-
-	_linkedRendererCommand->PostRender();
+	CRITICAL_ASSERT(_swapChain, "Trying to present an invalid swap chain.")
 
 #ifdef _DEBUG
 	HRESULT_CHECK_FALLBACK(
@@ -93,20 +82,8 @@ void DX12::RenderSurface::PostRender()
 	_currentBackBufferIndex = _swapChain->GetCurrentBackBufferIndex();
 }
 
-void DX12::RenderSurface::UpdateViewport()
-{
-	ID3D12GraphicsCommandList6* commandList = _linkedRendererCommand->GetCommandList();
-	commandList->RSSetViewports(1, &_viewport);
-	commandList->RSSetScissorRects(1, &_scissorRect);
-}
-
 void DX12::RenderSurface::ResetSwapChain(DX12::RendererCommand& rendererCommand, DXGI_FORMAT format)
 {
-	if (_linkedRendererCommand)
-		_linkedRendererCommand->Flush();
-
-	_linkedRendererCommand = &rendererCommand;
-
 	RECT windowDimensions = GetWindowDimensions();
 	const int width = windowDimensions.right - windowDimensions.left;
 	const int height = windowDimensions.bottom - windowDimensions.top;
@@ -124,7 +101,7 @@ void DX12::RenderSurface::ResetSwapChain(DX12::RendererCommand& rendererCommand,
 		Microsoft::WRL::ComPtr<IDXGISwapChain1> swapChain = nullptr;
 		HRESULT_CHECK_FALLBACK(
 			DX12::GetDxgiFactory()->CreateSwapChainForHwnd(
-				_linkedRendererCommand->GetCommandQueue(), _window, &desc, nullptr, nullptr, &swapChain),,
+				rendererCommand.GetCommandQueue(), _window, &desc, nullptr, nullptr, &swapChain),,
 			assert(false),
 			"Could not create a swap chain.");
 

@@ -18,13 +18,10 @@ namespace DX12
 		NO_COPY(RenderSurface);
 
 		void Resize();
-		void PreRender();
-		void PostRender();
-		void UpdateViewport();
+		void Present();
 
 		void ResetSwapChain(DX12::RendererCommand& rendererCommand, DXGI_FORMAT format);
 
-		DX12::RendererCommand* GetLinkedRendererCommand() const { return _linkedRendererCommand; }
 		constexpr HWND GetWindow() const { return _window; }
 		RECT GetWindowDimensions() const;
 		constexpr unsigned int GetWidth() const { return _viewport.Width; }
@@ -38,7 +35,6 @@ namespace DX12
 
 		void Finalize(DXGI_FORMAT format);
 
-		DX12::RendererCommand* _linkedRendererCommand = nullptr; // non-owning
 		HWND _window = NULL;
 		mutable unsigned int _currentBackBufferIndex = 0;
 		D3D12_VIEWPORT _viewport = {};

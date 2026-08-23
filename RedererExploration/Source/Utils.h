@@ -58,7 +58,7 @@ if (!(##instruction)) [[unlikely]] {\
 	T(T&&) = delete; \
 	T& operator=(T&&) = delete;
 
-#ifdef _DEBUG
+#ifdef _DEBUG_DESTRUCTORS
 #define DEBUG_DESTRUCTOR_BODY(clss, format, ...) DISPLAY_RAW_OUTPUT("["#clss"'s destructor][%p] "##format, this, __VA_ARGS__);
 #define DEBUG_DESTRUCTOR(clss, format, ...) ~##clss() { DEBUG_DESTRUCTOR_BODY(clss, format, __VA_ARGS__); }
 #else

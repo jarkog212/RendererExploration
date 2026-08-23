@@ -366,14 +366,12 @@ bool DX12::Initialize(HWND hwnd)
 	return true;
 }
 
-void DX12::Render(DX12::RenderSurface& surface, DX12::RenderPassBase* root)
+void DX12::Render(DX12::RendererCommand& rendererCommand)
 {
-	surface.PreRender();
-	
-	surface.UpdateViewport();
+	rendererCommand.PreRender();
+	rendererCommand.UpdateSurfaceViewport();
 
-	DX12::RendererCommand* rendererCommand = surface.GetLinkedRendererCommand();
-	ID3D12GraphicsCommandList6* commandList = rendererCommand->GetCommandList();
+	ID3D12GraphicsCommandList6* commandList = rendererCommand.GetCommandList();
 
 #ifdef _DEBUG
 	// HUGE ASSUMPTION!!! THE CURRENT DEFERRED CLEANUP ASSUMES ONLY ONE RENDERER COMMAND
@@ -381,36 +379,38 @@ void DX12::Render(DX12::RenderSurface& surface, DX12::RenderPassBase* root)
 	// MOVING COM POINTER RELEASES IS SIMPLE ENOUGH: MOVE THEIR PENDING RELASE MANAGEMENT INTO THE RENDERER COMMAND OBJECT.
 	// MOVING HEAP RELEASES REQUIRES A BIT MORE WORK IN HEAPS TO SOMEHOW LET THEM KNOW HANDLES BEING USED BY WHICH COMMAND.
 	static DX12::RendererCommand* mainCommand = DX12::GetMainRendererCommand();
-	CRITICAL_ASSERT(rendererCommand == mainCommand, "You're about to start freeing resources which may be protected. Currently only ONE (Main) render command is supported.");
+	CRITICAL_ASSERT(&rendererCommand == mainCommand, "You're about to start freeing resources which may be protected. Currently only ONE (Main) render command is supported.");
 #endif
 
-	const unsigned int currentFrame = rendererCommand->GetCurrentFrame();
+	const unsigned int currentFrame = rendererCommand.GetCurrentFrame();
 	if (DX12::TestPendingResourceFreeingFlag(currentFrame))
 		::DefferedFree::FreePendingResources(currentFrame);
 
-	DX12::Math::Vector2u32 size{ surface.GetWidth(), surface.GetHeight() };
+	DX12::RenderSurface* surface = rendererCommand.GetLinkedSurface();
+	CRITICAL_ASSERT(surface, "To render a renderer command, a valid surface that is linked to it is needed.")
+	DX12::Math::Vector2u32 size{ surface->GetWidth(), surface->GetHeight() };
 	DX12::GPassSpace::SetDimensions(size);
 
 	DX12::PendingTransitionResourceBarrier(
-		surface.GetBackbuffer(),
+		surface->GetBackbuffer(),
 		D3D12_RESOURCE_STATE_PRESENT,
 		D3D12_RESOURCE_STATE_RENDER_TARGET);
 
 	::RenderGraph::GetHead()->AccummulateCommands(commandList);
 
 	DX12::PendingTransitionResourceBarrier(
-		surface.GetBackbuffer(),
+		surface->GetBackbuffer(),
 		D3D12_RESOURCE_STATE_RENDER_TARGET,
 		D3D12_RESOURCE_STATE_PRESENT);
 
 	DX12::SubmitPendingBarriers(commandList);
 
-	surface.PostRender();
+	rendererCommand.PostRender();
 }
 
 void DX12::Render()
 {
-	DX12::Render(*DX12::GetMainRenderSurface() /*, root pass will go here */);
+	DX12::Render(*DX12::GetMainRendererCommand());
 }
 
 void DX12::ReleaseAll()
@@ -589,6 +589,9 @@ void DX12::RendererCommand::PostRender()
 	
 	_commandQueue->ExecuteCommandLists(_countof(lists), lists);
 
+	CRITICAL_ASSERT(_linkedSurface, "To present the backbuffers a valid surface is needed.");
+	_linkedSurface->Present();
+
 	_issuableFenceValue++;
 	_frame[_currentFrame].IssueFenceValue(_issuableFenceValue);
 	_commandQueue->Signal(_fence.Get(), _issuableFenceValue);
@@ -600,6 +603,7 @@ void DX12::RendererCommand::PostRender()
 	if (FAILED(deviceFailHR))
 		DX12::DEBUG::PrintDeviceRemovedReason(deviceFailHR);
 #endif
+
 	_currentFrame = ++_currentFrame % DX12::CC::k_commandFrameBuffers;
 }
 
@@ -614,6 +618,13 @@ void DX12::RendererCommand::Flush()
 	_issuableFenceValue = 0;
 }
 
+void DX12::RendererCommand::UpdateSurfaceViewport()
+{
+	CRITICAL_ASSERT(_linkedSurface, "To resize viewports, a valid surface is required to be linked.");
+	_commandList->RSSetViewports(1, &_linkedSurface->GetViewport());
+	_commandList->RSSetScissorRects(1, &_linkedSurface->GetScissor());
+}
+
 void DX12::RendererCommand::Release()
 {
 	if (_fence)
@@ -626,6 +637,8 @@ void DX12::RendererCommand::Release()
 			_fenceEvent = 0;
 		}
 	}
+
+	_linkedSurface = nullptr;
 
 	_fence.Reset();
 

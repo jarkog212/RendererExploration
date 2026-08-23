@@ -49,7 +49,7 @@ namespace DX12
 	void SubmitPendingBarriers(ID3D12GraphicsCommandList6* commandList);
 
 	bool Initialize(HWND hwnd);
-	void Render(DX12::RenderSurface& surface, DX12::RenderPassBase* root = nullptr );
+	void Render(DX12::RendererCommand& rendererCommand);
 	void Render();
 	void ReleaseAll();
 

@@ -104,10 +104,10 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
      //    return 0;
      //}
      
-     //case WM_SIZE:
-     //    // handle resize here if needed (width = LOWORD(lParam), height = HIWORD(lParam))
-     //    return 0;
-     
+     case WM_SIZE:
+         DX12::Resize();
+         return 0;
+
      case WM_KEYDOWN:
          if (wParam == VK_ESCAPE)
              Close(hwnd);

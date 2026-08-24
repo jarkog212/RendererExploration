@@ -33,7 +33,9 @@ namespace DX12
 
 	private:
 
-		void Finalize(DXGI_FORMAT format);
+		void SetupRenderTargets();
+		void PurgeRenderTargets();
+		void UnlinkRenderTargetsResources();
 
 		HWND _window = NULL;
 		mutable unsigned int _currentBackBufferIndex = 0;
@@ -41,6 +43,7 @@ namespace DX12
 		D3D12_RECT _scissorRect = {};
 		unsigned int _presentFlags = 0;
 		unsigned int _allowTearing = 0;
+		DXGI_FORMAT _suppliedSurfaceFormat = DXGI_FORMAT_UNKNOWN;
 		Microsoft::WRL::ComPtr<IDXGISwapChain4> _swapChain = nullptr;
 		DX12::RenderTargetData _renderTargetData[DX12::CC::k_swapChainBuffers];
 	};

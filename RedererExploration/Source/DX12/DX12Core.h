@@ -52,6 +52,7 @@ namespace DX12
 	void Render(DX12::RendererCommand& rendererCommand);
 	void Render();
 	void ReleaseAll();
+	void Resize();
 
 #ifdef _DEBUG
 

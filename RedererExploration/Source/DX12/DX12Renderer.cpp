@@ -466,6 +466,11 @@ void DX12::ReleaseAll()
 #endif
 }
 
+void DX12::Resize()
+{
+	DX12::GetMainRendererCommand()->ResizeSurface();
+}
+
 #ifdef _DEBUG
 void DX12::DEBUG::PrintDeviceRemovedReason(HRESULT hr)
 {
@@ -612,7 +617,7 @@ void DX12::RendererCommand::Flush()
 	for (int i = 0; i < DX12::CC::k_commandFrameBuffers; i++)
 	{
 		_frame[i].WaitForGPU(_fenceEvent, _fence.Get());
-		_frame[i].GetAllocator()->Reset();
+		_frame[i].Reinstate();
 	}
 
 	_issuableFenceValue = 0;
@@ -623,6 +628,16 @@ void DX12::RendererCommand::UpdateSurfaceViewport()
 	CRITICAL_ASSERT(_linkedSurface, "To resize viewports, a valid surface is required to be linked.");
 	_commandList->RSSetViewports(1, &_linkedSurface->GetViewport());
 	_commandList->RSSetScissorRects(1, &_linkedSurface->GetScissor());
+}
+
+void DX12::RendererCommand::ResizeSurface()
+{
+	if (!_linkedSurface)
+		return;
+
+	Flush();
+
+	_linkedSurface->Resize();
 }
 
 void DX12::RendererCommand::Release()
@@ -643,7 +658,7 @@ void DX12::RendererCommand::Release()
 	_fence.Reset();
 
 	for (int i = 0; i < DX12::CC::k_commandFrameBuffers; i++)
-		_frame[i].Reset();
+		_frame[i].Release();
 
 	_commandList.Reset();
 	_commandQueue.Reset();
@@ -665,9 +680,15 @@ bool DX12::RendererCommand::GfxCommandFrame::Setup(D3D12_COMMAND_LIST_TYPE type,
 	return true;
 }
 
-void DX12::RendererCommand::GfxCommandFrame::Reset()
+void DX12::RendererCommand::GfxCommandFrame::Release()
 {
 	_allocator.Reset();
+	_fenceValue = 0;
+}
+
+void DX12::RendererCommand::GfxCommandFrame::Reinstate()
+{
+	_allocator->Reset();
 	_fenceValue = 0;
 }
 

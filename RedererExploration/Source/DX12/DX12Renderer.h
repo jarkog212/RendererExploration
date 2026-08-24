@@ -27,6 +27,7 @@ namespace DX12
 		constexpr DX12::RenderSurface* GetLinkedSurface() const { return _linkedSurface; }
 
 		void UpdateSurfaceViewport();
+		void ResizeSurface();
 		void Release();
 		void Flush();
 
@@ -37,13 +38,14 @@ namespace DX12
 		public:
 
 			GfxCommandFrame() = default;
-			~GfxCommandFrame() { DEBUG_DESTRUCTOR_BODY(GfxCommandFrame) Reset(); }
+			~GfxCommandFrame() { DEBUG_DESTRUCTOR_BODY(GfxCommandFrame) Release(); }
 
 			NO_COPY(GfxCommandFrame);
 			NO_MOVE(GfxCommandFrame);
 
 			bool Setup(D3D12_COMMAND_LIST_TYPE type, int index = -1);
-			void Reset();
+			void Release();
+			void Reinstate();
 
 			void WaitForGPU(HANDLE fenceEvent, ID3D12Fence1* fence);
 

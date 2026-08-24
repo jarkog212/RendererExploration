@@ -23,8 +23,6 @@ DX12::RenderSurface::RenderSurface(const HWND window, DXGI_FORMAT format, DX12::
 		factory->MakeWindowAssociation(_window, DXGI_MWA_NO_ALT_ENTER), ,
 		assert(false),
 		"Could not restirct fullscreen on swapchain.");
-
-	Finalize(format);
 }
 
 DX12::RenderSurface::RenderSurface(RenderSurface&& other) noexcept :
@@ -60,10 +58,18 @@ DX12::RenderSurface& DX12::RenderSurface::operator=(RenderSurface&& other) noexc
 
 void DX12::RenderSurface::Resize()
 {
-	if (_linkedRendererCommand)
-		_linkedRendererCommand->Flush();
+	UnlinkRenderTargetsResources();
 
-	// body
+	const unsigned int flags = _allowTearing ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
+	HRESULT_CHECK_CRITICAL(
+		_swapChain->ResizeBuffers(DX12::CC::k_swapChainBuffers, 0, 0, DXGI_FORMAT_UNKNOWN, flags),
+		"Could not resize swap chain.");
+
+	_currentBackBufferIndex = _swapChain->GetCurrentBackBufferIndex();
+
+	SetupRenderTargets();
+
+	DISPLAY_RAW_OUTPUT("Surface resized.");
 }
 
 void DX12::RenderSurface::Present()
@@ -84,6 +90,8 @@ void DX12::RenderSurface::Present()
 
 void DX12::RenderSurface::ResetSwapChain(DX12::RendererCommand& rendererCommand, DXGI_FORMAT format)
 {
+	_suppliedSurfaceFormat = format;
+
 	RECT windowDimensions = GetWindowDimensions();
 	const int width = windowDimensions.right - windowDimensions.left;
 	const int height = windowDimensions.bottom - windowDimensions.top;
@@ -91,9 +99,9 @@ void DX12::RenderSurface::ResetSwapChain(DX12::RendererCommand& rendererCommand,
 	DXGI_SWAP_CHAIN_DESC1 desc = DX12::CC::Desc::SwapChain::k_descTemplate;
 	desc.BufferCount = DX12::CC::k_swapChainBuffers;
 	desc.Flags = (bool)_allowTearing ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
-	desc.Format = format == DXGI_FORMAT_R8G8B8A8_UNORM_SRGB ?
+	desc.Format = _suppliedSurfaceFormat == DXGI_FORMAT_R8G8B8A8_UNORM_SRGB ?
 		DXGI_FORMAT_R8G8B8A8_UNORM :
-		format;
+		_suppliedSurfaceFormat;
 	desc.Height = height;
 	desc.Width = width;
 
@@ -113,23 +121,19 @@ void DX12::RenderSurface::ResetSwapChain(DX12::RendererCommand& rendererCommand,
 
 	_currentBackBufferIndex = _swapChain->GetCurrentBackBufferIndex();
 
-	for (int i = 0; i < DX12::CC::k_swapChainBuffers; i++)
-	{
-		_renderTargetData[i].Release();
-		_renderTargetData[i]._rtvHandle = DX12::GetRTVHeap()->Allocate();
-	}
+	PurgeRenderTargets();
 
-	Finalize(format);
+	SetupRenderTargets();
 }
 
 RECT DX12::RenderSurface::GetWindowDimensions() const
 {
 	RECT rect;
-	FALLBACK_ASSERT(GetWindowRect(_window, &rect),,,"Error getting window dimensions.")
+	FALLBACK_ASSERT(GetClientRect(_window, &rect),,,"Error getting window dimensions.")
 	return rect;
 }
 
-void DX12::RenderSurface::Finalize(DXGI_FORMAT format)
+void DX12::RenderSurface::SetupRenderTargets()
 {
 	for (int i = 0; i < DX12::CC::k_swapChainBuffers; i++)
 	{
@@ -142,7 +146,7 @@ void DX12::RenderSurface::Finalize(DXGI_FORMAT format)
 		HRESULT_CHECK_CRITICAL(data._resource->SetName(name.c_str()), "Could not name render surface buffer %d", i);
 
 		D3D12_RENDER_TARGET_VIEW_DESC desc = DX12::CC::Desc::RTView::k_descTemplate;
-		desc.Format = format;
+		desc.Format = _suppliedSurfaceFormat;
 
 		DX12::GetRendererDevice()->CreateRenderTargetView(data._resource.Get(), &desc, data._rtvHandle._cpu);
 	}
@@ -169,4 +173,21 @@ void DX12::RenderSurface::Finalize(DXGI_FORMAT format)
 	_viewport.MaxDepth = 1.f;
 
 	_scissorRect = { 0,0, (long)width, (long)height };
+}
+
+void DX12::RenderSurface::PurgeRenderTargets()
+{
+	for (int i = 0; i < DX12::CC::k_swapChainBuffers; i++)
+	{
+		_renderTargetData[i].Release();
+		_renderTargetData[i]._rtvHandle = DX12::GetRTVHeap()->Allocate();
+	}
+}
+
+void DX12::RenderSurface::UnlinkRenderTargetsResources()
+{
+	for (int i = 0; i < DX12::CC::k_swapChainBuffers; i++)
+	{
+		_renderTargetData[i]._resource.Reset();
+	}
 }

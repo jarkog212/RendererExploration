@@ -8,28 +8,8 @@ VSOutput FullscreenTri (in uint vertexIdx : SV_VertexID)
 {
     VSOutput output;
 
-    float2 tex;
-    float2 pos;
-
-    output._position = float4(0,0,0,1);
-
-    if (vertexIdx == 0)
-    {
-        tex = float2(0,0);
-        pos = float2(-1,1);
-    }
-    else if(vertexIdx == 1)
-    {
-        tex = float2(0,2);
-        pos = float2(-1, -3);
-    }
-    else if(vertexIdx == 2)
-    {
-        tex = float2(2,0);
-        pos = float2(3, 1);
-    }
-
-    output._position = float4(pos, 0, 1);
+    const float2 tex = float2(uint2(vertexIdx, vertexIdx << 1) & 2);
+    output._position = float4(lerp(float2(-1, 1), float2(1, -1), tex), 0, 1);
     output._UVs = tex;
 
     return output;

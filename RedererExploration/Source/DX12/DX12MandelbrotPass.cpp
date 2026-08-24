@@ -126,6 +126,13 @@ DX12::MandelbrotPass& DX12::MandelbrotPass::operator=(MandelbrotPass&& other) no
 
 void DX12::MandelbrotPass::PrePassResourceBarriers()
 {
+	CRITICAL_ASSERT(_renderSurface, "Cannot declare post process pass's barriers without valid output surface.");
+
+	DX12::PendingTransitionResourceBarrier(
+		_renderSurface->GetBackbuffer(),
+		D3D12_RESOURCE_STATE_PRESENT,
+		D3D12_RESOURCE_STATE_RENDER_TARGET,
+		D3D12_RESOURCE_BARRIER_FLAG_END_ONLY);
 }
 
 void DX12::MandelbrotPass::AccummulatePassCommands(ID3D12GraphicsCommandList6* commandList)

@@ -394,7 +394,8 @@ void DX12::Render(DX12::RendererCommand& rendererCommand)
 	DX12::PendingTransitionResourceBarrier(
 		surface->GetBackbuffer(),
 		D3D12_RESOURCE_STATE_PRESENT,
-		D3D12_RESOURCE_STATE_RENDER_TARGET);
+		D3D12_RESOURCE_STATE_RENDER_TARGET,
+		D3D12_RESOURCE_BARRIER_FLAG_BEGIN_ONLY);
 
 	::RenderGraph::GetHead()->AccummulateCommands(commandList);
 

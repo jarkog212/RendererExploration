@@ -3,7 +3,6 @@
 #include <utility>
 
 #include "DX12CommonConstants.h"
-#include <wrl.h>
 
 namespace DX12
 {

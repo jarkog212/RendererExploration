@@ -151,6 +151,7 @@
     <ClCompile Include="Source\DX12\DX12Resources.cpp" />
     <ClCompile Include="Source\DX12\DX12Shaders.cpp" />
     <ClCompile Include="Source\DX12\DX12Texture.cpp" />
+    <ClCompile Include="Source\DX12\DX12UploadContext.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
@@ -171,6 +172,7 @@
     <ClInclude Include="Source\DX12\DX12Renderer.h" />
     <ClInclude Include="Source\DX12\DX12Shaders.h" />
     <ClInclude Include="Source\DX12\DX12Texture.h" />
+    <ClInclude Include="Source\DX12\DX12UploadContext.h" />
     <ClInclude Include="Source\DX12\DX12Utils.h" />
     <ClInclude Include="Source\Utils.h" />
   </ItemGroup>

@@ -7,6 +7,7 @@
 #pragma comment(lib, "d3d12.lib")
 
 #include <filesystem>
+#include <wrl.h>
 
 namespace DX12::CC
 {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "DX12Core.h"
+#include "DX12CommonDescriptors.h"
 #include "Utils.h"
 
 namespace DX12::Helpers

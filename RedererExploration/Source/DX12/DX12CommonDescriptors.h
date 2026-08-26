@@ -6,8 +6,16 @@ namespace DX12::CC::Desc
 {
 	namespace Heap
 	{
-		constexpr D3D12_HEAP_PROPERTIES k_propertiesTemplate {
+		constexpr D3D12_HEAP_PROPERTIES k_baseTemplate {
 			D3D12_HEAP_TYPE_DEFAULT,
+			D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
+			D3D12_MEMORY_POOL_UNKNOWN,
+			0,	// CreationNodeMask
+			0	// VisibleNodeMask
+		};
+
+		constexpr D3D12_HEAP_PROPERTIES k_uploadTemplate {
+			D3D12_HEAP_TYPE_UPLOAD,
 			D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
 			D3D12_MEMORY_POOL_UNKNOWN,
 			0,	// CreationNodeMask
@@ -199,4 +207,23 @@ namespace DX12::CC::Desc
 			DX12::CC::RootSignature::k_VertexPixelStagesOnly
 		};
 	} // RootSignature 
+
+	namespace BufferResource
+	{
+		constexpr D3D12_RESOURCE_DESC k_bufferTemplate {
+			D3D12_RESOURCE_DIMENSION_BUFFER,
+			0,	// Alignment
+			0,	// Width
+			1,	// Height
+			1,	// DepthOrArraySize
+			1,	// MipLevels
+			DXGI_FORMAT_UNKNOWN,
+			DXGI_SAMPLE_DESC{
+				1,	//Count
+				0	//Quality
+			},
+			D3D12_TEXTURE_LAYOUT_ROW_MAJOR,
+			D3D12_RESOURCE_FLAG_NONE
+		};
+	}
 }

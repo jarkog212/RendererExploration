@@ -274,19 +274,21 @@ const DX12::Shaders::ShaderView DX12::Shaders::LoadOrCompile(const DX12::Shaders
 	precompiledPath.append(specs._filename);
 	precompiledPath += ::Compiler::k_shaderBinaryExtension;
 
+#ifdef _FORCE_NONGENERIC_SHADER_COMPILATION
+	Utils::System::TryDeleteFile(precompiledPath);
+#else
 	if (Utils::System::FileExists(precompiledPath)) [[likely]]
 	{
 		Utils::System::LoadFile(precompiledPath, out._byteCode, out._size);
 		return out.CreateView();
 	}
+#endif
 
-	{
-		Microsoft::WRL::ComPtr<IDxcBlob> blob = ::Compiler::CompileShader(specs);
-		out._size = blob->GetBufferSize();
-		out._byteCode = new char[out._size];
-		memcpy(out._byteCode, blob->GetBufferPointer(), out._size);
-	}
-
+	Microsoft::WRL::ComPtr<IDxcBlob> blob = ::Compiler::CompileShader(specs);
+	out._size = blob->GetBufferSize();
+	out._byteCode = new char[out._size];
+	memcpy(out._byteCode, blob->GetBufferPointer(), out._size);
+	
 	Utils::System::SaveFile(precompiledPath, out._byteCode, out._size);
 
 	return out.CreateView();

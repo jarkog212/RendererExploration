@@ -99,8 +99,10 @@ namespace
 		{
 			DX12::GPassSpace::WarmUp();
 			DX12::PostProcessSpace::WarmUp();
-			DX12::MandelbrotSpace::WarmUp();
 
+#ifdef _MANDELBROT_TEST
+			DX12::MandelbrotSpace::WarmUp();
+#endif
 			::RenderGraph::GetHead();
 		}
 
@@ -108,7 +110,10 @@ namespace
 		{
 			DX12::GPassSpace::Release();
 			DX12::PostProcessSpace::Release();
+
+#ifdef _MANDELBROT_TEST
 			DX12::MandelbrotSpace::Release();
+#endif
 
 			::RenderGraph::GetHead() = nullptr;
 		}

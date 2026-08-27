@@ -4,13 +4,13 @@
 
 namespace DX12
 {
-	class RendererCommand;
+	class RendererWorker;
 
 	class RenderSurface
 	{
 	public:
 
-		RenderSurface(const HWND window, DXGI_FORMAT format, DX12::RendererCommand& rendererCommand);
+		RenderSurface(const HWND window, DXGI_FORMAT format, DX12::RendererWorker& rendererWorker);
 		DEBUG_DESTRUCTOR(RenderSurface)
 		RenderSurface(RenderSurface&& other) noexcept;
 		RenderSurface& operator=(RenderSurface&& other) noexcept;
@@ -20,7 +20,7 @@ namespace DX12
 		void Resize();
 		void Present();
 
-		void ResetSwapChain(DX12::RendererCommand& rendererCommand, DXGI_FORMAT format);
+		void ResetSwapChain(DX12::RendererWorker& rendererCommand, DXGI_FORMAT format);
 
 		constexpr HWND GetWindow() const { return _window; }
 		RECT GetWindowDimensions() const;

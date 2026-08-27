@@ -359,34 +359,34 @@ bool DX12::Initialize(HWND hwnd)
 	DX12::GetMainRenderSurface(
 		hwnd,
 		DX12::CC::k_defaultRenderTargetFormat,
-		DX12::GetMainRendererCommand());
+		DX12::GetMainRendererWorker());
 
 	::RenderGraph::WarmUp();
 
 	return true;
 }
 
-void DX12::Render(DX12::RendererCommand& rendererCommand)
+void DX12::Render(DX12::RendererWorker& rendererWorker)
 {
-	rendererCommand.PreRender();
-	rendererCommand.UpdateSurfaceViewport();
+	rendererWorker.PreRender();
+	rendererWorker.UpdateSurfaceViewport();
 
-	ID3D12GraphicsCommandList6* commandList = rendererCommand.GetCommandList();
+	ID3D12GraphicsCommandList6* commandList = rendererWorker.GetCommandList();
 
 #ifdef _DEBUG
 	// HUGE ASSUMPTION!!! THE CURRENT DEFERRED CLEANUP ASSUMES ONLY ONE RENDERER COMMAND
 	// USING ANOTHER ONE WILL WREAK HAVOC ONTO HELD RESOURCES
 	// MOVING COM POINTER RELEASES IS SIMPLE ENOUGH: MOVE THEIR PENDING RELASE MANAGEMENT INTO THE RENDERER COMMAND OBJECT.
 	// MOVING HEAP RELEASES REQUIRES A BIT MORE WORK IN HEAPS TO SOMEHOW LET THEM KNOW HANDLES BEING USED BY WHICH COMMAND.
-	static DX12::RendererCommand* mainCommand = DX12::GetMainRendererCommand();
-	CRITICAL_ASSERT(&rendererCommand == mainCommand, "You're about to start freeing resources which may be protected. Currently only ONE (Main) render command is supported.");
+	static DX12::RendererWorker* mainCommand = DX12::GetMainRendererWorker();
+	CRITICAL_ASSERT(&rendererWorker == mainCommand, "You're about to start freeing resources which may be protected. Currently only ONE (Main) render command is supported.");
 #endif
 
-	const unsigned int currentFrame = rendererCommand.GetCurrentFrame();
+	const unsigned int currentFrame = rendererWorker.GetCurrentFrame();
 	if (DX12::TestPendingResourceFreeingFlag(currentFrame))
 		::DefferedFree::FreePendingResources(currentFrame);
 
-	DX12::RenderSurface* surface = rendererCommand.GetLinkedSurface();
+	DX12::RenderSurface* surface = rendererWorker.GetLinkedSurface();
 	CRITICAL_ASSERT(surface, "To render a renderer command, a valid surface that is linked to it is needed.")
 	DX12::Math::Vector2u32 size{ surface->GetWidth(), surface->GetHeight() };
 	DX12::GPassSpace::SetDimensions(size);
@@ -406,12 +406,12 @@ void DX12::Render(DX12::RendererCommand& rendererCommand)
 
 	DX12::SubmitPendingBarriers(commandList);
 
-	rendererCommand.PostRender();
+	rendererWorker.PostRender();
 }
 
 void DX12::Render()
 {
-	DX12::Render(*DX12::GetMainRendererCommand());
+	DX12::Render(*DX12::GetMainRendererWorker());
 }
 
 void DX12::ReleaseAll()
@@ -419,7 +419,7 @@ void DX12::ReleaseAll()
 	// intended to be called only once at shutdown, reinit is not possible due to static nature of things?
 	static auto cleaner = []()
 		{
-			DX12::GetMainRendererCommand()->Flush();
+			DX12::GetMainRendererWorker()->Flush();
 
 			::RenderGraph::Release();
 			DX12::Shaders::Release();
@@ -429,7 +429,7 @@ void DX12::ReleaseAll()
 
 			::g_mainRenderSurface.reset();
 
-			DX12::GetMainRendererCommand()->Release();
+			DX12::GetMainRendererWorker()->Release();
 
 			// Render surface containes RTVs that hav ebeen deferred
 			::DefferedFree::FreePendingResources(DX12::CC::k_forAllFrames);
@@ -469,7 +469,7 @@ void DX12::ReleaseAll()
 
 void DX12::Resize()
 {
-	DX12::GetMainRendererCommand()->ResizeSurface();
+	DX12::GetMainRendererWorker()->ResizeSurface();
 }
 
 #ifdef _DEBUG
@@ -524,20 +524,17 @@ void DX12::DEBUG::PrintDeviceRemovedReason(HRESULT hr)
 }
 #endif
 
-DX12::RendererCommand::RendererCommand(D3D12_COMMAND_LIST_TYPE type)
+DX12::RendererWorker::RendererWorker(D3D12_COMMAND_LIST_TYPE type)
 {
-	D3D12_COMMAND_QUEUE_DESC cq;
-	cq.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-	cq.NodeMask = 0;
-	cq.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
+	D3D12_COMMAND_QUEUE_DESC cq = DX12::CC::Desc::CommandQueue::k_baseTemplate;
 	cq.Type = type;
 
-	const wchar_t* commandQueueName = type == D3D12_COMMAND_LIST_TYPE_DIRECT ? L"GFX Command Queue" :
-		type == D3D12_COMMAND_LIST_TYPE_COMPUTE ? L"GFX Compute Queue" :
+	const wchar_t* commandQueueName = type == D3D12_COMMAND_LIST_TYPE_DIRECT ? L"Renderer Command Queue" :
+		type == D3D12_COMMAND_LIST_TYPE_COMPUTE ? L"Renderer Compute Queue" :
 		L"Command Queue";
 
-	const wchar_t* commandListName = type == D3D12_COMMAND_LIST_TYPE_DIRECT ? L"GFX Command List" :
-		type == D3D12_COMMAND_LIST_TYPE_COMPUTE ? L"GFX Compute List" :
+	const wchar_t* commandListName = type == D3D12_COMMAND_LIST_TYPE_DIRECT ? L"Renderer Command List" :
+		type == D3D12_COMMAND_LIST_TYPE_COMPUTE ? L"Renderer Compute List" :
 		L"Command List";
 
 	ID3D12Device8* device = DX12::GetRendererDevice();
@@ -547,11 +544,11 @@ DX12::RendererCommand::RendererCommand(D3D12_COMMAND_LIST_TYPE type)
 		goto _error,
 		"Could not create command queue.");
 
-	for (int i = 0; i < DX12::CC::k_commandFrameBuffers; i++)
-		_frame[i].Setup(type, i);
+	for (int i = 0; i < DX12::CC::k_rendererWorkerFrameBuffers; i++)
+		_frames[i].Setup(type, i);
 
 	HRESULT_CHECK_FALLBACK(
-		device->CreateCommandList(0, type, _frame[0].GetAllocator(), nullptr, IID_PPV_ARGS(&_commandList)),,
+		device->CreateCommandList(0, type, _frames[0].GetAllocator(), nullptr, IID_PPV_ARGS(&_commandList)),,
 		goto _error,
 		"Could not create command list.");
 
@@ -568,7 +565,7 @@ DX12::RendererCommand::RendererCommand(D3D12_COMMAND_LIST_TYPE type)
 		goto _error,
 		"Could not create fence.");
 
-	HRESULT_CHECK_FALLBACK(_commandList->SetName(L"D3D12 Fence"),,, "Could not set (%ls) to command list.", commandListName);
+	HRESULT_CHECK_FALLBACK(_fence->SetName(L"D3D12 Renderer Fence"),,, "Could not set fence name.");
 
 	_fenceEvent = CreateEventEx(nullptr, nullptr, 0, EVENT_ALL_ACCESS);
 	FALLBACK_ASSERT(_fenceEvent,,,"Could not create fence event.");
@@ -580,15 +577,15 @@ _error:
 	Release();
 }
 
-void DX12::RendererCommand::PreRender()
+void DX12::RendererWorker::PreRender()
 {
-	DX12::RendererCommand::GfxCommandFrame& currentFrame = _frame[_currentFrame];
+	DX12::RendererWorker::RendererWorkerFrame& currentFrame = _frames[_currentFrame];
 	currentFrame.WaitForGPU(_fenceEvent, _fence.Get());
 	HRESULT_CHECK_CRITICAL(currentFrame.GetAllocator()->Reset(), "Could not clear/reset commandAllocator");
 	HRESULT_CHECK_CRITICAL(_commandList->Reset(currentFrame.GetAllocator(), nullptr), "Could not reset command list.");
 }
 
-void DX12::RendererCommand::PostRender()
+void DX12::RendererWorker::PostRender()
 {
 	_commandList->Close();
 	ID3D12CommandList* const lists[] = { _commandList.Get() };
@@ -599,7 +596,7 @@ void DX12::RendererCommand::PostRender()
 	_linkedSurface->Present();
 
 	_issuableFenceValue++;
-	_frame[_currentFrame].IssueFenceValue(_issuableFenceValue);
+	_frames[_currentFrame].IssueFenceValue(_issuableFenceValue);
 	_commandQueue->Signal(_fence.Get(), _issuableFenceValue);
 
 #ifdef _DEBUG_CPU_GPU_SYNCHRONISED
@@ -610,28 +607,28 @@ void DX12::RendererCommand::PostRender()
 		DX12::DEBUG::PrintDeviceRemovedReason(deviceFailHR);
 #endif
 
-	_currentFrame = ++_currentFrame % DX12::CC::k_commandFrameBuffers;
+	_currentFrame = ++_currentFrame % DX12::CC::k_rendererWorkerFrameBuffers;
 }
 
-void DX12::RendererCommand::Flush()
+void DX12::RendererWorker::Flush()
 {
-	for (int i = 0; i < DX12::CC::k_commandFrameBuffers; i++)
+	for (int i = 0; i < DX12::CC::k_rendererWorkerFrameBuffers; i++)
 	{
-		_frame[i].WaitForGPU(_fenceEvent, _fence.Get());
-		_frame[i].Reinstate();
+		_frames[i].WaitForGPU(_fenceEvent, _fence.Get());
+		_frames[i].Reinstate();
 	}
 
 	_issuableFenceValue = 0;
 }
 
-void DX12::RendererCommand::UpdateSurfaceViewport()
+void DX12::RendererWorker::UpdateSurfaceViewport()
 {
 	CRITICAL_ASSERT(_linkedSurface, "To resize viewports, a valid surface is required to be linked.");
 	_commandList->RSSetViewports(1, &_linkedSurface->GetViewport());
 	_commandList->RSSetScissorRects(1, &_linkedSurface->GetScissor());
 }
 
-void DX12::RendererCommand::ResizeSurface()
+void DX12::RendererWorker::ResizeSurface()
 {
 	if (!_linkedSurface)
 		return;
@@ -641,7 +638,7 @@ void DX12::RendererCommand::ResizeSurface()
 	_linkedSurface->Resize();
 }
 
-void DX12::RendererCommand::Release()
+void DX12::RendererWorker::Release()
 {
 	if (_fence)
 	{
@@ -658,8 +655,8 @@ void DX12::RendererCommand::Release()
 
 	_fence.Reset();
 
-	for (int i = 0; i < DX12::CC::k_commandFrameBuffers; i++)
-		_frame[i].Release();
+	for (int i = 0; i < DX12::CC::k_rendererWorkerFrameBuffers; i++)
+		_frames[i].Release();
 
 	_commandList.Reset();
 	_commandQueue.Reset();
@@ -667,33 +664,33 @@ void DX12::RendererCommand::Release()
 	_currentFrame = 0;
 }
 
-bool DX12::RendererCommand::GfxCommandFrame::Setup(D3D12_COMMAND_LIST_TYPE type, int index)
+bool DX12::RendererWorker::RendererWorkerFrame::Setup(D3D12_COMMAND_LIST_TYPE type, int index)
 {
 	HRESULT_CHECK_FALLBACK(
 		DX12::GetRendererDevice()->CreateCommandAllocator(type, IID_PPV_ARGS(&_allocator)),,
 		return false,
 		"Could not create command allocator.");
 
-	wchar_t buffer[250];
-	swprintf(buffer, 250, L"Command Allocator %u", index);
+	wchar_t buffer[250]{};
+	swprintf(buffer, 250, L"Render Command Allocator %u", index);
 	HRESULT_CHECK_FALLBACK(_allocator->SetName(buffer),,,"Could not set name (%ls) to command buffer.", buffer);
 
 	return true;
 }
 
-void DX12::RendererCommand::GfxCommandFrame::Release()
+void DX12::RendererWorker::RendererWorkerFrame::Release()
 {
 	_allocator.Reset();
 	_fenceValue = 0;
 }
 
-void DX12::RendererCommand::GfxCommandFrame::Reinstate()
+void DX12::RendererWorker::RendererWorkerFrame::Reinstate()
 {
 	_allocator->Reset();
 	_fenceValue = 0;
 }
 
-void DX12::RendererCommand::GfxCommandFrame::WaitForGPU(HANDLE fenceEvent, ID3D12Fence1* fence)
+void DX12::RendererWorker::RendererWorkerFrame::WaitForGPU(HANDLE fenceEvent, ID3D12Fence1* fence)
 {
 	assert(fenceEvent && fence);
 

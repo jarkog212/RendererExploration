@@ -4,7 +4,7 @@
 #include "DX12DescriptorHeap.h"
 #include "DX12CommonDescriptors.h"
 
-DX12::RenderSurface::RenderSurface(const HWND window, DXGI_FORMAT format, DX12::RendererCommand& rendererCommand)
+DX12::RenderSurface::RenderSurface(const HWND window, DXGI_FORMAT format, DX12::RendererWorker& rendererWorker)
 	: _window(window)
 {
 	IDXGIFactory7* factory = DX12::GetDxgiFactory();
@@ -16,8 +16,8 @@ DX12::RenderSurface::RenderSurface(const HWND window, DXGI_FORMAT format, DX12::
 	if ((bool)_allowTearing)
 		_presentFlags = DXGI_PRESENT_ALLOW_TEARING;
 
-	ResetSwapChain(rendererCommand, format);
-	rendererCommand.LinkRenderSurface(this);
+	ResetSwapChain(rendererWorker, format);
+	rendererWorker.LinkRenderSurface(this);
 
 	HRESULT_CHECK_FALLBACK(
 		factory->MakeWindowAssociation(_window, DXGI_MWA_NO_ALT_ENTER), ,
@@ -88,7 +88,7 @@ void DX12::RenderSurface::Present()
 	_currentBackBufferIndex = _swapChain->GetCurrentBackBufferIndex();
 }
 
-void DX12::RenderSurface::ResetSwapChain(DX12::RendererCommand& rendererCommand, DXGI_FORMAT format)
+void DX12::RenderSurface::ResetSwapChain(DX12::RendererWorker& rendererWorker, DXGI_FORMAT format)
 {
 	_suppliedSurfaceFormat = format;
 
@@ -109,7 +109,7 @@ void DX12::RenderSurface::ResetSwapChain(DX12::RendererCommand& rendererCommand,
 		Microsoft::WRL::ComPtr<IDXGISwapChain1> swapChain = nullptr;
 		HRESULT_CHECK_FALLBACK(
 			DX12::GetDxgiFactory()->CreateSwapChainForHwnd(
-				rendererCommand.GetCommandQueue(), _window, &desc, nullptr, nullptr, &swapChain),,
+				rendererWorker.GetCommandQueue(), _window, &desc, nullptr, nullptr, &swapChain),,
 			assert(false),
 			"Could not create a swap chain.");
 

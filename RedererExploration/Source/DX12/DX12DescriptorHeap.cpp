@@ -124,7 +124,7 @@ void DX12::DescriptorHeap::Free(DescriptorHandle& handle)
 		unsigned int index = (handle._cpu.ptr - _mainHandles._cpu.ptr) / _descriptorSize;
 		CRITICAL_ASSERT(index == handle._index, "Called Free for handle whose index is not matching what it got initialised with.");
 
-		const int currentFrame = DX12::GetMainRendererCommand()->GetCurrentFrame();
+		const int currentFrame = DX12::GetMainRendererWorker()->GetCurrentFrame();
 		_deferredResourceFreeing[currentFrame].push_back(index);
 		DX12::SetPendingResourceFreeingFlag();
 	}
@@ -151,7 +151,7 @@ void DX12::DescriptorHeap::ProcessPendingResourceFreeing(const int currentFrame)
 
 	if (currentFrame == DX12::CC::k_forAllFrames)
 	{
-		for (int i = 0; i < DX12::CC::k_commandFrameBuffers; i++)
+		for (int i = 0; i < DX12::CC::k_rendererWorkerFrameBuffers; i++)
 			cleaner(i);
 
 		return;

@@ -23,6 +23,16 @@ namespace DX12::CC::Desc
 		};
 	} // Heap
 
+	namespace CommandQueue
+	{
+		constexpr D3D12_COMMAND_QUEUE_DESC k_baseTemplate{
+			D3D12_COMMAND_LIST_TYPE_NONE,
+			D3D12_COMMAND_QUEUE_PRIORITY_NORMAL,
+			D3D12_COMMAND_QUEUE_FLAG_NONE,
+			0 // NodeMask
+		};
+	}
+
 	namespace RTT
 	{
 		constexpr D3D12_SHADER_RESOURCE_VIEW_DESC k_SRVTemplate {

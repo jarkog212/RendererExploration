@@ -48,7 +48,7 @@ ID3D12PipelineState* GetPipelineState()
 
 ID3D12GraphicsCommandList6* ExampleRenderBuild()
 {
-	ID3D12GraphicsCommandList6* commandList = DX12::GetMainRendererCommand()->GetCommandList();
+	ID3D12GraphicsCommandList6* commandList = DX12::GetMainRendererWorker()->GetCommandList();
 
 	commandList->SetGraphicsRootSignature(GetRootSignature());
 	commandList->SetPipelineState(GetPipelineState());

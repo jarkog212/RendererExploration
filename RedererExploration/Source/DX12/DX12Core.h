@@ -6,7 +6,7 @@
 
 namespace DX12
 {
-	class RendererCommand;
+	class RendererWorker;
 	class RenderSurface;
 	class DescriptorHeap;
 	class RenderPassBase;
@@ -18,9 +18,9 @@ namespace DX12
 	DX12::RenderSurface* GetMainRenderSurface(
 		HWND window = NULL,
 		DXGI_FORMAT format = DX12::CC::k_defaultRenderTargetFormat,
-		DX12::RendererCommand* renderer = nullptr);
+		DX12::RendererWorker* renderer = nullptr);
 
-	DX12::RendererCommand* GetMainRendererCommand();
+	DX12::RendererWorker* GetMainRendererWorker();
 	DX12::DescriptorHeap* GetRTVHeap();
 	DX12::DescriptorHeap* GetDSVHeap();
 	DX12::DescriptorHeap* GetSRVHeap();
@@ -48,7 +48,7 @@ namespace DX12
 	void SubmitPendingBarriers(ID3D12GraphicsCommandList6* commandList);
 
 	bool Initialize(HWND hwnd);
-	void Render(DX12::RendererCommand& rendererCommand);
+	void Render(DX12::RendererWorker& rendererWorker);
 	void Render();
 	void ReleaseAll();
 	void Resize();

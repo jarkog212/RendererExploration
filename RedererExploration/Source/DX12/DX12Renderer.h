@@ -6,15 +6,15 @@
 
 namespace DX12
 {
-	class RendererCommand
+	class RendererWorker
 	{
 	public:
 
-		RendererCommand(D3D12_COMMAND_LIST_TYPE type);
-		~RendererCommand() { DEBUG_DESTRUCTOR_BODY(RendererCommand) Release(); };
+		RendererWorker(D3D12_COMMAND_LIST_TYPE type);
+		~RendererWorker() { DEBUG_DESTRUCTOR_BODY(RendererWorker) Release(); };
 
-		NO_COPY(RendererCommand);
-		NO_MOVE(RendererCommand);
+		NO_COPY(RendererWorker);
+		NO_MOVE(RendererWorker);
 
 		void PreRender();
 		void PostRender();
@@ -33,15 +33,15 @@ namespace DX12
 
 	private:
 
-		class GfxCommandFrame
+		class RendererWorkerFrame
 		{
 		public:
 
-			GfxCommandFrame() = default;
-			~GfxCommandFrame() { DEBUG_DESTRUCTOR_BODY(GfxCommandFrame) Release(); }
+			RendererWorkerFrame() = default;
+			~RendererWorkerFrame() { DEBUG_DESTRUCTOR_BODY(RendererWorkerFrame) Release(); }
 
-			NO_COPY(GfxCommandFrame);
-			NO_MOVE(GfxCommandFrame);
+			NO_COPY(RendererWorkerFrame);
+			NO_MOVE(RendererWorkerFrame);
 
 			bool Setup(D3D12_COMMAND_LIST_TYPE type, int index = -1);
 			void Release();
@@ -49,8 +49,8 @@ namespace DX12
 
 			void WaitForGPU(HANDLE fenceEvent, ID3D12Fence1* fence);
 
-			void IssueFenceValue(int value) { _fenceValue = value; };
-			ID3D12CommandAllocator* GetAllocator() { return _allocator.Get(); };
+			void IssueFenceValue(int value) { _fenceValue = value; }
+			ID3D12CommandAllocator* GetAllocator() { return _allocator.Get(); }
 
 		private:
 
@@ -60,7 +60,7 @@ namespace DX12
 
 		Microsoft::WRL::ComPtr<ID3D12CommandQueue> _commandQueue = nullptr;
 		Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList6> _commandList = nullptr;
-		GfxCommandFrame _frame[DX12::CC::k_commandFrameBuffers];
+		RendererWorkerFrame _frames[DX12::CC::k_rendererWorkerFrameBuffers];
 		Microsoft::WRL::ComPtr<ID3D12Fence1> _fence = nullptr;
 		HANDLE _fenceEvent = 0;
 		unsigned int _currentFrame = 0;

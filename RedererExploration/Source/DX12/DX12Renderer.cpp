@@ -21,11 +21,11 @@ namespace
 
 	namespace DefferedFree
 	{
-		// This should be connected with DX12::RendererCommand - likely inside it.
+		// This should be connected with DX12::RendererWorker- likely inside it.
 
 		static int g_deferredResourceFreeingFlag = 0;
-		static_assert(sizeof(g_deferredResourceFreeingFlag) * sizeof(char) > DX12::CC::k_commandFrameBuffers, "Flag bit-buffer needs to be wide enough for frame buffer count.");
-		static std::vector<IUnknown*> g_deferredCOMReleases[DX12::CC::k_commandFrameBuffers];
+		static_assert(sizeof(g_deferredResourceFreeingFlag) * sizeof(char) > DX12::CC::k_rendererWorkerFrameBuffers, "Flag bit-buffer needs to be wide enough for frame buffer count.");
+		static std::vector<IUnknown*> g_deferredCOMReleases[DX12::CC::k_rendererWorkerFrameBuffers];
 
 		static void FreePendingResources(const int currentFrame = DX12::CC::k_forAllFrames)
 		{
@@ -49,7 +49,7 @@ namespace
 				};
 
 			if (currentFrame == DX12::CC::k_forAllFrames)
-				for (int i = 0; i < DX12::CC::k_commandFrameBuffers; i++)
+				for (int i = 0; i < DX12::CC::k_rendererWorkerFrameBuffers; i++)
 					cleaner(i);
 			else
 				cleaner(currentFrame);
@@ -127,7 +127,7 @@ void UtilsImpl::COM::Release(IUnknown* resource)
 
 void UtilsImpl::COM::DeferredRenderThreadRelease(IUnknown* resource)
 {
-	unsigned int currentFrame = DX12::GetMainRendererCommand()->GetCurrentFrame();
+	unsigned int currentFrame = DX12::GetMainRendererWorker()->GetCurrentFrame();
 	::DefferedFree::g_deferredCOMReleases[currentFrame].push_back(resource);
 	DX12::SetPendingResourceFreeingFlag();
 }
@@ -270,28 +270,34 @@ IDXGIAdapter4* DX12::GetDxgiAdapter()
 DX12::RenderSurface* DX12::GetMainRenderSurface(
 	HWND window,
 	DXGI_FORMAT format,
-	DX12::RendererCommand* rendererCommand)
+	DX12::RendererWorker* rendererWorker)
 {
 	if (::g_mainRenderSurface) [[likely]]
 		return ::g_mainRenderSurface.get();
 
 	CRITICAL_ASSERT(
-		window != NULL && rendererCommand,
+		window != NULL && rendererWorker,
 		"Uninitialized render surface requires legitimate arguments so it can be initialized.");
 
-	::g_mainRenderSurface = std::make_unique<DX12::RenderSurface>(window, format, *rendererCommand);
+	::g_mainRenderSurface = std::make_unique<DX12::RenderSurface>(window, format, *rendererWorker);
 	return ::g_mainRenderSurface.get();
 }
 
-DX12::RendererCommand* DX12::GetMainRendererCommand()
+DX12::RendererWorker* DX12::GetMainRendererWorker()
 {
-	static DX12::RendererCommand instance(D3D12_COMMAND_LIST_TYPE_DIRECT);
+	static DX12::RendererWorker instance(D3D12_COMMAND_LIST_TYPE_DIRECT);
+	return &instance;
+}
+
+DX12::UploadCopyWorker* DX12::GetMainUploadCopyWorker()
+{
+	static DX12::UploadCopyWorker instance;
 	return &instance;
 }
 
 void DX12::SetPendingResourceFreeingFlag()
 {
-	::DefferedFree::g_deferredResourceFreeingFlag |= 1ull << DX12::GetMainRendererCommand()->GetCurrentFrame();
+	::DefferedFree::g_deferredResourceFreeingFlag |= 1ull << DX12::GetMainRendererWorker()->GetCurrentFrame();
 }
 
 bool DX12::TestPendingResourceFreeingFlag(const unsigned int frame)
@@ -354,7 +360,7 @@ void DX12::SubmitPendingBarriers(ID3D12GraphicsCommandList6* commandList)
 bool DX12::Initialize(HWND hwnd)
 {
 	// Things are written lazy-init style mostly (encapsulation purposes),
-	// warmup efectively makes the initialization controlled.
+	// warmup effectively makes the initialization controlled.
 
 	HRESULT_CHECK_FALLBACK(DX12::GetRTVHeap()->GetHeap()->SetName(L"RTV Heap"), , , "Could not name RTV Heap.");
 	HRESULT_CHECK_FALLBACK(DX12::GetDSVHeap()->GetHeap()->SetName(L"DSV Heap"), , , "Could not name DSV Heap.");
@@ -365,6 +371,8 @@ bool DX12::Initialize(HWND hwnd)
 		hwnd,
 		DX12::CC::k_defaultRenderTargetFormat,
 		DX12::GetMainRendererWorker());
+
+	DX12::GetMainUploadCopyWorker();
 
 	::RenderGraph::WarmUp();
 
@@ -435,8 +443,9 @@ void DX12::ReleaseAll()
 			::g_mainRenderSurface.reset();
 
 			DX12::GetMainRendererWorker()->Release();
+			DX12::GetMainUploadCopyWorker()->Release();
 
-			// Render surface containes RTVs that hav ebeen deferred
+			// Render surface containes RTVs that have been deferred
 			::DefferedFree::FreePendingResources(DX12::CC::k_forAllFrames);
 
 			DX12::GetRTVHeap()->Release();
@@ -600,9 +609,9 @@ void DX12::RendererWorker::PostRender()
 	CRITICAL_ASSERT(_linkedSurface, "To present the backbuffers a valid surface is needed.");
 	_linkedSurface->Present();
 
-	_issuableFenceValue++;
-	_frames[_currentFrame].IssueFenceValue(_issuableFenceValue);
-	_commandQueue->Signal(_fence.Get(), _issuableFenceValue);
+	HRESULT_CHECK_CRITICAL(
+		_commandQueue->Signal(_fence.Get(), _frames[_currentFrame].IssueFenceValue(++_issuableFenceValue)),
+		"Could not queue up a render fence signal.");
 
 #ifdef _DEBUG_CPU_GPU_SYNCHRONISED
 	// forced synchronisation
@@ -705,4 +714,179 @@ void DX12::RendererWorker::RendererWorkerFrame::WaitForGPU(HANDLE fenceEvent, ID
 	HRESULT_CHECK_CRITICAL(fence->SetEventOnCompletion(_fenceValue, fenceEvent), "Could not assign fence signal to event handle.");
 
 	WaitForSingleObject(fenceEvent, INFINITE);
+}
+
+DX12::UploadCopyWorker::UploadCopyWorker()
+{
+	const wchar_t* buffer = L"UploadCopy Command Queue";
+	ID3D12Device8* device = DX12::GetRendererDevice();
+
+	for (int i = 0; i < DX12::CC::k_uploadCopyWorkerFrameBuffers; i++)
+		_frames[i].Setup(i);
+
+	D3D12_COMMAND_QUEUE_DESC cq = DX12::CC::Desc::CommandQueue::k_baseTemplate;
+	cq.Type = D3D12_COMMAND_LIST_TYPE_COPY;
+
+	HRESULT_CHECK_FALLBACK(
+		device->CreateCommandQueue(&cq, IID_PPV_ARGS(&_commandQueue)), ,
+		goto _error,
+		"Could not create command queue.");
+
+	HRESULT_CHECK_FALLBACK(_commandQueue->SetName(buffer), , , "Could not set name (%ls) to command buffer.", buffer);
+
+	HRESULT_CHECK_FALLBACK(
+		device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&_fence)), ,
+		goto _error,
+		"Could not create fence.");
+
+	HRESULT_CHECK_FALLBACK(_fence->SetName(L"D3D12 UploadCopy Fence"), , , "Could not set fence name.");
+
+	_fenceEvent = CreateEventEx(nullptr, nullptr, 0, EVENT_ALL_ACCESS);
+	FALLBACK_ASSERT(_fenceEvent, , , "Could not create fence event.");
+
+_error:
+
+	Release();
+}
+
+void DX12::UploadCopyWorker::Release()
+{
+	if (_fence)
+	{
+		for (int i = 0; i < DX12::CC::k_uploadCopyWorkerFrameBuffers; i++)
+		{
+			_frames[i].WaitForGPU(_fenceEvent, _fence.Get());
+			_frames[i].Release();
+		}
+
+		if (_fenceEvent)
+		{
+			CloseHandle(_fenceEvent);
+			_fenceEvent = 0;
+		}
+	}
+
+	_fence.Reset();
+	_commandQueue.Reset();
+	_issuableFenceValue = 0;
+}
+
+unsigned int DX12::UploadCopyWorker::ReserveUploadFrame()
+{
+	std::lock_guard lock(_framesMutex);
+
+	for (int i = 0; i < DX12::CC::k_uploadCopyWorkerFrameBuffers; i++)
+	{
+		if (_frames[i].IsReady())
+		{
+			_frames[i].Reserve();
+			return i;
+		}
+	}
+
+	unsigned int index = 0;
+	for (index; !_frames[index].IsReady(); index = (index + 1) % DX12::CC::k_uploadCopyWorkerFrameBuffers)
+		std::this_thread::yield();
+
+	_frames[index].Reserve();
+	return index;
+}
+
+void DX12::UploadCopyWorker::AssignBuffer(unsigned int index, ID3D12Resource*&& resource)
+{
+	CRITICAL_ASSERT(
+		index > 0 && index < DX12::CC::k_uploadCopyWorkerFrameBuffers,
+		"Out of bounds index for frame to assign upload buffer to.");
+
+	UploadCopyFrame& frame = _frames[index];
+	CRITICAL_ASSERT(frame.IsReserved(), "Trying to assign upload buffer to an unreserved upload frame.");
+
+	frame.AssignBuffer(std::move(resource));
+}
+
+const DX12::UploadCopyWorker::UploadCopyFrame& DX12::UploadCopyWorker::GetFrameConst(unsigned int index)
+{
+	CRITICAL_ASSERT(
+		index > 0 && index < DX12::CC::k_uploadCopyWorkerFrameBuffers,
+		"Out of bounds index for getting resource of an uplaod frame.");
+
+	return _frames[index];
+}
+
+void DX12::UploadCopyWorker::ExecuteCopy(unsigned int frameId)
+{
+	CRITICAL_ASSERT(frameId < DX12::CC::k_uploadCopyWorkerFrameBuffers, "Requesting to queue up an out of bounds upload frame.");
+	
+	DX12::UploadCopyWorker::UploadCopyFrame& frame = _frames[frameId];
+	ID3D12CommandList* commandLists[DX12::CC::k_uploadCopyWorkerFrameBuffers] = {
+		frame.GetCommandList()
+	};
+
+	std::lock_guard lock(_queueMutex);
+	_commandQueue->ExecuteCommandLists(1, commandLists);
+
+	HRESULT_CHECK_CRITICAL(
+		_commandQueue->Signal(_fence.Get(), frame.IssueFenceValue(++_issuableFenceValue)),
+		"Could not queue up a upload copy fence signal.");
+
+	frame.WaitAndResetBuffer(_fenceEvent, _fence.Get());
+}
+
+bool DX12::UploadCopyWorker::UploadCopyFrame::Setup(int index)
+{
+	ID3D12Device8* device = DX12::GetRendererDevice();
+
+	HRESULT_CHECK_FALLBACK(
+		device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_COPY, IID_PPV_ARGS(&_allocator)), ,
+		return false,
+		"Could not create command allocator.");
+
+	wchar_t buffer[250]{};
+	swprintf(buffer, 250, L"CopyUpload Command Allocator %u", index);
+	HRESULT_CHECK_FALLBACK(_allocator->SetName(buffer), , , "Could not set name (%ls) to command buffer.", buffer);
+
+	HRESULT_CHECK_FALLBACK(
+		device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_COPY, _allocator.Get(), nullptr, IID_PPV_ARGS(&_commandList)), ,
+		return false,
+		"Could not create command list.");
+
+	HRESULT_CHECK_CRITICAL(_commandList->Close(), "Could not Close() new command list");
+
+	memset(buffer, '\0', sizeof(buffer));
+	swprintf(buffer, 250, L"CopyUpload Command List %u", index);
+	HRESULT_CHECK_FALLBACK(_commandList->SetName(buffer), , , "Could not set name (%ls) to command buffer.", buffer);
+
+	return true;
+}
+
+void DX12::UploadCopyWorker::UploadCopyFrame::Release()
+{
+	_uploadBuffer.Reset();
+	_allocator.Reset();
+	_commandList.Reset();
+	_reserved = false;
+}
+
+void DX12::UploadCopyWorker::UploadCopyFrame::WaitForGPU(HANDLE fenceEvent, ID3D12Fence1* fence)
+{
+	assert(fenceEvent && fence);
+
+	if (fence->GetCompletedValue() >= _fenceValue) [[likely]]
+		return;
+
+	HRESULT_CHECK_CRITICAL(fence->SetEventOnCompletion(_fenceValue, fenceEvent), "Could not assign fence signal to event handle.");
+
+	WaitForSingleObject(fenceEvent, INFINITE);
+}
+
+void DX12::UploadCopyWorker::UploadCopyFrame::WaitAndResetBuffer(HANDLE fenceEvent, ID3D12Fence1* fence)
+{
+	WaitForGPU(fenceEvent, fence);
+	_uploadBuffer.Reset();
+	_reserved = false;
+}
+
+void DX12::UploadCopyWorker::UploadCopyFrame::AssignBuffer(ID3D12Resource*&& resource)
+{
+	_uploadBuffer.Attach(std::exchange(resource, nullptr));
 }

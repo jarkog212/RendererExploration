@@ -4,6 +4,8 @@
 #include "DX12Core.h"
 #include "Utils.h"
 
+#include <mutex>
+
 namespace DX12
 {
 	class RendererWorker
@@ -49,8 +51,9 @@ namespace DX12
 
 			void WaitForGPU(HANDLE fenceEvent, ID3D12Fence1* fence);
 
-			void IssueFenceValue(int value) { _fenceValue = value; }
+			int IssueFenceValue(int value) { return _fenceValue = value; }
 			ID3D12CommandAllocator* GetAllocator() { return _allocator.Get(); }
+
 
 		private:
 
@@ -66,5 +69,67 @@ namespace DX12
 		unsigned int _currentFrame = 0;
 		unsigned int _issuableFenceValue = 0;
 		DX12::RenderSurface* _linkedSurface = nullptr; //non-owning
+	};
+
+	class UploadCopyWorker
+	{
+	public:
+	
+		class UploadCopyFrame
+		{
+		public:
+
+			UploadCopyFrame() = default;
+			~UploadCopyFrame() { DEBUG_DESTRUCTOR_BODY(UploadCopyFrame) Release(); }
+
+			NO_COPY(UploadCopyFrame);
+			NO_MOVE(UploadCopyFrame);
+
+			bool Setup(int index);
+			void Release();
+			void WaitForGPU(HANDLE fenceEvent, ID3D12Fence1* fence);
+			void WaitAndResetBuffer(HANDLE fenceEvent, ID3D12Fence1* fence);
+
+			bool IsReady() const { return !_reserved && _uploadBuffer == nullptr; }
+			bool IsReserved() const { return _reserved; }
+
+			int IssueFenceValue(int value) { return _fenceValue = value; }
+			ID3D12CommandAllocator* GetAllocator() const { return _allocator.Get(); }
+			ID3D12GraphicsCommandList6* GetCommandList() const { return _commandList.Get(); }
+			ID3D12Resource* GetResource() const { return _uploadBuffer.Get(); }
+			void Reserve() { _reserved = true; }
+			void AssignBuffer(ID3D12Resource*&& resource);
+
+		private:
+
+			Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList6> _commandList = nullptr;
+			Microsoft::WRL::ComPtr<ID3D12CommandAllocator> _allocator = nullptr;
+			Microsoft::WRL::ComPtr<ID3D12Resource> _uploadBuffer = nullptr;
+			unsigned int _fenceValue = 0;
+			bool _reserved = false;
+		};
+
+		UploadCopyWorker();
+		~UploadCopyWorker() { DEBUG_DESTRUCTOR_BODY(UploadCopyWorker); Release(); }
+
+		NO_COPY(UploadCopyWorker);
+		NO_MOVE(UploadCopyWorker);
+
+		void Release();
+		unsigned int ReserveUploadFrame();
+		void AssignBuffer(unsigned int index, ID3D12Resource*&& resource);
+		const UploadCopyFrame& GetFrameConst(unsigned int index);
+		void ExecuteCopy(unsigned int frameId);
+
+
+	private:
+
+		Microsoft::WRL::ComPtr<ID3D12CommandQueue> _commandQueue = nullptr;
+		UploadCopyFrame _frames[DX12::CC::k_uploadCopyWorkerFrameBuffers];
+		Microsoft::WRL::ComPtr<ID3D12Fence1> _fence = nullptr;
+		unsigned int _issuableFenceValue = 0;
+		HANDLE _fenceEvent = 0;
+		std::mutex _framesMutex;
+		std::mutex _queueMutex;
 	};
 };

@@ -53,7 +53,7 @@
     <ClCompile Include="Source\DX12\DX12MandelbrotPass.cpp">
       <Filter>Source Files\DX12</Filter>
     </ClCompile>
-    <ClCompile Include="Source\DX12\DX12UploadContext.cpp">
+    <ClCompile Include="Source\DX12\DX12UploadRequest.cpp">
       <Filter>Source Files\DX12</Filter>
     </ClCompile>
   </ItemGroup>
@@ -112,7 +112,7 @@
     <ClInclude Include="Source\DX12\DX12MandelbrotPass.h">
       <Filter>Source Files\DX12</Filter>
     </ClInclude>
-    <ClInclude Include="Source\DX12\DX12UploadContext.h">
+    <ClInclude Include="Source\DX12\DX12UploadRequest.h">
       <Filter>Source Files\DX12</Filter>
     </ClInclude>
   </ItemGroup>

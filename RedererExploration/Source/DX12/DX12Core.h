@@ -7,6 +7,7 @@
 namespace DX12
 {
 	class RendererWorker;
+	class UploadCopyWorker;
 	class RenderSurface;
 	class DescriptorHeap;
 	class RenderPassBase;
@@ -21,6 +22,7 @@ namespace DX12
 		DX12::RendererWorker* renderer = nullptr);
 
 	DX12::RendererWorker* GetMainRendererWorker();
+	DX12::UploadCopyWorker* GetMainUploadCopyWorker();
 	DX12::DescriptorHeap* GetRTVHeap();
 	DX12::DescriptorHeap* GetDSVHeap();
 	DX12::DescriptorHeap* GetSRVHeap();

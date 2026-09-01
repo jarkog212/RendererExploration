@@ -162,4 +162,20 @@ namespace Utils
 	{
 		return UtilsImpl::GetFps();
 	}
+
+	template<unsigned long long int alignement>
+	inline unsigned long long int AlignSizeUp(unsigned long long int size)
+	{
+		constexpr unsigned long long int mask(alignement - 1);
+		CRITICAL_ASSERT(!(alignement & mask)); // alignement is power of 2
+		return (size + mask) & ~mask;
+	}
+
+	template<unsigned long long int alignement>
+	inline unsigned long long int AlignSizeDown(unsigned long long int size)
+	{
+		constexpr unsigned long long int mask(alignement - 1);
+		CRITICAL_ASSERT(!(alignement & mask)); // alignement is power of 2
+		return size & ~mask;
+	}
 } // Utils

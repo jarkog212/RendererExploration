@@ -32,6 +32,18 @@ namespace DX12::Helpers
 		}
 	}
 
+	enum class ConverterSupportedTopologies : unsigned int
+	{
+		Unknown = 0U,
+		PointList = D3D_PRIMITIVE_TOPOLOGY::D3D_PRIMITIVE_TOPOLOGY_POINTLIST,
+		LineList = D3D_PRIMITIVE_TOPOLOGY::D3D_PRIMITIVE_TOPOLOGY_LINELIST,
+		LineStrip = D3D_PRIMITIVE_TOPOLOGY::D3D_PRIMITIVE_TOPOLOGY_LINESTRIP,
+		TriengleList = D3D_PRIMITIVE_TOPOLOGY::D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST,
+		TriangleStrip = D3D_PRIMITIVE_TOPOLOGY::D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP,
+
+		Count = 6U, // expected use with '<' not '<='
+	};
+
 	// Max mem 64 DWORDS:
 	// descriptor table = 1 DWORD
 	// root constants = 1 DWORD (per constant)

@@ -20,7 +20,7 @@ namespace DX12
 	{
 	public:
 
-		GPUUploadRequest(unsigned int alignedSize, const void* data, UploadCopyWorker& uploadCopyWorker);
+		GPUUploadRequest(unsigned int alignedSize, const void* data, UploadCopyWorker& uploadCopyWorker = *DX12::GetMainUploadCopyWorker());
 		DEBUG_DESTRUCTOR(GPUUploadRequest);
 
 		NO_COPY(GPUUploadRequest);

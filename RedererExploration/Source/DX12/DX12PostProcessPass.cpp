@@ -74,8 +74,8 @@ ID3D12PipelineState* DX12::PostProcessSpace::GetPipelineState()
 	using namespace DX12::PipelineStream;
 	struct {
 		SubRootSignature _rs{ DX12::PostProcessSpace::GetRootSignature() };
-		SubVertexShader _vs{ DX12::Shaders::GetGenericShader(DX12::Shaders::GenericShader::FullscreenTri_VS) };
-		SubPixelShader _ps{ DX12::Shaders::GetGenericShader(DX12::Shaders::GenericShader::PostProcess_PS) };
+		SubVertexShader _vs{ DX12::Shaders::GetGenericShader(DX12::Shaders::GenericShader::Type::FullscreenTri_VS) };
+		SubPixelShader _ps{ DX12::Shaders::GetGenericShader(DX12::Shaders::GenericShader::Type::PostProcess_PS) };
 		SubPrimitiveTopology _primitiveTopoliogy{ D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE };
 		SubRenderTargetFormats _renderTargetFormats{};
 		SubRasterizer _rasterizer{ DX12::CC::Desc::Rasterizer::k_noCullTemplate };

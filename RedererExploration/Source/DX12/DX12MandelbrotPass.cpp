@@ -33,7 +33,7 @@ namespace
 	constexpr DX12::Shaders::ShaderSpecs k_mandelbrotShaderSpecs{
 		L"Mandelbrot",
 		L"Mandelbrot",
-		DX12::Shaders::GenericShader::NotGeneric,
+		DX12::Shaders::GenericShader::Type::NotGeneric,
 		DX12::Shaders::Stage::Pixel
 	};
 }
@@ -83,7 +83,7 @@ ID3D12PipelineState* DX12::MandelbrotSpace::GetPipelineState()
 	using namespace DX12::PipelineStream;
 	struct {
 		SubRootSignature _rs{ DX12::MandelbrotSpace::GetRootSignature() };
-		SubVertexShader _vs{ DX12::Shaders::GetGenericShader(DX12::Shaders::GenericShader::FullscreenTri_VS) };
+		SubVertexShader _vs{ DX12::Shaders::GetGenericShader(DX12::Shaders::GenericShader::Type::FullscreenTri_VS) };
 		SubPixelShader _ps{ DX12::Shaders::GetShader(::k_mandelbrotShaderSpecs)};
 		SubPrimitiveTopology _primitiveTopoliogy{ D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE };
 		SubRenderTargetFormats _renderTargetFormats{};

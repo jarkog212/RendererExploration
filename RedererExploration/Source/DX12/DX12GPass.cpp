@@ -88,8 +88,8 @@ ID3D12PipelineState* DX12::GPassSpace::GetPipelineState()
 	using namespace DX12::PipelineStream;
 	struct {	
 		SubRootSignature _rs{ DX12::GPassSpace::GetRootSignature() };
-		SubVertexShader _vs{ DX12::Shaders::GetGenericShader(DX12::Shaders::GenericShader::FullscreenTri_VS) };
-		SubPixelShader _ps{DX12::Shaders::GetGenericShader(DX12::Shaders::GenericShader::FillColor_PS) };
+		SubVertexShader _vs{ DX12::Shaders::GetGenericShader(DX12::Shaders::GenericShader::Type::FullscreenTri_VS) };
+		SubPixelShader _ps{DX12::Shaders::GetGenericShader(DX12::Shaders::GenericShader::Type::FillColor_PS) };
 		SubPrimitiveTopology _primitiveTopoliogy{ D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE };
 		SubRenderTargetFormats _renderTargetFormats{};
 		SubDepthStencilFormat _depthStencilFormat{ DX12::CC::Desc::GPassRes::k_depthTextureTemplate.Format };
@@ -108,7 +108,7 @@ ID3D12PipelineState* DX12::GPassSpace::GetPipelineState()
 	return ::g_GPassPipelineState.Get();
 }
 
-DX12::DepthPass* DX12::GPassSpace::GetDepthPass(DX12::Math::Vector2u32 initSize)
+DX12::DepthPass* DX12::GPassSpace::GetDepthPass(DirectX::XMUINT2 initSize)
 {
 	if (::g_DepthPass) [[likely]]
 		return ::g_DepthPass.get();
@@ -117,7 +117,7 @@ DX12::DepthPass* DX12::GPassSpace::GetDepthPass(DX12::Math::Vector2u32 initSize)
 	return ::g_DepthPass.get();
 }
 
-DX12::GPassRT* DX12::GPassSpace::GetGPassRTPass(DX12::Math::Vector2u32 initSize)
+DX12::GPassRT* DX12::GPassSpace::GetGPassRTPass(DirectX::XMUINT2  initSize)
 {
 	if (::g_GPassRTPass) [[likely]]
 		return ::g_GPassRTPass.get();
@@ -146,13 +146,13 @@ DX12::RenderPassBase* DX12::GPassSpace::GetTailNode()
 	return DX12::GPassSpace::GetGPassRTPass();
 }
 
-void DX12::GPassSpace::SetDimensions(const DX12::Math::Vector2u32& size)
+void DX12::GPassSpace::SetDimensions(const DirectX::XMUINT2& size)
 {
 	DX12::GPassSpace::GetDepthPass()->SetDimensions(size);
 	DX12::GPassSpace::GetGPassRTPass()->SetDimensions(size);
 }
 
-DX12::DepthPass DX12::DepthPass::Create(const DX12::Math::Vector2u32& size)
+DX12::DepthPass DX12::DepthPass::Create(const DirectX::XMUINT2& size)
 {
 	return DepthPass(DX12::DepthPass::CreateDepthBuffer(size));
 }
@@ -208,23 +208,23 @@ void DX12::DepthPass::PostPassResourceBarriers()
 	DX12::PendingTransitionResourceBarrier(_depthBuffer.GetResource(), k_depthWriteOnly, k_depthReadOnly);
 }
 
-void DX12::DepthPass::SetDimensions(const DX12::Math::Vector2u32& dimensions)
+void DX12::DepthPass::SetDimensions(const DirectX::XMUINT2& dimensions)
 {
-	DX12::Math::Vector2u32 newDimensions = dimensions;
-	if (dimensions.X() > _dimensions.X() || dimensions.Y() > _dimensions.Y())
+	DirectX::XMUINT2 newDimensions = dimensions;
+	if (dimensions.x > _dimensions.x || dimensions.y > _dimensions.y)
 	{
-		newDimensions = { std::max(dimensions.X(), _dimensions.X()), std::max(dimensions.Y(), _dimensions.Y()) };
+		newDimensions = { std::max(dimensions.x, _dimensions.x), std::max(dimensions.y, _dimensions.y) };
 		_depthBuffer = DX12::DepthPass::CreateDepthBuffer(newDimensions);
 	}
 
 	_dimensions = newDimensions;
 }
 
-DX12::DepthBufferTexture DX12::DepthPass::CreateDepthBuffer(const DX12::Math::Vector2u32& size)
+DX12::DepthBufferTexture DX12::DepthPass::CreateDepthBuffer(const DirectX::XMUINT2& size)
 {
 	D3D12_RESOURCE_DESC desc = DX12::CC::Desc::GPassRes::k_depthTextureTemplate;
-	desc.Width = size.X();
-	desc.Height = size.Y();
+	desc.Width = size.x;
+	desc.Height = size.y;
 
 	DX12::TextureSpecs specs;
 	specs._resourceDesc = &desc;
@@ -239,7 +239,7 @@ DX12::DepthBufferTexture DX12::DepthPass::CreateDepthBuffer(const DX12::Math::Ve
 	return DX12::DepthBufferTexture::Create(specs);
 }
 
-DX12::GPassRT DX12::GPassRT::Create(const DX12::Math::Vector2u32& size)
+DX12::GPassRT DX12::GPassRT::Create(const DirectX::XMUINT2& size)
 {
 	return DX12::GPassRT(DX12::GPassRT::CreateRenderTarget(size));
 }
@@ -307,23 +307,23 @@ void DX12::GPassRT::PostPassResourceBarriers()
 		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 }
 
-void DX12::GPassRT::SetDimensions(const DX12::Math::Vector2u32& dimensions)
+void DX12::GPassRT::SetDimensions(const DirectX::XMUINT2& dimensions)
 {
-	DX12::Math::Vector2u32 newDimensions = dimensions;
-	if (dimensions.X() > _dimensions.X() || dimensions.Y() > _dimensions.Y())
+	DirectX::XMUINT2 newDimensions = dimensions;
+	if (dimensions.x > _dimensions.x || dimensions.y > _dimensions.y)
 	{
-		newDimensions = { std::max(dimensions.X(), _dimensions.X()), std::max(dimensions.Y(), _dimensions.Y()) };
+		newDimensions = { std::max(dimensions.x, _dimensions.x), std::max(dimensions.y, _dimensions.y) };
 		_mainBuffer = DX12::GPassRT::CreateRenderTarget(newDimensions);
 	}
 
 	_dimensions = newDimensions;
 }
 
-DX12::RenderTargetTexture DX12::GPassRT::CreateRenderTarget(const DX12::Math::Vector2u32& size)
+DX12::RenderTargetTexture DX12::GPassRT::CreateRenderTarget(const DirectX::XMUINT2& size)
 {
 	D3D12_RESOURCE_DESC desc = DX12::CC::Desc::GPassRes::k_mainTextureTemplate;
-	desc.Width = size.X();
-	desc.Height = size.Y();
+	desc.Width = size.x;
+	desc.Height = size.y;
 
 	DX12::TextureSpecs specs;
 	specs._resourceDesc = &desc;

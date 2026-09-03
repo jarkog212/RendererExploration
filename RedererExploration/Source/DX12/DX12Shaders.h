@@ -7,7 +7,7 @@
 
 namespace DX12::Shaders
 {
-	enum Stage 
+	enum class Stage 
 	{
 		Vertex = 0,
 		Hull,
@@ -45,7 +45,7 @@ namespace DX12::Shaders
 
 	struct GenericShader
 	{
-		enum Type : unsigned int
+		enum class Type : unsigned int
 		{
 			FullscreenTri_VS = 0,
 			FillColor_PS,

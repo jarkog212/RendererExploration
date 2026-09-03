@@ -24,7 +24,7 @@ namespace DX12::Meshes
         * note indexSize is dependent on the number of indeces (either 16 or 32 bytes)
     */
 
-    struct StreamHeader {
+    struct MeshStreamHeader {
         unsigned int _elementSize;
         unsigned int _vertexCount;
         unsigned int _indexCount;

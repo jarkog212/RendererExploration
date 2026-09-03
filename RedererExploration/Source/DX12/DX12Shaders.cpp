@@ -32,7 +32,7 @@ namespace
 			L"as_6_5",
 			L"ms_6_5"
 		};
-		static_assert(_countof(k_shaderStageNames) == DX12::Shaders::Stage::Count, "Number of names does not match count of shader stages.");
+		static_assert(_countof(k_shaderStageNames) == (int)DX12::Shaders::Stage::Count, "Number of names does not match count of shader stages.");
 
 		IDxcBlob* CompileShader(const DX12::Shaders::ShaderSpecs& spec)
 		{
@@ -126,16 +126,16 @@ namespace
 		{L"FillColor", L"FillColor", DX12::Shaders::GenericShader::Type::FillColor_PS, DX12::Shaders::Stage::Pixel},
 		{L"PostProcess", L"PostProcess", DX12::Shaders::GenericShader::Type::PostProcess_PS, DX12::Shaders::Stage::Pixel},
 	};
-	static_assert(_countof(k_genericShaderSpecs) == DX12::Shaders::GenericShader::Type::Count, "Missing file specification of at least one generic shader.");
+	static_assert(_countof(k_genericShaderSpecs) == (int)DX12::Shaders::GenericShader::Type::Count, "Missing file specification of at least one generic shader.");
 
 	static std::unordered_map<const wchar_t* ,DX12::Shaders::Shader> g_shaders;
 
 	unsigned long long int CompileAndSaveGenericShaders() 
 	{
 		unsigned long long int shaderHeapSize = 0;
-		Microsoft::WRL::ComPtr<IDxcBlob> blobs[DX12::Shaders::GenericShader::Type::Count];
+		Microsoft::WRL::ComPtr<IDxcBlob> blobs[(int)DX12::Shaders::GenericShader::Type::Count];
 
-		for (int i = 0; i < DX12::Shaders::GenericShader::Count; i++)
+		for (int i = 0; i < (int)DX12::Shaders::GenericShader::Type::Count; i++)
 		{	
 			IDxcBlob* blob = ::Compiler::CompileShader(k_genericShaderSpecs[i]);
 			shaderHeapSize += blob->GetBufferSize() + DX12::Shaders::ShaderView::_k_headerSize;
@@ -144,7 +144,7 @@ namespace
 
 		g_genericShadersArena = std::make_unique<char[]>(shaderHeapSize);
 		unsigned long long int offset = 0;
-		for (int i = 0; i < DX12::Shaders::GenericShader::Count; i++)
+		for (int i = 0; i < (int)DX12::Shaders::GenericShader::Type::Count; i++)
 		{
 			unsigned long long int size = blobs[i]->GetBufferSize();
 			memcpy((void*)(&g_genericShadersArena[offset]), &size, DX12::Shaders::ShaderView::_k_headerSize);
@@ -185,7 +185,7 @@ namespace
 
 		CRITICAL_ASSERT(g_genericShadersArena && shaderHeapSize > 0, "Failed to load or compile generic shaders or allocate shader heap.");
 
-		g_genericShaderViews = std::make_unique<DX12::Shaders::GenericShader[]>(DX12::Shaders::GenericShader::Count);
+		g_genericShaderViews = std::make_unique<DX12::Shaders::GenericShader[]>((int)DX12::Shaders::GenericShader::Type::Count);
 
 		unsigned long long int offset = 0;
 
@@ -254,7 +254,7 @@ D3D12_SHADER_BYTECODE DX12::Shaders::GetGenericShader(DX12::Shaders::GenericShad
 {
 	if (g_genericShaderViews) [[likely]]
 	{
-		const DX12::Shaders::ShaderView& shader = g_genericShaderViews[type]._shader;
+		const DX12::Shaders::ShaderView& shader = g_genericShaderViews[(int)type]._shader;
 		D3D12_SHADER_BYTECODE out;
 		out.BytecodeLength = shader._size;
 		out.pShaderBytecode = shader._byteCode;

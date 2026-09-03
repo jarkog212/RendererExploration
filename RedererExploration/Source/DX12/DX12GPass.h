@@ -3,11 +3,12 @@
 #include "DX12Resources.h"
 #include "DX12RenderTargetTexture.h"
 #include "DX12DepthBufferTexture.h"
-#include "DX12Math.h"
+
+#include "DirectXMath.h"
 
 namespace 
 {
-	static const DX12::Math::Vector2u32 k_defaultDimensions = { 100,100 };
+	static const DirectX::XMUINT2 k_defaultDimensions = { 100,100 };
 }
 
 namespace DX12
@@ -23,20 +24,20 @@ namespace DX12
 		ID3D12RootSignature* GetRootSignature();
 		ID3D12PipelineState* GetPipelineState();
 
-		DepthPass* GetDepthPass(DX12::Math::Vector2u32 size = ::k_defaultDimensions);
-		GPassRT* GetGPassRTPass(DX12::Math::Vector2u32 size = ::k_defaultDimensions);
+		DepthPass* GetDepthPass(DirectX::XMUINT2 size = ::k_defaultDimensions);
+		GPassRT* GetGPassRTPass(DirectX::XMUINT2 size = ::k_defaultDimensions);
 
 		RenderPassBase* GetHeadNode();
 		RenderPassBase* GetTailNode();
 
-		void SetDimensions(const DX12::Math::Vector2u32& size);
+		void SetDimensions(const DirectX::XMUINT2& size);
 	}
 
 	class DepthPass : public RenderPassBase
 	{
 	public:
 
-		static DepthPass Create(const DX12::Math::Vector2u32& size);
+		static DepthPass Create(const DirectX::XMUINT2& size);
 
 		DepthPass(DX12::DepthBufferTexture&& depthBuffer);
 		DEBUG_DESTRUCTOR(DepthPass);
@@ -50,21 +51,21 @@ namespace DX12
 		void PostPassResourceBarriers() final override;
 
 		const DX12::DepthBufferTexture* GetDepthBuffer() const { return &_depthBuffer; }
-		void SetDimensions(const DX12::Math::Vector2u32& dimensions);
+		void SetDimensions(const DirectX::XMUINT2& dimensions);
 
 	private:
 
 		DX12::DepthBufferTexture _depthBuffer;
-		DX12::Math::Vector2u32 _dimensions = ::k_defaultDimensions;
+		DirectX::XMUINT2 _dimensions = ::k_defaultDimensions;
 
-		static DX12::DepthBufferTexture CreateDepthBuffer(const DX12::Math::Vector2u32& size);
+		static DX12::DepthBufferTexture CreateDepthBuffer(const DirectX::XMUINT2& size);
 	};
 
 	class GPassRT : public RenderPassBase
 	{
 	public:
 
-		static GPassRT Create(const DX12::Math::Vector2u32& size);
+		static GPassRT Create(const DirectX::XMUINT2& size);
 
 		GPassRT(DX12::RenderTargetTexture&& mainBuffer);
 		DEBUG_DESTRUCTOR(GPassRT);
@@ -79,15 +80,15 @@ namespace DX12
 
 		void LinkDepthPass(const DX12::DepthPass* pass) { _linkToDepthPass = pass; }
 		void UnlinkDepthPass() { _linkToDepthPass = nullptr; }
-		void SetDimensions(const DX12::Math::Vector2u32& dimensions);
+		void SetDimensions(const DirectX::XMUINT2& dimensions);
 		DX12::DescriptorHandleView GetMainBufferHandleView() const { return _mainBuffer.GetSRVHandle(); }
 
 	private:
 
 		const DX12::DepthPass* _linkToDepthPass = nullptr; //non-owning
 		DX12::RenderTargetTexture _mainBuffer;
-		DX12::Math::Vector2u32 _dimensions = ::k_defaultDimensions;
+		DirectX::XMUINT2 _dimensions = ::k_defaultDimensions;
 
-		static DX12::RenderTargetTexture CreateRenderTarget(const DX12::Math::Vector2u32& size);
+		static DX12::RenderTargetTexture CreateRenderTarget(const DirectX::XMUINT2& size);
 	};
 }

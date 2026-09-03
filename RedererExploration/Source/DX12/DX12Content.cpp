@@ -1,6 +1,7 @@
 #include "DX12Content.h"
-#include "DX12Math.h"
 #include "DX12UploadRequest.h"
+
+#include "DirectXMath.h"
 
 #include <map>
 #include <mutex>
@@ -52,13 +53,13 @@ namespace
 int DX12::Meshes::Add(const void* stream, unsigned long long& consumedBytes)
 {
 	const char* byteStream = reinterpret_cast<const char*>(stream);
-	const DX12::Meshes::StreamHeader* header = reinterpret_cast<const DX12::Meshes::StreamHeader*>(stream);
+	const DX12::Meshes::MeshStreamHeader* header = reinterpret_cast<const DX12::Meshes::MeshStreamHeader*>(stream);
 
-	constexpr unsigned int headerSize = sizeof(StreamHeader);
+	constexpr unsigned int headerSize = sizeof(MeshStreamHeader);
 	constexpr unsigned int alignment = D3D12_RAW_UAV_SRV_BYTE_ALIGNMENT;
 
 	const unsigned int indexSize = header->_vertexCount < (1 << 16) ? sizeof(unsigned short) : sizeof(unsigned int);
-	const unsigned int positionBuffferSize = header->_vertexCount * sizeof(DX12::Math::Vector3f);
+	const unsigned int positionBuffferSize = header->_vertexCount * sizeof(DirectX::XMFLOAT3);
 	const unsigned int alignedPositionBuffferSize = Utils::AlignSizeUp<alignment>(positionBuffferSize);
 	const unsigned int elementBufferSize = header->_elementSize * header->_vertexCount;
 	const unsigned int alignedElementBufferSize = Utils::AlignSizeUp<alignment>(elementBufferSize);
@@ -91,7 +92,7 @@ int DX12::Meshes::Add(const void* stream, unsigned long long& consumedBytes)
 
 		meshData._positionView._positionView.BufferLocation = resource->GetGPUVirtualAddress();
 		meshData._positionView._positionView.SizeInBytes = positionBuffferSize;
-		meshData._positionView._positionView.StrideInBytes = sizeof(DX12::Math::Vector3f);
+		meshData._positionView._positionView.StrideInBytes = sizeof(DirectX::XMFLOAT3);
 		meshData._positionView._indexView.BufferLocation = resource->GetGPUVirtualAddress() + alignedPositionBuffferSize + alignedElementBufferSize;
 		meshData._positionView._indexView.Format = indexSize == sizeof(unsigned short) ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT;
 		meshData._positionView._indexView.SizeInBytes = indexBufferSize;

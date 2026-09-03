@@ -387,10 +387,10 @@ void DX12::Render(DX12::RendererWorker& rendererWorker)
 	ID3D12GraphicsCommandList6* commandList = rendererWorker.GetCommandList();
 
 #ifdef _DEBUG
-	// HUGE ASSUMPTION!!! THE CURRENT DEFERRED CLEANUP ASSUMES ONLY ONE RENDERER COMMAND
+	// HUGE ASSUMPTION!!! THE CURRENT DEFERRED CLEANUP ASSUMES ONLY ONE RENDERER WORKER
 	// USING ANOTHER ONE WILL WREAK HAVOC ONTO HELD RESOURCES
-	// MOVING COM POINTER RELEASES IS SIMPLE ENOUGH: MOVE THEIR PENDING RELASE MANAGEMENT INTO THE RENDERER COMMAND OBJECT.
-	// MOVING HEAP RELEASES REQUIRES A BIT MORE WORK IN HEAPS TO SOMEHOW LET THEM KNOW HANDLES BEING USED BY WHICH COMMAND.
+	// MOVING COM POINTER RELEASES IS SIMPLE ENOUGH: MOVE THEIR PENDING RELASE MANAGEMENT INTO THE RENDERER WORKER OBJECT.
+	// MOVING HEAP RELEASES REQUIRES A BIT MORE WORK IN HEAPS TO SOMEHOW LET THEM KNOW HANDLES BEING USED BY WHICH WORKER.
 	static DX12::RendererWorker* mainCommand = DX12::GetMainRendererWorker();
 	CRITICAL_ASSERT(&rendererWorker == mainCommand, "You're about to start freeing resources which may be protected. Currently only ONE (Main) render command is supported.");
 #endif
@@ -401,7 +401,7 @@ void DX12::Render(DX12::RendererWorker& rendererWorker)
 
 	DX12::RenderSurface* surface = rendererWorker.GetLinkedSurface();
 	CRITICAL_ASSERT(surface, "To render a renderer command, a valid surface that is linked to it is needed.")
-	DX12::Math::Vector2u32 size{ surface->GetWidth(), surface->GetHeight() };
+	DirectX::XMUINT2 size{ surface->GetWidth(), surface->GetHeight() };
 	DX12::GPassSpace::SetDimensions(size);
 
 	DX12::PendingTransitionResourceBarrier(

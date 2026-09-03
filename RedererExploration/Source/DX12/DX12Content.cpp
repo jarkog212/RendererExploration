@@ -52,6 +52,8 @@ namespace
 
 int DX12::Meshes::Add(const void* stream, unsigned long long& consumedBytes)
 {
+	CRITICAL_ASSERT(stream, "Invalid mesh stream.");
+
 	const char* byteStream = reinterpret_cast<const char*>(stream);
 	const DX12::Meshes::MeshStreamHeader* header = reinterpret_cast<const DX12::Meshes::MeshStreamHeader*>(stream);
 
@@ -76,9 +78,8 @@ int DX12::Meshes::Add(const void* stream, unsigned long long& consumedBytes)
 		"Stream contains a mesh with unsupported topology.");
 
 	ID3D12Resource* resource = DX12::UploadDataToGPU(byteStream + headerSize, totalBufferSize);
-
-	MeshData* meshData = nullptr;
 	int meshCollectionIndex = -1;
+
 	{
 		std::lock_guard lock(::g_mutex);
 
@@ -116,4 +117,19 @@ void DX12::Meshes::Remove(unsigned int index)
 	std::lock_guard lock(::g_mutex);
 	::g_IDPool[--::g_currentIDPoolIndex] = index;
 	::g_MeshDataCollection[index].Release();
+}
+
+void DX12::Meshes::WarmUp()
+{
+	::BatchResizeMeshDataCollection();
+}
+
+void DX12::Meshes::Release()
+{
+	for (auto& it : ::g_MeshDataCollection)
+		it.Release();
+
+	::g_MeshDataCollection.clear();
+	::g_IDPool.clear();
+	::g_currentIDPoolIndex = 0;
 }

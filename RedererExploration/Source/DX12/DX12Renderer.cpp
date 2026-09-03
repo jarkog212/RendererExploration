@@ -6,6 +6,7 @@
 #include "DX12PostProcessPass.h"
 #include "DX12MandelbrotPass.h"
 #include "DX12Utils.h"
+#include "DX12Content.h"
 
 #include <string>
 #include <format>
@@ -375,6 +376,7 @@ bool DX12::Initialize(HWND hwnd)
 	DX12::GetMainUploadCopyWorker();
 
 	::RenderGraph::WarmUp();
+	::DX12::Meshes::WarmUp();
 
 	return true;
 }
@@ -452,6 +454,8 @@ void DX12::ReleaseAll()
 			DX12::GetDSVHeap()->Release();
 			DX12::GetSRVHeap()->Release();
 			DX12::GetUAVHeap()->Release();
+
+			DX12::Meshes::Release();
 
 			// Heap releases add to the deferred pile
 			::DefferedFree::FreePendingResources(DX12::CC::k_forAllFrames);

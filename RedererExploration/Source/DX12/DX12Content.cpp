@@ -2,31 +2,54 @@
 #include "DX12Math.h"
 #include "DX12UploadRequest.h"
 
+#include <map>
 #include <mutex>
 
 namespace
 {
-	struct PositionView 
+	struct MeshData
 	{
-		D3D12_VERTEX_BUFFER_VIEW _positionView;
-		D3D12_INDEX_BUFFER_VIEW _indexView;
+		ID3D12Resource* _resource = nullptr; //non-owning, deferred release;
+
+		struct PositionView
+		{
+			D3D12_VERTEX_BUFFER_VIEW _positionView;
+			D3D12_INDEX_BUFFER_VIEW _indexView;
+		}_positionView;
+
+		struct ElementView
+		{
+			D3D12_VERTEX_BUFFER_VIEW _vertexView;
+			unsigned int _elementtype;
+			D3D_PRIMITIVE_TOPOLOGY _topology;
+
+		}_elementsView;
+
+		void Release() 
+		{
+			Utils::COM::SafeDeferredRenderThreadRelease(_resource);
+			*this = {};
+		}
 	};
 
-	struct ElementView
-	{
-		D3D12_VERTEX_BUFFER_VIEW _vertexView;
-		unsigned int _elementtype;
-		D3D_PRIMITIVE_TOPOLOGY _topology;
-	};
+	std::vector<MeshData> g_MeshDataCollection;
+	std::vector<int> g_IDPool;
+	unsigned int g_currentIDPoolIndex = 0;
 
 	// the following vectors are expected to have parity (i.e. same size and correlating indeces)
-	std::vector<ID3D12Resource*> g_submeshResources; //non-owning, deferred release;
-	std::vector<PositionView> g_positionViews;
-	std::vector<ElementView> g_elements;
 	std::mutex g_mutex;
+
+	void BatchResizeMeshDataCollection()
+	{
+		::g_IDPool.resize(::g_IDPool.size() + DX12::Meshes::k_IdPoolBatchReserveSize);
+		::g_MeshDataCollection.resize(::g_MeshDataCollection.size() + DX12::Meshes::k_IdPoolBatchReserveSize);
+
+		for (int i = 0; i < DX12::Meshes::k_IdPoolBatchReserveSize; i++)
+			::g_IDPool[::g_currentIDPoolIndex + i] = ::g_currentIDPoolIndex + i;
+	}
 }
 
-int DX12::Meshes::Add(const void* stream, unsigned int& consumedBytes)
+int DX12::Meshes::Add(const void* stream, unsigned long long& consumedBytes)
 {
 	const char* byteStream = reinterpret_cast<const char*>(stream);
 	const DX12::Meshes::StreamHeader* header = reinterpret_cast<const DX12::Meshes::StreamHeader*>(stream);
@@ -53,37 +76,43 @@ int DX12::Meshes::Add(const void* stream, unsigned int& consumedBytes)
 
 	ID3D12Resource* resource = DX12::UploadDataToGPU(byteStream + headerSize, totalBufferSize);
 
-	PositionView positionView;
-	positionView._positionView.BufferLocation = resource->GetGPUVirtualAddress();
-	positionView._positionView.SizeInBytes = positionBuffferSize;
-	positionView._positionView.StrideInBytes = sizeof(DX12::Math::Vector3f);
-	positionView._indexView.BufferLocation = resource->GetGPUVirtualAddress() + alignedPositionBuffferSize + alignedElementBufferSize;
-	positionView._indexView.Format = indexBufferSize == sizeof(unsigned short) ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT;
-	positionView._indexView.SizeInBytes = indexBufferSize;
-
-	ElementView elementsView;
-	if (header->_elementSize > 0)
+	MeshData* meshData = nullptr;
+	int meshCollectionIndex = -1;
 	{
-		elementsView._vertexView.BufferLocation = resource->GetGPUVirtualAddress() + alignedPositionBuffferSize;
-		elementsView._vertexView.SizeInBytes = elementBufferSize;
-		elementsView._vertexView.StrideInBytes = header->_elementSize;
+		std::lock_guard lock(::g_mutex);
+
+		if (::g_currentIDPoolIndex >= ::g_IDPool.size())
+			::BatchResizeMeshDataCollection();
+
+		meshCollectionIndex = ::g_IDPool[::g_currentIDPoolIndex++];
+		MeshData& meshData = ::g_MeshDataCollection[meshCollectionIndex];
+
+		meshData._resource = resource;
+
+		meshData._positionView._positionView.BufferLocation = resource->GetGPUVirtualAddress();
+		meshData._positionView._positionView.SizeInBytes = positionBuffferSize;
+		meshData._positionView._positionView.StrideInBytes = sizeof(DX12::Math::Vector3f);
+		meshData._positionView._indexView.BufferLocation = resource->GetGPUVirtualAddress() + alignedPositionBuffferSize + alignedElementBufferSize;
+		meshData._positionView._indexView.Format = indexSize == sizeof(unsigned short) ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT;
+		meshData._positionView._indexView.SizeInBytes = indexBufferSize;
+
+		if (header->_elementSize > 0)
+		{
+			meshData._elementsView._vertexView.BufferLocation = resource->GetGPUVirtualAddress() + alignedPositionBuffferSize;
+			meshData._elementsView._vertexView.SizeInBytes = elementBufferSize;
+			meshData._elementsView._vertexView.StrideInBytes = header->_elementSize;
+		}
+
+		meshData._elementsView._elementtype = header->_elementsType;
+		meshData._elementsView._topology = (D3D_PRIMITIVE_TOPOLOGY)header->_primitiveTopology;
 	}
 
-	elementsView._elementtype = header->_elementsType;
-	elementsView._topology = (D3D_PRIMITIVE_TOPOLOGY)header->_primitiveTopology;
-
-	std::lock_guard lock(::g_mutex);
-
-	::g_submeshResources.push_back(resource);
-	::g_positionViews.push_back(positionView);
-	::g_elements.push_back(elementsView);
-
-	return ::g_submeshResources.size() - 1;
+	return meshCollectionIndex;
 }
 
 void DX12::Meshes::Remove(unsigned int index)
 {
 	std::lock_guard lock(::g_mutex);
-	 // problem
-	g_positionViews.erase(g_positionViews.begin() + index);
+	::g_IDPool[--::g_currentIDPoolIndex] = index;
+	::g_MeshDataCollection[index].Release();
 }

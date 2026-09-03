@@ -4,6 +4,8 @@
 namespace DX12::Meshes
 {
 
+    static const unsigned int k_IdPoolBatchReserveSize = 10;
+
 // ensure this is tightly packed (used to map onto the stream header)
 #pragma pack(push, 1)
 
@@ -32,7 +34,7 @@ namespace DX12::Meshes
 
 #pragma pack(pop)
 
-    int Add(const void* stream, unsigned int& consumedBytes);
+    int Add(const void* stream, unsigned long long& consumedBytes);
     void Remove(unsigned int index);
     void Release() {};
 }

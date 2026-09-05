@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Utils.h"
+
 #include "DirectXMath.h"
 
 namespace DX12::Projection
@@ -53,31 +55,41 @@ namespace DX12::Projection
 	{
 	public:
 
-		Camera(const CameraSpecs& specs) : _specs(specs) {};
+		Camera(const CameraSpecs& specs) : _specs(specs) { Update(); };
+		DEBUG_DESTRUCTOR(Camera);
 
-		DirectX::XMMATRIX View() const;
-		DirectX::XMMATRIX Projection() const;
-		DirectX::XMMATRIX InvProjection() const;
-		DirectX::XMMATRIX ViewProjection() const;
-		DirectX::XMMATRIX InvViewProjection() const;
-		DirectX::XMFLOAT3 Up() const;
-		float NearZ() const { return _specs._nearZ; };
-		float& NearZ() { return _specs._nearZ; }
-		float FarZ() const;
-		float& FarZ();
-		float Fov() const;
-		float& Fov();
-		float AspectRatio() const;
-		float& AspectRatio();
-		float ViewWidth() const;
-		float& ViewWidth();
-		float ViewHeight() const;
-		float& ViewHeight();
-		DX12::Projection::Type Type() const;
-		DX12::Projection::Type& Type();
+		constexpr DirectX::XMMATRIX GetView() const { return _view; }
+		constexpr DirectX::XMMATRIX GetProjection() const { return _projection;}
+		constexpr DirectX::XMMATRIX GetInvProjection() const { return _invProjection; }
+		constexpr DirectX::XMMATRIX GetViewProjection() const { return _viewProjection; }
+		constexpr DirectX::XMMATRIX GetInvViewProjection() const { return _invViewProjection; }
+		constexpr DirectX::XMFLOAT3 GetUp() const { return _specs._up; }
+		constexpr float GetNearZ() const { return _specs._nearZ; }
+		constexpr float GetFarZ() const { return _specs._farZ; }
+		constexpr float GetFov() const { return _specs._fov; }
+		constexpr float GetAspectRatio() const { return _specs._aspectRatio; }
+		constexpr float GetViewWidth() const { return _specs._viewWidth; }
+		constexpr float GetViewHeight() const { return _specs._viewHeight; }
+		constexpr DX12::Projection::Type GetType() const { _specs._type; }
+
+		void SetUp(DirectX::XMFLOAT3& up);
+		void SetNearZ(float nearZ);
+		void SetFarZ(float farZ);
+		void SetFov(float fov);
+		void SetAspectRatio(float aspectRatio);
+		void SetViewWidth(float viewWidth);
+		void SetViewHeight(float viewHeight);
+
+		void Update();
 
 	private:
 
-		CameraSpecs _specs;
+		CameraSpecs _specs = {};
+		DirectX::XMMATRIX _view = {};
+		DirectX::XMMATRIX _projection = {};
+		DirectX::XMMATRIX _invProjection = {};
+		DirectX::XMMATRIX _viewProjection = {};
+		DirectX::XMMATRIX _invViewProjection = {};
+		bool _dirty = false;
 	};
 }

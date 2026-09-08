@@ -122,5 +122,8 @@
     <ClInclude Include="Source\DX12\DX12Camera.h">
       <Filter>Source Files\DX12</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Attributes.h">
+      <Filter>Source Files\DX12</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Utils.h"
-
+#include "Attributes.h"
 #include "DirectXMath.h"
 
 namespace DX12::Projection
@@ -14,7 +14,7 @@ namespace DX12::Projection
 
 	struct CameraSpecs
 	{
-		unsigned int _id;
+		int _id;
 		DX12::Projection::Type _type;
 		DirectX::XMFLOAT3 _up;
 		union 
@@ -51,15 +51,18 @@ namespace DX12::Projection
 		10000.f // _farZ
 	};
 
-	class Camera
+	class Camera : public AttributeHolder<Camera>, 
+		public ATransform,
+		public AMovable,
+		public AIUpdatable
 	{
 	public:
 
-		Camera(const CameraSpecs& specs) : _specs(specs) { Update(); };
+		Camera(const CameraSpecs& specs) : AMovable((ATransform*)this), _specs(specs) { Update(); };
 		DEBUG_DESTRUCTOR(Camera);
 
 		constexpr DirectX::XMMATRIX GetView() const { return _view; }
-		constexpr DirectX::XMMATRIX GetProjection() const { return _projection;}
+		constexpr DirectX::XMMATRIX GetProjection() const { return _projection; }
 		constexpr DirectX::XMMATRIX GetInvProjection() const { return _invProjection; }
 		constexpr DirectX::XMMATRIX GetViewProjection() const { return _viewProjection; }
 		constexpr DirectX::XMMATRIX GetInvViewProjection() const { return _invViewProjection; }
@@ -70,7 +73,7 @@ namespace DX12::Projection
 		constexpr float GetAspectRatio() const { return _specs._aspectRatio; }
 		constexpr float GetViewWidth() const { return _specs._viewWidth; }
 		constexpr float GetViewHeight() const { return _specs._viewHeight; }
-		constexpr DX12::Projection::Type GetType() const { _specs._type; }
+		DX12::Projection::Type GetType() const { _specs._type; }
 
 		void SetUp(DirectX::XMFLOAT3& up);
 		void SetNearZ(float nearZ);
@@ -80,7 +83,8 @@ namespace DX12::Projection
 		void SetViewWidth(float viewWidth);
 		void SetViewHeight(float viewHeight);
 
-		void Update();
+		// AIUpdatable
+		void Update(float deltaTime) override;
 
 	private:
 

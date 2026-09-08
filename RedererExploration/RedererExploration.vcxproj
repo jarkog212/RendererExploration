@@ -159,6 +159,7 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Source\Attributes.h" />
     <ClInclude Include="Source\DX12\DX12Camera.h" />
     <ClInclude Include="Source\DX12\DX12CommonConstants.h" />
     <ClInclude Include="Source\DX12\DX12CommonDescriptors.h" />

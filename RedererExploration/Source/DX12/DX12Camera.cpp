@@ -45,6 +45,8 @@ void DX12::Projection::Camera::SetViewHeight(float viewHeight)
 	_dirty = true;
 }
 
-void DX12::Projection::Camera::Update()
+void DX12::Projection::Camera::Update(float deltaTime)
 {
+	auto* translation = GetAttribute<ATransform>();
+
 }

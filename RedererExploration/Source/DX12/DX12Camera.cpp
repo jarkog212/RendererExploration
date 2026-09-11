@@ -1,7 +1,8 @@
 #include "DX12Camera.h"
+#include "DirectXMath.h"
 #include "Utils.h"
 
-void DX12::Projection::Camera::SetUp(DirectX::XMFLOAT3& up)
+void DX12::Projection::Camera::SetUp(DirectX::XMVECTOR& up)
 {
 	_specs._up = up;
 	_dirty = true;
@@ -47,6 +48,33 @@ void DX12::Projection::Camera::SetViewHeight(float viewHeight)
 
 void DX12::Projection::Camera::Update(float deltaTime)
 {
-	auto* translation = GetAttribute<ATransform>();
+	auto* transform = GetAttribute<ATransform>();
+	if (!transform)
+		return;
 
+	_view = DirectX::XMMatrixLookToRH(
+		transform->_location,
+		transform->_direction,
+		_specs._up);
+
+	if (_dirty)
+	{
+		_projection = (_specs._type == DX12::Projection::Type::Perspective) ?
+			DirectX::XMMatrixPerspectiveFovRH(
+				_specs._fov * DirectX::XM_PI,
+				_specs._aspectRatio,
+				_specs._nearZ,
+				_specs._farZ) :
+			DirectX::XMMatrixPerspectiveRH(
+				_specs._viewWidth,
+				_specs._viewHeight,
+				_specs._nearZ,
+				_specs._farZ);
+
+		_invProjection = DirectX::XMMatrixInverse(nullptr, _projection);
+		_dirty = false;
+	}
+
+	_viewProjection = DirectX::XMMatrixMultiply(_view, _projection);
+	_invViewProjection = DirectX::XMMatrixInverse(nullptr, _viewProjection);
 }

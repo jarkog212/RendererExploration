@@ -16,7 +16,7 @@ namespace DX12::Projection
 	{
 		int _id;
 		DX12::Projection::Type _type;
-		DirectX::XMFLOAT3 _up;
+		DirectX::XMVECTOR _up;
 		union 
 		{
 			float _fov;
@@ -58,7 +58,7 @@ namespace DX12::Projection
 	{
 	public:
 
-		Camera(const CameraSpecs& specs) : AMovable((ATransform*)this), _specs(specs) { Update(); };
+		Camera(const CameraSpecs& specs) : AMovable((ATransform*)this), _specs(specs) { Update(0.f); };
 		DEBUG_DESTRUCTOR(Camera);
 
 		constexpr DirectX::XMMATRIX GetView() const { return _view; }
@@ -66,7 +66,7 @@ namespace DX12::Projection
 		constexpr DirectX::XMMATRIX GetInvProjection() const { return _invProjection; }
 		constexpr DirectX::XMMATRIX GetViewProjection() const { return _viewProjection; }
 		constexpr DirectX::XMMATRIX GetInvViewProjection() const { return _invViewProjection; }
-		constexpr DirectX::XMFLOAT3 GetUp() const { return _specs._up; }
+		constexpr DirectX::XMVECTOR GetUp() const { return _specs._up; }
 		constexpr float GetNearZ() const { return _specs._nearZ; }
 		constexpr float GetFarZ() const { return _specs._farZ; }
 		constexpr float GetFov() const { return _specs._fov; }
@@ -75,7 +75,7 @@ namespace DX12::Projection
 		constexpr float GetViewHeight() const { return _specs._viewHeight; }
 		DX12::Projection::Type GetType() const { _specs._type; }
 
-		void SetUp(DirectX::XMFLOAT3& up);
+		void SetUp(DirectX::XMVECTOR& up);
 		void SetNearZ(float nearZ);
 		void SetFarZ(float farZ);
 		void SetFov(float fov);

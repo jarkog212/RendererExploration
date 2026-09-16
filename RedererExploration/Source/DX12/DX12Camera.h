@@ -16,7 +16,6 @@ namespace DX12::Projection
 	{
 		int _id;
 		DX12::Projection::Type _type;
-		DirectX::XMVECTOR _up;
 		union 
 		{
 			float _fov;
@@ -34,7 +33,6 @@ namespace DX12::Projection
 	static const CameraSpecs k_PerspectiveCameraSpecsTemplate = {
 		-1, // _id
 		DX12::Projection::Type::Perspective,
-		{0.f, 1.f, 0.f}, //_up
 		{._fov{0.25f}},
 		{._aspectRatio{16.f / 9.f}},
 		0.001f, // _nearZ
@@ -44,21 +42,20 @@ namespace DX12::Projection
 	static const CameraSpecs k_OrthogonalCameraSpecsTemplate = {
 		-1, // _id
 		DX12::Projection::Type::Orthogonal,
-		{0.f, 1.f, 0.f}, //_up
 		{._viewWidth{1920.f}},
 		{._viewHeight{1080.f}},
 		0.001f, // _nearZ
 		10000.f // _farZ
 	};
 
-	class Camera : public AttributeHolder<Camera>, 
-		public ATransform,
-		public AMovable,
-		public AIUpdatable
+	class Camera : public Attrib::Holder<Camera>,
+		public Attrib::Transform,
+		public Attrib::Movable,
+		public Attrib::IUpdatable
 	{
 	public:
 
-		Camera(const CameraSpecs& specs) : AMovable((ATransform*)this), _specs(specs) { Update(0.f); };
+		Camera(const CameraSpecs& specs) : Attrib::Movable((Attrib::Transform*)this), _specs(specs) { Update(0.f); };
 		DEBUG_DESTRUCTOR(Camera);
 
 		constexpr DirectX::XMMATRIX GetView() const { return _view; }
@@ -66,7 +63,7 @@ namespace DX12::Projection
 		constexpr DirectX::XMMATRIX GetInvProjection() const { return _invProjection; }
 		constexpr DirectX::XMMATRIX GetViewProjection() const { return _viewProjection; }
 		constexpr DirectX::XMMATRIX GetInvViewProjection() const { return _invViewProjection; }
-		constexpr DirectX::XMVECTOR GetUp() const { return _specs._up; }
+		const DirectX::XMVECTOR* GetUp() const { return &GetAttribute<Attrib::Transform>()->_up; };
 		constexpr float GetNearZ() const { return _specs._nearZ; }
 		constexpr float GetFarZ() const { return _specs._farZ; }
 		constexpr float GetFov() const { return _specs._fov; }
@@ -83,7 +80,7 @@ namespace DX12::Projection
 		void SetViewWidth(float viewWidth);
 		void SetViewHeight(float viewHeight);
 
-		// AIUpdatable
+		// Attrib::IUpdatable
 		void Update(float deltaTime) override;
 
 	private:

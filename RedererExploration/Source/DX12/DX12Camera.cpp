@@ -4,7 +4,7 @@
 
 void DX12::Projection::Camera::SetUp(DirectX::XMVECTOR& up)
 {
-	_specs._up = up;
+	GetAttribute<Attrib::Transform>()->_up = up;
 	_dirty = true;
 }
 
@@ -48,14 +48,14 @@ void DX12::Projection::Camera::SetViewHeight(float viewHeight)
 
 void DX12::Projection::Camera::Update(float deltaTime)
 {
-	auto* transform = GetAttribute<ATransform>();
+	auto* transform = GetAttribute<Attrib::Transform>();
 	if (!transform)
 		return;
 
 	_view = DirectX::XMMatrixLookToRH(
 		transform->_location,
-		transform->_direction,
-		_specs._up);
+		transform->_forward,
+		transform->_up);
 
 	if (_dirty)
 	{

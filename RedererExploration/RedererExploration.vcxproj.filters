@@ -62,6 +62,9 @@
     <ClCompile Include="Source\DX12\DX12Mesh.cpp">
       <Filter>Source Files\DX12</Filter>
     </ClCompile>
+    <ClCompile Include="Source\DX12\DX12Material.cpp">
+      <Filter>Source Files\DX12</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
@@ -125,6 +128,9 @@
       <Filter>Source Files\DX12</Filter>
     </ClInclude>
     <ClInclude Include="Source\DX12\DX12Mesh.h">
+      <Filter>Source Files\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\DX12\DX12Material.h">
       <Filter>Source Files\DX12</Filter>
     </ClInclude>
   </ItemGroup>

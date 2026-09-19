@@ -56,10 +56,10 @@
     <ClCompile Include="Source\DX12\DX12UploadRequest.cpp">
       <Filter>Source Files\DX12</Filter>
     </ClCompile>
-    <ClCompile Include="Source\DX12\DX12Content.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="Source\DX12\DX12Camera.cpp">
+      <Filter>Source Files\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\DX12\DX12Mesh.cpp">
       <Filter>Source Files\DX12</Filter>
     </ClCompile>
   </ItemGroup>
@@ -118,11 +118,13 @@
     <ClInclude Include="Source\DX12\DX12UploadRequest.h">
       <Filter>Source Files\DX12</Filter>
     </ClInclude>
-    <ClInclude Include="Source\DX12\DX12Content.h" />
     <ClInclude Include="Source\DX12\DX12Camera.h">
       <Filter>Source Files\DX12</Filter>
     </ClInclude>
     <ClInclude Include="Source\Attributes.h">
+      <Filter>Source Files\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\DX12\DX12Mesh.h">
       <Filter>Source Files\DX12</Filter>
     </ClInclude>
   </ItemGroup>

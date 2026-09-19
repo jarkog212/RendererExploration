@@ -6,7 +6,7 @@
 #include "DX12PostProcessPass.h"
 #include "DX12MandelbrotPass.h"
 #include "DX12Utils.h"
-#include "DX12Content.h"
+#include "DX12Mesh.h"
 
 #include <string>
 #include <format>

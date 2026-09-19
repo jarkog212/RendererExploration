@@ -1,4 +1,4 @@
-#include "DX12Content.h"
+#include "DX12Mesh.h"
 #include "DX12UploadRequest.h"
 
 #include "DirectXMath.h"

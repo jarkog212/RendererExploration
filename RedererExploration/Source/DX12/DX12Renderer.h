@@ -121,7 +121,6 @@ namespace DX12
 		const UploadCopyFrame& GetFrameConst(unsigned int index);
 		void ExecuteCopy(unsigned int frameId);
 
-
 	private:
 
 		Microsoft::WRL::ComPtr<ID3D12CommandQueue> _commandQueue = nullptr;

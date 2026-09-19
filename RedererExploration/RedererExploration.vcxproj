@@ -140,7 +140,7 @@
   <ItemGroup>
     <ClCompile Include="RedererExploration.cpp" />
     <ClCompile Include="Source\DX12\DX12Camera.cpp" />
-    <ClCompile Include="Source\DX12\DX12Content.cpp" />
+    <ClCompile Include="Source\DX12\DX12Mesh.cpp" />
     <ClCompile Include="Source\DX12\DX12DepthBufferTexture.cpp" />
     <ClCompile Include="Source\DX12\DX12DescriptorHeap.cpp" />
     <ClCompile Include="Source\DX12\DX12Example.cpp" />
@@ -163,7 +163,7 @@
     <ClInclude Include="Source\DX12\DX12Camera.h" />
     <ClInclude Include="Source\DX12\DX12CommonConstants.h" />
     <ClInclude Include="Source\DX12\DX12CommonDescriptors.h" />
-    <ClInclude Include="Source\DX12\DX12Content.h" />
+    <ClInclude Include="Source\DX12\DX12Mesh.h" />
     <ClInclude Include="Source\DX12\DX12Core.h" />
     <ClInclude Include="Source\DX12\DX12DepthBufferTexture.h" />
     <ClInclude Include="Source\DX12\DX12DescriptorHeap.h" />

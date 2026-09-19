@@ -167,7 +167,7 @@ namespace Utils
 	inline unsigned long long int AlignSizeUp(unsigned long long int size)
 	{
 		constexpr unsigned long long int mask(alignement - 1);
-		CRITICAL_ASSERT(!(alignement & mask)); // alignement is power of 2
+		CRITICAL_ASSERT(!(alignement & mask), "Requested alignement is not a power of 2.");
 		return (size + mask) & ~mask;
 	}
 
@@ -175,7 +175,7 @@ namespace Utils
 	inline unsigned long long int AlignSizeDown(unsigned long long int size)
 	{
 		constexpr unsigned long long int mask(alignement - 1);
-		CRITICAL_ASSERT(!(alignement & mask)); // alignement is power of 2
+		CRITICAL_ASSERT(!(alignement & mask), "Requested alignement is not a power of 2."); // alignement is power of 2
 		return size & ~mask;
 	}
 } // Utils

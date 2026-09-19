@@ -20,7 +20,7 @@ namespace Attrib
 		template<typename T>
 		const typename T::AttributeType* GetAttribute() const
 		{
-			T* asType = dynamic_cast<T*>(static_cast<D*>(this));
+			const T* asType = dynamic_cast<const T*>(static_cast<const D*>(this));
 			return asType ? asType->GetValue() : nullptr;
 		}
 	};
@@ -78,21 +78,12 @@ namespace Attrib
 				transform._up = DirectX::XMVector3Rotate(transform._up, quat);
 			}
 
-			// relative translate
-			if (const float forward = _relativeTranslate.m128_f32[2]; forward != 0.f)
-			{
-				transform._location = DirectX::XMVectorMultiplyAdd(
-					transform._forward,
-					DirectX::XMVECTOR(forward, forward, forward),
-					transform._location);
-			}
-
 			if (const float right = _relativeTranslate.m128_f32[0]; right != 0.f)
 			{
 				const DirectX::XMVECTOR rightAxis = DirectX::XMVector3Cross(transform._up, transform._forward);
 				transform._location = DirectX::XMVectorMultiplyAdd(
 					rightAxis,
-					DirectX::XMVECTOR(right, right, right),
+					{ right, right, right, 0 },
 					transform._location);
 			}
 
@@ -100,18 +91,30 @@ namespace Attrib
 			{
 				transform._location = DirectX::XMVectorMultiplyAdd(
 					transform._up,
-					DirectX::XMVECTOR(up, up, up),
+					{ up, up, up, 0 },
+					transform._location);
+			}
+
+			// relative translate
+			if (const float forward = _relativeTranslate.m128_f32[2]; forward != 0.f)
+			{
+				transform._location = DirectX::XMVectorMultiplyAdd(
+					transform._forward,
+					{ forward, forward, forward, 0},
 					transform._location);
 			}
 
 			*_transformToModify = transform;
 			Reset();
-		};
+		}
 
-		inline void Forward(float value) { _relativeTranslate.m128_f32[2] = value; };
-		inline void Right(float value) { _relativeTranslate.m128_f32[0] = value; };
-		inline void Up(float value) { _relativeTranslate.m128_f32[1] = value; };
-		inline void Turn(DirectX::XMFLOAT3 value) { _rotate = value; };
+		inline void Forward(float value) { _relativeTranslate.m128_f32[2] += value; }
+		inline void Right(float value) { _relativeTranslate.m128_f32[0] += value; }
+		inline void Up(float value) { _relativeTranslate.m128_f32[1] += value; }
+		inline void AddX(float value) { _worldTranslate.m128_u8[0] += value; }
+		inline void AddY(float value) { _worldTranslate.m128_u8[1] += value; }
+		inline void AddZ(float value) { _worldTranslate.m128_u8[2] += value; }
+		inline void Turn(DirectX::XMFLOAT3 value) { _rotate.x += value.x; _rotate.y += value.y; _rotate.z = value.z; }
 
 		using AttributeType = Movable;
 

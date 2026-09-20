@@ -3,6 +3,7 @@
 #include "DX12Resources.h"
 #include "DX12RenderTargetTexture.h"
 #include "DX12DepthBufferTexture.h"
+#include "DX12CommonDescriptors.h"
 
 #include "DirectXMath.h"
 
@@ -31,6 +32,20 @@ namespace DX12
 		RenderPassBase* GetTailNode();
 
 		void SetDimensions(const DirectX::XMUINT2& size);
+
+		struct PSOBase
+		{
+			PipelineStream::SubRootSignature _rs{ DX12::GPassSpace::GetRootSignature() };
+			PipelineStream::SubPrimitiveTopology _primitiveTopoliogy{ D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE };
+			PipelineStream::SubRenderTargetFormats _renderTargetFormats{
+				{
+					{DX12::CC::Desc::GPassRes::k_mainTextureTemplate.Format},
+					1
+				}};
+			PipelineStream::SubDepthStencilFormat _depthStencilFormat{ DX12::CC::Desc::GPassRes::k_depthTextureTemplate.Format };
+			PipelineStream::SubRasterizer _rasterizer{ DX12::CC::Desc::Rasterizer::k_noCullTemplate };
+			PipelineStream::SubDepthStencil1 _depth{ DX12::CC::Desc::DepthStencil::k_disabledBothTemplate };
+		};
 	}
 
 	class DepthPass : public RenderPassBase

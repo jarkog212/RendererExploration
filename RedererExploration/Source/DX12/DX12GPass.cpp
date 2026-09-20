@@ -1,8 +1,9 @@
 #include "DX12GPass.h"
-#include "DX12CommonDescriptors.h"
 #include "DX12Renderer.h"
 #include "DX12Shaders.h"
 #include "DX12Utils.h"
+
+#include "DX12DescriptorHeap.h"
 
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -16,6 +17,7 @@ namespace
 		enum Params : unsigned int
 		{
 			Constants,
+			DescriptorTables,
 
 			Count
 		};
@@ -66,6 +68,12 @@ ID3D12RootSignature* DX12::GPassSpace::GetRootSignature()
 	DX12::RootParameter params[::RootSignature::Params::Count]{};
 	params[::RootSignature::Params::Constants].AsConstants(1, D3D12_SHADER_VISIBILITY_PIXEL, 0);
 	
+	DX12::DescriptorRange srvDescriptors = DX12::GetSRVHeap()->AsDescriptorRange();
+	srvDescriptors.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE;
+	srvDescriptors.BaseShaderRegister = 0;
+	srvDescriptors.RegisterSpace = 0;
+	params[::RootSignature::Params::DescriptorTables].AsDescriptorTable(D3D12_SHADER_VISIBILITY_PIXEL, &srvDescriptors, 1);
+
 	D3D12_ROOT_SIGNATURE_DESC1 desc = DX12::CC::Desc::RootSignature::k_vertexPixelTemplate;
 	desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
 	desc.NumParameters = _countof(params);
@@ -85,19 +93,10 @@ ID3D12PipelineState* DX12::GPassSpace::GetPipelineState()
 	if (::g_GPassPipelineState) [[likely]]
 		return ::g_GPassPipelineState.Get();
 
-	using namespace DX12::PipelineStream;
-	struct {	
-		SubRootSignature _rs{ DX12::GPassSpace::GetRootSignature() };
-		SubVertexShader _vs{ DX12::Shaders::GetGenericShader(DX12::Shaders::GenericShader::Type::FullscreenTri_VS) };
-		SubPixelShader _ps{DX12::Shaders::GetGenericShader(DX12::Shaders::GenericShader::Type::FillColor_PS) };
-		SubPrimitiveTopology _primitiveTopoliogy{ D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE };
-		SubRenderTargetFormats _renderTargetFormats{};
-		SubDepthStencilFormat _depthStencilFormat{ DX12::CC::Desc::GPassRes::k_depthTextureTemplate.Format };
-		SubRasterizer _rasterizer{ DX12::CC::Desc::Rasterizer::k_noCullTemplate };
-		SubDepthStencil1 _depth{ DX12::CC::Desc::DepthStencil::k_disabledBothTemplate };
+	struct : public DX12::GPassSpace::PSOBase{
+		PipelineStream::SubVertexShader _vs{ DX12::Shaders::GetGenericShader(DX12::Shaders::GenericShader::Type::FullscreenTri_VS) };
+		PipelineStream::SubPixelShader _ps{DX12::Shaders::GetGenericShader(DX12::Shaders::GenericShader::Type::FillColor_PS) };
 	}stream;
-	stream._renderTargetFormats._sub.NumRenderTargets = 1;
-	stream._renderTargetFormats._sub.RTFormats[0] = DX12::CC::Desc::GPassRes::k_mainTextureTemplate.Format;
 
 	::g_GPassPipelineState = DX12::Helpers::CreatePipelineState(&stream, sizeof(stream));
 

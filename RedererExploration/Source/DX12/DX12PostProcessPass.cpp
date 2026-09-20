@@ -54,6 +54,7 @@ ID3D12RootSignature* DX12::PostProcessSpace::GetRootSignature()
 	params[::RootSignature::Params::DescriptorTables].AsDescriptorTable(D3D12_SHADER_VISIBILITY_PIXEL, &srvDescriptors, 1);
 
 	D3D12_ROOT_SIGNATURE_DESC1 desc = DX12::CC::Desc::RootSignature::k_vertexPixelTemplate;
+	desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
 	desc.NumParameters = _countof(params);
 	desc.pParameters = params;
 

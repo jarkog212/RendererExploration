@@ -1,48 +1,55 @@
 #include "DX12Material.h"
 
-#include <map>
+#include <unordered_map>
+#include <memory>
 #include <mutex>
 
 namespace
 {
-	struct MeshData
-	{
-		ID3D12Resource* _resource = nullptr; //non-owning, deferred release;
+	std::unordered_map<DX12::Materials::Type, std::unique_ptr<DX12::Materials::Material>> g_Materials;
 
-		struct PositionView
-		{
-			D3D12_VERTEX_BUFFER_VIEW _positionView;
-			D3D12_INDEX_BUFFER_VIEW _indexView;
-		}_positionView;
-
-		struct ElementView
-		{
-			D3D12_VERTEX_BUFFER_VIEW _vertexView;
-			unsigned int _elementtype;
-			D3D_PRIMITIVE_TOPOLOGY _topology;
-
-		}_elementsView;
-
-		void Release()
-		{
-			Utils::COM::SafeDeferredRenderThreadRelease(_resource);
-			*this = {};
-		}
-	};
-
-	std::vector<MeshData> g_MeshDataCollection;
-	std::vector<int> g_IDPool;
-	unsigned int g_currentIDPoolIndex = 0;
-
-	// the following vectors are expected to have parity (i.e. same size and correlating indeces)
 	std::mutex g_mutex;
-
-	void BatchResizeMeshDataCollection()
-	{
-		::g_IDPool.resize(::g_IDPool.size() + DX12::Meshes::k_IdPoolBatchReserveSize);
-		::g_MeshDataCollection.resize(::g_MeshDataCollection.size() + DX12::Meshes::k_IdPoolBatchReserveSize);
-
-		for (int i = 0; i < DX12::Meshes::k_IdPoolBatchReserveSize; i++)
-			::g_IDPool[::g_currentIDPoolIndex + i] = ::g_currentIDPoolIndex + i;
-	}
 }
+
+const DX12::Materials::Material& DX12::Materials::Get(DX12::Materials::Type type)
+{
+	auto item = ::g_Materials.find(type);
+	if (item != ::g_Materials.end())
+		return *(item->second);
+
+	std::scoped_lock lock(::g_mutex);
+
+#define MATERIAL_CASE(ENUM, TYPE) case ENUM: ::g_Materials.emplace(ENUM, std::make_unique<##TYPE>()); break;
+
+	switch (type)
+	{
+		MATERIAL_LIST_OP(MATERIAL_CASE)
+	}
+
+#undef MATERIAL_CASE
+}
+
+void DX12::Materials::Unload(DX12::Materials::Type type)
+{
+	std::scoped_lock lock(::g_mutex);
+
+	auto item = ::g_Materials.find(type);
+	if (item == ::g_Materials.end())
+		return;
+
+	::g_Materials.erase(item);
+}
+
+void DX12::Materials::Release() 
+{
+	::g_Materials.clear();
+};
+
+void DX12::Materials::WarmUp()
+{
+#define MATERIAL_WARMUP(ENUM, TYPE) ::g_Materials.emplace(ENUM, std::make_unique<##TYPE>());
+
+	MATERIAL_LIST_OP(MATERIAL_WARMUP)
+
+#undef MATERIAL_WARMUP
+};

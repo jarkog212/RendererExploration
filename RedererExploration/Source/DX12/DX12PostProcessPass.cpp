@@ -15,7 +15,7 @@ namespace
 		enum Params : unsigned int
 		{
 			Constants,
-			DescriptorTables,
+			SrvDescriptorTable,
 
 			Count
 		};
@@ -51,7 +51,7 @@ ID3D12RootSignature* DX12::PostProcessSpace::GetRootSignature()
 	srvDescriptors.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE;
 	srvDescriptors.BaseShaderRegister = 0;
 	srvDescriptors.RegisterSpace = 0;
-	params[::RootSignature::Params::DescriptorTables].AsDescriptorTable(D3D12_SHADER_VISIBILITY_PIXEL, &srvDescriptors, 1);
+	params[::RootSignature::Params::SrvDescriptorTable].AsDescriptorTable(D3D12_SHADER_VISIBILITY_PIXEL, &srvDescriptors, 1);
 
 	D3D12_ROOT_SIGNATURE_DESC1 desc = DX12::CC::Desc::RootSignature::k_vertexPixelTemplate;
 	desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
@@ -142,7 +142,7 @@ void DX12::PostProcessPass::AccummulatePassCommands(ID3D12GraphicsCommandList6* 
 	commandList->SetDescriptorHeaps(1, heaps);
 
 	commandList->SetGraphicsRoot32BitConstant(::RootSignature::Params::Constants, _inputGPass->GetMainBufferHandleView()._index, 0);
-	commandList->SetGraphicsRootDescriptorTable(::RootSignature::Params::DescriptorTables, srvHeap->GetGpuPtr());
+	commandList->SetGraphicsRootDescriptorTable(::RootSignature::Params::SrvDescriptorTable, srvHeap->GetGpuPtr());
 
 	commandList->IASetPrimitiveTopology(D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 

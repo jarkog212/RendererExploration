@@ -17,6 +17,7 @@ DX12::DepthBufferTexture DX12::DepthBufferTexture::Create(DX12::TextureSpecs& sp
 		specs._srvDesc = &srvDesc;
 	}
 
+	// depth/stencil will always be 32bit per pixel, layout may be custom but the resource does not care beyond max width. 
 	specs._resourceDesc->Format = DXGI_FORMAT_R32_TYPELESS;
 
 	return DepthBufferTexture(specs, depthStencilFormat);

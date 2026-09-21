@@ -3,7 +3,6 @@
 
 #include "DirectXMath.h"
 
-#include <map>
 #include <mutex>
 
 namespace

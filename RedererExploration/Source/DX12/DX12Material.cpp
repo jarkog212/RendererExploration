@@ -11,7 +11,7 @@ namespace
 	std::mutex g_mutex;
 }
 
-const DX12::Materials::Material& DX12::Materials::Get(DX12::Materials::Type type)
+const DX12::Materials::Material& DX12::Materials::GetOrLoad(DX12::Materials::Type type)
 {
 	auto item = ::g_Materials.find(type);
 	if (item != ::g_Materials.end())

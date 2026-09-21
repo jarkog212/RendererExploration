@@ -37,3 +37,9 @@ namespace DX12
 		DX12::DescriptorHandle _srvHandle = {};
 	};
 }
+
+namespace DX12::TextureSpace
+{
+	std::shared_ptr<DX12::Texture> GetOrLoad(const wchar_t* name);
+	void Release();
+}

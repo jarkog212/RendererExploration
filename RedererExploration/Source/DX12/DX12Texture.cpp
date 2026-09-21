@@ -2,6 +2,8 @@
 #include "DX12CommonDescriptors.h"
 #include "DX12DescriptorHeap.h"
 
+#include <unordered_map>
+
 DX12::Texture::Texture(TextureSpecs& specs)
 {
 	CRITICAL_ASSERT(specs._resourceDesc, "Cannot create texture without valid resource descriptor.");
@@ -49,6 +51,13 @@ DX12::Texture::Texture(TextureSpecs& specs)
 	device->CreateShaderResourceView(_resource, specs._srvDesc, _srvHandle._cpu);
 }
 
+namespace
+{
+	std::unordered_map<const wchar_t*, std::weak_ptr<DX12::Texture>> g_textures;
+
+	std::mutex g_mutex;
+}
+
 DX12::Texture::~Texture()
 {
 	DEBUG_DESTRUCTOR_BODY(Texture)
@@ -70,4 +79,27 @@ DX12::Texture& DX12::Texture::operator=(Texture&& other) noexcept
 	std::swap(_srvHandle, other._srvHandle);
 
 	return *this;
+}
+
+std::shared_ptr<DX12::Texture> DX12::TextureSpace::GetOrLoad(const wchar_t* name)
+{
+	std::scoped_lock lock(::g_mutex);
+
+	auto texture = ::g_textures.find(name);
+	if (texture != ::g_textures.end()) [[likely]]
+		return texture->second.lock();
+
+	// TODO textures load from file.
+	std::shared_ptr<DX12::Texture> out = std::make_shared<DX12::Texture>();
+	::g_textures.emplace(name, out);
+
+	// NRVO/move should protect against deletion?
+	return out;
+}
+
+void DX12::TextureSpace::Release() 
+{
+	std::scoped_lock lock(::g_mutex);
+
+	::g_textures.clear();
 }

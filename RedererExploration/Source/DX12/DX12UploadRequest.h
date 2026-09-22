@@ -9,6 +9,7 @@ namespace DX12
 	ID3D12Resource* UploadDataToGPU(
 		const void* data,
 		unsigned int bufferSize,
+		D3D12_RESOURCE_DESC* desc = nullptr,
 		bool isCPUAccessible = false,
 		D3D12_RESOURCE_STATES state = D3D12_RESOURCE_STATE_COMMON,
 		D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE,
@@ -20,7 +21,12 @@ namespace DX12
 	{
 	public:
 
-		GPUUploadRequest(unsigned int alignedSize, const void* data, UploadCopyWorker& uploadCopyWorker = *DX12::GetMainUploadCopyWorker());
+		GPUUploadRequest(
+			unsigned int alignedSize,
+			const void* data,
+			D3D12_RESOURCE_DESC* desc = nullptr,
+			UploadCopyWorker& uploadCopyWorker = *DX12::GetMainUploadCopyWorker());
+
 		DEBUG_DESTRUCTOR(GPUUploadRequest);
 
 		NO_COPY(GPUUploadRequest);

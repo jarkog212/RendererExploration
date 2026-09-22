@@ -53,3 +53,25 @@ void DX12::Materials::WarmUp()
 
 #undef MATERIAL_WARMUP
 };
+
+ID3D12PipelineState* DX12::Materials::BasicMaterial::GetPSO() const
+{
+	return nullptr;
+}
+
+int DX12::Materials::BasicMaterial::GetDataIndecesBufferIndex() const
+{
+	return 0;
+}
+
+void DX12::Materials::BasicMaterial::AccummulatePassCommands(ID3D12GraphicsCommandList6* commandList)
+{
+}
+
+void DX12::Materials::BasicMaterial::Load()
+{
+}
+
+void DX12::Materials::BasicMaterial::Release()
+{
+}

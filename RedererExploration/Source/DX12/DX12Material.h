@@ -22,7 +22,7 @@ namespace DX12::Materials
     public:
 
         Material() = default;
-        virtual ~Material() = 0;
+        virtual ~Material() = default;
 
         NO_COPY(Material);
 
@@ -38,11 +38,11 @@ namespace DX12::Materials
     void Release();
     void WarmUp();
 
-    class BasicMaterial : public Material 
+    class BasicMaterial : public Material
     {
     public:
-        
-        BasicMaterial();
+
+        BasicMaterial() {};
         ~BasicMaterial() { DEBUG_DESTRUCTOR_BODY(BasicMaterial); Release(); }
         BasicMaterial(BasicMaterial&&) = default;
         //BasicMaterial& operator=(BasicMaterial&&);

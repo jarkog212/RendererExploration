@@ -225,7 +225,7 @@ DX12::DepthBufferTexture DX12::DepthPass::CreateDepthBuffer(const DirectX::XMUIN
 	desc.Width = size.x;
 	desc.Height = size.y;
 
-	DX12::TextureSpecs specs;
+	DX12::Texture::Specs specs;
 	specs._resourceDesc = &desc;
 	specs._initialState =
 		D3D12_RESOURCE_STATE_DEPTH_READ |
@@ -324,7 +324,7 @@ DX12::RenderTargetTexture DX12::GPassRT::CreateRenderTarget(const DirectX::XMUIN
 	desc.Width = size.x;
 	desc.Height = size.y;
 
-	DX12::TextureSpecs specs;
+	DX12::Texture::Specs specs;
 	specs._resourceDesc = &desc;
 	specs._initialState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
 	specs._clearValue.Format = desc.Format;

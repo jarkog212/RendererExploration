@@ -8,7 +8,7 @@ namespace DX12
 	{
 	public:
 
-		static RenderTargetTexture Create(DX12::TextureSpecs& specs);
+		static RenderTargetTexture Create(DX12::Texture::Specs& specs);
 
 		RenderTargetTexture(RenderTargetTexture&& other) noexcept;
 		DEBUG_DESTRUCTOR(RenderTargetTexture)
@@ -23,7 +23,7 @@ namespace DX12
 
 	private:
 
-		RenderTargetTexture(DX12::TextureSpecs& spec);
+		RenderTargetTexture(DX12::Texture::Specs& spec);
 
 		DX12::Texture _texture;
 		DX12::DescriptorHandle _rtvHandles[DX12::Texture::_k_maxMips];

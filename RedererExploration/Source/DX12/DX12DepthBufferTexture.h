@@ -8,7 +8,7 @@ namespace DX12
 	{
 	public:
 
-		static DepthBufferTexture Create(DX12::TextureSpecs& specs);
+		static DepthBufferTexture Create(DX12::Texture::Specs& specs);
 
 		DEBUG_DESTRUCTOR(DepthBufferTexture);
 
@@ -23,7 +23,7 @@ namespace DX12
 
 	private:
 
-		DepthBufferTexture(DX12::TextureSpecs& specs, DXGI_FORMAT depthStencilFormat);
+		DepthBufferTexture(DX12::Texture::Specs& specs, DXGI_FORMAT depthStencilFormat);
 		
 		DX12::Texture _texture;
 		DX12::DescriptorHandle _dsvHandle;

@@ -4,7 +4,7 @@
 
 #include <unordered_map>
 
-DX12::Texture::Texture(TextureSpecs& specs)
+DX12::Texture::Texture(DX12::Texture::Specs& specs)
 {
 	CRITICAL_ASSERT(specs._resourceDesc, "Cannot create texture without valid resource descriptor.");
 	CRITICAL_ASSERT(specs._srvDesc, "Cannot create texture without valid SRV descriptor.");
@@ -19,8 +19,7 @@ DX12::Texture::Texture(TextureSpecs& specs)
 
 	if (specs._resource)
 	{
-		_resource = specs._resource;
-		specs._resource = nullptr;
+		_resource = std::exchange(specs._resource, nullptr);
 	}
 	else if (specs._heap)
 	{

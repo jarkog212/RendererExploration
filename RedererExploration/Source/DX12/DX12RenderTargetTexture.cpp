@@ -2,7 +2,7 @@
 #include "DX12DescriptorHeap.h"
 #include "DX12CommonDescriptors.h"
 
-DX12::RenderTargetTexture DX12::RenderTargetTexture::Create(DX12::TextureSpecs& specs)
+DX12::RenderTargetTexture DX12::RenderTargetTexture::Create(DX12::Texture::Specs& specs)
 {
 	CRITICAL_ASSERT(specs._resourceDesc, "Trying to make render target with invalid resource descriptor.");
 	CRITICAL_ASSERT(!specs._resource, "Trying to make render target with non-empty DX12 resource.");
@@ -14,7 +14,7 @@ DX12::RenderTargetTexture DX12::RenderTargetTexture::Create(DX12::TextureSpecs& 
 	return RenderTargetTexture(specs);
 }
 
-DX12::RenderTargetTexture::RenderTargetTexture(DX12::TextureSpecs& specs) :
+DX12::RenderTargetTexture::RenderTargetTexture(DX12::Texture::Specs& specs) :
 	_texture(specs)
 {
 	_mipCount = _texture.GetResource()->GetDesc().MipLevels;

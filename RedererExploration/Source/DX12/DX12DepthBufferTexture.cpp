@@ -3,7 +3,7 @@
 #include "DX12CommonDescriptors.h"
 #include "DX12Utils.h"
 
-DX12::DepthBufferTexture DX12::DepthBufferTexture::Create(DX12::TextureSpecs& specs)
+DX12::DepthBufferTexture DX12::DepthBufferTexture::Create(DX12::Texture::Specs& specs)
 {
 	CRITICAL_ASSERT(specs._resourceDesc, "Trying to make depth buffer with invalid resource descriptor.");
 	CRITICAL_ASSERT(!specs._resource, "Trying to make depth buffer with non-empty DX12 resource.");
@@ -23,7 +23,7 @@ DX12::DepthBufferTexture DX12::DepthBufferTexture::Create(DX12::TextureSpecs& sp
 	return DepthBufferTexture(specs, depthStencilFormat);
 }
 
-DX12::DepthBufferTexture::DepthBufferTexture(DX12::TextureSpecs& specs, DXGI_FORMAT depthStencilFormat) :
+DX12::DepthBufferTexture::DepthBufferTexture(DX12::Texture::Specs& specs, DXGI_FORMAT depthStencilFormat) :
 	_texture(specs)
 {
 	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = DX12::CC::Desc::DepthStencil::k_viewTemplate;

@@ -19,9 +19,15 @@ namespace DX12
 			D3D12_CLEAR_VALUE _clearValue = {};
 		};
 
+		struct LoadingRequest : public Specs
+		{
+			const wchar_t* _filename = L"";
+		};
+
 		static constexpr unsigned int _k_maxMips = 14;
 
 		Texture(Specs& specs);
+		Texture(LoadingRequest& request);
 		~Texture();
 		Texture(Texture&& other) noexcept;
 		Texture& operator=(Texture&& other) noexcept;

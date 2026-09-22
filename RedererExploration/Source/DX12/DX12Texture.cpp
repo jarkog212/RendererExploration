@@ -1,8 +1,60 @@
 #include "DX12Texture.h"
 #include "DX12CommonDescriptors.h"
 #include "DX12DescriptorHeap.h"
+#include "DX12UploadRequest.h"
 
 #include <unordered_map>
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "External/stb_image.h"
+
+namespace
+{
+	typedef int STBI_Format;
+	
+	static std::filesystem::path k_textureFilePrefix(".\\Textures");
+
+	std::unordered_map<const wchar_t*, std::weak_ptr<DX12::Texture>> g_textures;
+
+	std::mutex g_mutex;
+
+	inline int STBIChannelEnumToCount(::STBI_Format enumValue)
+	{
+		// enum values seem to match the count but just in case...
+		switch (enumValue)
+		{
+			case STBI_grey:
+				return 1;
+			case STBI_grey_alpha:
+				return 2;
+			case STBI_rgb:
+				return 3;
+			case STBI_rgb_alpha:
+				return 4;
+		}
+
+		return 0;
+	}
+
+	inline ::STBI_Format DXGIToSTBIFormat(DXGI_FORMAT format)
+	{
+		switch (format)
+		{
+			case DXGI_FORMAT_R8_UNORM:
+			case DXGI_FORMAT_A8_UNORM:
+				return STBI_grey;
+			case DXGI_FORMAT_R8G8_UNORM:
+				return STBI_grey_alpha;
+			case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
+				return STBI_rgb_alpha;
+	
+		}
+
+		CRITICAL_ASSERT(false, "Unexpected DXGI texture format %u", format);
+
+		return 0;
+	}
+}
 
 DX12::Texture::Texture(DX12::Texture::Specs& specs)
 {
@@ -50,11 +102,30 @@ DX12::Texture::Texture(DX12::Texture::Specs& specs)
 	device->CreateShaderResourceView(_resource, specs._srvDesc, _srvHandle._cpu);
 }
 
-namespace
+DX12::Texture::Texture(DX12::Texture::LoadingRequest& request)
 {
-	std::unordered_map<const wchar_t*, std::weak_ptr<DX12::Texture>> g_textures;
+	CRITICAL_ASSERT(request._filename != L"", "Invalid filename for the texture loading.");
+	CRITICAL_ASSERT(request._resourceDesc, "Cannot create texture without valid resource descriptor.");
+	CRITICAL_ASSERT(request._srvDesc, "Cannot create texture without valid SRV descriptor.");
 
-	std::mutex g_mutex;
+	std::filesystem::path path = ::k_textureFilePrefix;
+	path.append(request._filename);
+
+	::STBI_Format stbiFormat = ::DXGIToSTBIFormat(request._resourceDesc->Format);
+	int width, height, channels;
+	// so far we're limited to 8bits per channel always (other stbi_load versions support larger widths)
+	unsigned char* imgBuffer = stbi_load(path.string().c_str(),	&width,	&height, &channels,	stbiFormat);
+	CRITICAL_ASSERT(imgBuffer, "Invalid texture buffer fr %s", request._filename);
+
+	const int imgBufferSize = width * height * ::STBIChannelEnumToCount(stbiFormat);
+	request._resourceDesc->Height = height;
+	request._resourceDesc->Width = width;
+	
+	_resource = DX12::UploadDataToGPU(imgBuffer, imgBufferSize, request._resourceDesc, false, request._initialState, request._resourceDesc->Flags);
+	_srvHandle = DX12::GetSRVHeap()->Allocate();
+	DX12::GetRendererDevice()->CreateShaderResourceView(_resource, request._srvDesc, _srvHandle._cpu);
+
+	stbi_image_free(imgBuffer);
 }
 
 DX12::Texture::~Texture()
@@ -88,8 +159,15 @@ std::shared_ptr<DX12::Texture> DX12::TextureSpace::GetOrLoad(const wchar_t* name
 	if (texture != ::g_textures.end()) [[likely]]
 		return texture->second.lock();
 
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = DX12::CC::Desc::TextureRaw::k_basicSRVTemplate;
+	D3D12_RESOURCE_DESC desc = DX12::CC::Desc::TextureRaw::k_basicTextureTemplate;
+	DX12::Texture::LoadingRequest request;
+	request._initialState |= D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+	request._srvDesc = &srvDesc;
+	request._resourceDesc = &desc;
+
 	// TODO textures load from file.
-	std::shared_ptr<DX12::Texture> out = std::make_shared<DX12::Texture>();
+	std::shared_ptr<DX12::Texture> out = std::make_shared<DX12::Texture>(request);
 	::g_textures.emplace(name, out);
 
 	// NRVO/move should protect against deletion?

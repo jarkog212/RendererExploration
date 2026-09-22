@@ -235,5 +235,36 @@ namespace DX12::CC::Desc
 			D3D12_TEXTURE_LAYOUT_ROW_MAJOR,
 			D3D12_RESOURCE_FLAG_NONE
 		};
-	}
+	} // namespace BufferResource
+
+	namespace TextureRaw
+	{
+		constexpr D3D12_RESOURCE_DESC k_basicTextureTemplate{
+			D3D12_RESOURCE_DIMENSION_TEXTURE2D,
+			0,	// Alignment
+			0,	// Width
+			0,	// Height
+			1,	// DepthOrArraySize
+			0,	// MipLevels
+			DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+			DXGI_SAMPLE_DESC{
+				1,	//Count
+				0	//Quality
+			},
+			D3D12_TEXTURE_LAYOUT_UNKNOWN,
+			D3D12_RESOURCE_FLAG_NONE
+		};
+
+		constexpr D3D12_SHADER_RESOURCE_VIEW_DESC k_basicSRVTemplate{
+			DXGI_FORMAT_UNKNOWN,
+			D3D12_SRV_DIMENSION_TEXTURE2D,
+			D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING,
+			{.Texture2D = D3D12_TEX2D_SRV{
+				0,		// MostDetailedMip
+				1,		// MipLevels
+				0,		// PlaneSlice
+				0.f		// ResourceMinLODClamp
+			}}
+		};
+	} // namespace TextureRaw
 }

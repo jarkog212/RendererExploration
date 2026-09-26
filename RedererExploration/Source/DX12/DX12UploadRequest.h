@@ -17,6 +17,15 @@ namespace DX12
 		unsigned long long int heapOffset = 0,
 		UploadCopyWorker* uploadCopyWorker = DX12::GetMainUploadCopyWorker());
 
+	void UploadDataToGPU(
+		ID3D12Resource* destination,
+		const void* data,
+		unsigned int bufferSize,
+		D3D12_RESOURCE_DESC* desc = nullptr,
+		bool isCPUAccessible = false,
+		D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE,
+		UploadCopyWorker* uploadCopyWorker = DX12::GetMainUploadCopyWorker());
+
 	class GPUUploadRequest
 	{
 	public:

@@ -78,6 +78,49 @@ ID3D12Resource* DX12::UploadDataToNewGPUBuffer(
 	return resource;
 }
 
+void DX12::UploadDataToGPU(
+	ID3D12Resource* destination,
+	const void* data,
+	unsigned int bufferSize,
+	D3D12_RESOURCE_DESC* desc,
+	bool isCPUAccessible,
+	D3D12_RESOURCE_FLAGS flags,
+	UploadCopyWorker* uploadCopyWorker)
+{
+	CRITICAL_ASSERT(data, "No data to Copy/upload.");
+
+	D3D12_RESOURCE_DESC defaultDesc = DX12::CC::Desc::BufferResource::k_bufferTemplate;
+	if (!desc)
+	{
+		desc = &defaultDesc;
+		desc->Width = bufferSize;
+		desc->Flags = isCPUAccessible ? D3D12_RESOURCE_FLAG_NONE : flags;
+	}
+
+	CRITICAL_ASSERT(
+		desc->Flags == D3D12_RESOURCE_FLAG_NONE || desc->Flags == D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
+		"Provided resource is not intended for upload use.");
+
+	if (isCPUAccessible)
+	{
+		D3D12_RANGE range{}; // init/nulled state implies no read access 
+		void* address = nullptr;
+		HRESULT_CHECK_CRITICAL(
+			destination->Map(0, &range, (void**)&address),
+			"Failed to map provided resource.");
+
+		memcpy(address, data, bufferSize);
+		destination->Unmap(0, nullptr);
+	}
+	else
+	{
+		CRITICAL_ASSERT(uploadCopyWorker, "Upload/copy data via proxy buffer requires a copy/upload worker.")
+			DX12::GPUUploadRequest request(bufferSize, data, desc, *uploadCopyWorker);
+		request.ApplyCopy(destination);
+		request.EndRequest();
+	}
+}
+
 DX12::GPUUploadRequest::GPUUploadRequest(
 	unsigned int alignedSize,
 	const void* data,

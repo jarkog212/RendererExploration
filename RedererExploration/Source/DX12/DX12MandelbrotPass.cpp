@@ -33,8 +33,8 @@ namespace
 	constexpr DX12::Shaders::ShaderSpecs k_mandelbrotShaderSpecs{
 		L"Mandelbrot",
 		L"Mandelbrot",
-		DX12::Shaders::GenericShader::Type::NotGeneric,
-		DX12::Shaders::Stage::Pixel
+		DX12::Shaders::Stage::Pixel,
+		DX12::Shaders::GenericShader::Type::NotGeneric
 	};
 }
 

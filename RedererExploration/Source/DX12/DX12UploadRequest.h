@@ -6,7 +6,7 @@
 
 namespace DX12
 {
-	ID3D12Resource* UploadDataToGPU(
+	ID3D12Resource* UploadDataToNewGPUBuffer(
 		const void* data,
 		unsigned int bufferSize,
 		D3D12_RESOURCE_DESC* desc = nullptr,

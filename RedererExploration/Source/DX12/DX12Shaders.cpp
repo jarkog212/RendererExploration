@@ -122,9 +122,9 @@ namespace
 	static std::unique_ptr<DX12::Shaders::GenericShader[]> g_genericShaderViews = nullptr;
 	constexpr DX12::Shaders::ShaderSpecs k_genericShaderSpecs[] = 
 	{
-		{L"FullscreenTri", L"FullscreenTri", DX12::Shaders::GenericShader::Type::FullscreenTri_VS, DX12::Shaders::Stage::Vertex},
-		{L"FillColor", L"FillColor", DX12::Shaders::GenericShader::Type::FillColor_PS, DX12::Shaders::Stage::Pixel},
-		{L"PostProcess", L"PostProcess", DX12::Shaders::GenericShader::Type::PostProcess_PS, DX12::Shaders::Stage::Pixel},
+		{L"FullscreenTri", L"FullscreenTri", DX12::Shaders::Stage::Vertex, DX12::Shaders::GenericShader::Type::FullscreenTri_VS},
+		{L"FillColor", L"FillColor", DX12::Shaders::Stage::Pixel, DX12::Shaders::GenericShader::Type::FillColor_PS},
+		{L"PostProcess", L"PostProcess", DX12::Shaders::Stage::Pixel, DX12::Shaders::GenericShader::Type::PostProcess_PS},
 	};
 	static_assert(_countof(k_genericShaderSpecs) == (int)DX12::Shaders::GenericShader::Type::Count, "Missing file specification of at least one generic shader.");
 

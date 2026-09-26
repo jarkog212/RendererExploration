@@ -76,7 +76,7 @@ int DX12::Meshes::Add(const void* stream, unsigned long long& consumedBytes)
 		return -1,
 		"Stream contains a mesh with unsupported topology.");
 
-	ID3D12Resource* resource = DX12::UploadDataToGPU(byteStream + headerSize, totalBufferSize);
+	ID3D12Resource* resource = DX12::UploadDataToNewGPUBuffer(byteStream + headerSize, totalBufferSize);
 	int meshCollectionIndex = -1;
 
 	{

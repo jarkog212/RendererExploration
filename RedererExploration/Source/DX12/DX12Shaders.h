@@ -62,8 +62,8 @@ namespace DX12::Shaders
 	{
 		const wchar_t* _filename;
 		const wchar_t* _function;
-		DX12::Shaders::GenericShader::Type _type;
 		DX12::Shaders::Stage _stage;
+		DX12::Shaders::GenericShader::Type _type;
 	};
 
 	void WarmUp();

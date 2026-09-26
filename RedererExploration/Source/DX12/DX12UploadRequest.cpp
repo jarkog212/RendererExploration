@@ -2,7 +2,7 @@
 #include "DX12Renderer.h"
 #include "DX12Utils.h"
 
-ID3D12Resource* DX12::UploadDataToGPU(
+ID3D12Resource* DX12::UploadDataToNewGPUBuffer(
 	const void* data,
 	unsigned int bufferSize,
 	D3D12_RESOURCE_DESC* desc,
@@ -90,7 +90,7 @@ DX12::GPUUploadRequest::GPUUploadRequest(
 	_frameId = _uploadCopyWorker->ReserveUploadFrame();
 	const DX12::UploadCopyWorker::UploadCopyFrame& frameView = _uploadCopyWorker->GetFrameConst(_frameId);
 
-	ID3D12Resource* resource = DX12::UploadDataToGPU(data, alignedSize, desc, true);
+	ID3D12Resource* resource = DX12::UploadDataToNewGPUBuffer(data, alignedSize, desc, true);
 	wchar_t buffer[250]{};
 	swprintf(buffer, 250, L"Proxy Upload Buffer (size: %u)", alignedSize);
 	HRESULT_CHECK_CRITICAL(resource->SetName(buffer), "Could not name upload buffer.");

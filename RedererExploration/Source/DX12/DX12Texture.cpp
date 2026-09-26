@@ -121,7 +121,7 @@ DX12::Texture::Texture(DX12::Texture::LoadingRequest& request)
 	request._resourceDesc->Height = height;
 	request._resourceDesc->Width = width;
 	
-	_resource = DX12::UploadDataToGPU(imgBuffer, imgBufferSize, request._resourceDesc, false, request._initialState, request._resourceDesc->Flags);
+	_resource = DX12::UploadDataToNewGPUBuffer(imgBuffer, imgBufferSize, request._resourceDesc, false, request._initialState, request._resourceDesc->Flags);
 	_srvHandle = DX12::GetSRVHeap()->Allocate();
 	DX12::GetRendererDevice()->CreateShaderResourceView(_resource, request._srvDesc, _srvHandle._cpu);
 
@@ -162,11 +162,10 @@ std::shared_ptr<DX12::Texture> DX12::TextureSpace::GetOrLoad(const wchar_t* name
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = DX12::CC::Desc::TextureRaw::k_basicSRVTemplate;
 	D3D12_RESOURCE_DESC desc = DX12::CC::Desc::TextureRaw::k_basicTextureTemplate;
 	DX12::Texture::LoadingRequest request;
-	request._initialState |= D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+	request._initialState |= D3D12_RESOURCE_STATE_COMMON;
 	request._srvDesc = &srvDesc;
 	request._resourceDesc = &desc;
 
-	// TODO textures load from file.
 	std::shared_ptr<DX12::Texture> out = std::make_shared<DX12::Texture>(request);
 	::g_textures.emplace(name, out);
 

@@ -14,9 +14,9 @@ namespace
 	
 	static std::filesystem::path k_textureFilePrefix(".\\Textures");
 
-	std::unordered_map<const wchar_t*, std::weak_ptr<DX12::Texture>> g_textures;
+	std::unordered_map<std::wstring, std::weak_ptr<DX12::Texture>> g_textures;
 
-	std::mutex g_mutex;
+	std::mutex g_textureMutex;
 
 	inline int STBIChannelEnumToCount(::STBI_Format enumValue)
 	{
@@ -53,6 +53,23 @@ namespace
 		CRITICAL_ASSERT(false, "Unexpected DXGI texture format %u", format);
 
 		return 0;
+	}
+
+	const bool SafeReleaseTexture(const wchar_t* name)
+	{
+		std::lock_guard lock(::g_textureMutex);
+
+		auto it = ::g_textures.find(name);
+		if (it == ::g_textures.end())
+			return false;
+
+		CRITICAL_ASSERT(
+			it->second.expired(),
+			"Trying to remove texture with legitimate references. %ls",
+			name);
+
+		::g_textures.erase(it);
+		return true;
 	}
 }
 
@@ -123,6 +140,7 @@ DX12::Texture::Texture(DX12::Texture::LoadingRequest& request)
 	
 	_resource = DX12::UploadDataToNewGPUBuffer(imgBuffer, imgBufferSize, request._resourceDesc, false, request._initialState, request._resourceDesc->Flags);
 	_srvHandle = DX12::GetSRVHeap()->Allocate();
+	_name = request._filename;
 	DX12::GetRendererDevice()->CreateShaderResourceView(_resource, request._srvDesc, _srvHandle._cpu);
 
 	stbi_image_free(imgBuffer);
@@ -132,12 +150,30 @@ DX12::Texture::~Texture()
 {
 	DEBUG_DESTRUCTOR_BODY(Texture)
 
-	Utils::COM::SafeDeferredRenderThreadRelease(_resource);
+	if (_name.empty())
+	{
+		Utils::COM::SafeDeferredRenderThreadRelease(_resource);
+		return;
+	}
+	
+	// name means it has been read from a file and may be referenced else where
+	::SafeReleaseTexture(_name.c_str());
+	Utils::SafeDeferredRenderThreadReleaseViaLambda(
+		[
+			resource = _resource,
+			handle = _srvHandle.MoveToRawHeap()
+		]
+		() mutable
+		{
+			Utils::COM::SafeRelease(resource);
+			delete handle;
+		});
 }
 
 DX12::Texture::Texture(Texture&& other) noexcept :
 	_resource(std::exchange(other._resource, nullptr)),
-	_srvHandle(std::move(other._srvHandle))
+	_srvHandle(std::move(other._srvHandle)),
+	_name(std::move(other._name))
 {
 }
 
@@ -147,16 +183,16 @@ DX12::Texture& DX12::Texture::operator=(Texture&& other) noexcept
 
 	std::swap(_resource, other._resource);
 	std::swap(_srvHandle, other._srvHandle);
+	std::swap(_name, other._name);
 
 	return *this;
 }
 
 std::shared_ptr<DX12::Texture> DX12::TextureSpace::GetOrLoad(const wchar_t* name)
 {
-	std::scoped_lock lock(::g_mutex);
+	std::scoped_lock lock(::g_textureMutex);
 
-	auto texture = ::g_textures.find(name);
-	if (texture != ::g_textures.end()) [[likely]]
+	if (auto texture = ::g_textures.find(name); texture != ::g_textures.end() && !texture->second.expired()) [[likely]]
 		return texture->second.lock();
 
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = DX12::CC::Desc::TextureRaw::k_basicSRVTemplate;
@@ -167,15 +203,14 @@ std::shared_ptr<DX12::Texture> DX12::TextureSpace::GetOrLoad(const wchar_t* name
 	request._resourceDesc = &desc;
 
 	std::shared_ptr<DX12::Texture> out = std::make_shared<DX12::Texture>(request);
-	::g_textures.emplace(name, out);
+	::g_textures[name] = out;
 
-	// NRVO/move should protect against deletion?
 	return out;
 }
 
 void DX12::TextureSpace::Release() 
 {
-	std::scoped_lock lock(::g_mutex);
+	std::scoped_lock lock(::g_textureMutex);
 
 	::g_textures.clear();
 }

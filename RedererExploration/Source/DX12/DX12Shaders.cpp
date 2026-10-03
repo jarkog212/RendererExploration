@@ -4,6 +4,7 @@
 #include <d3d12shader.h>
 #include <wrl.h>
 
+#include <mutex>
 #include <memory>
 #include <filesystem>
 #include <unordered_map>
@@ -34,7 +35,7 @@ namespace
 		};
 		static_assert(_countof(k_shaderStageNames) == (int)DX12::Shaders::Stage::Count, "Number of names does not match count of shader stages.");
 
-		IDxcBlob* CompileShader(const DX12::Shaders::ShaderSpecs& spec)
+		IDxcBlob* CompileShader(const DX12::Shaders::Specs& spec)
 		{
 			if (!::Compiler::g_shaderCompiler) [[unlikely]]
 				HRESULT_CHECK_CRITICAL(
@@ -118,9 +119,10 @@ namespace
 		}
 	} // Compiler
 
+	static std::mutex g_shaderMutex;
 	static std::unique_ptr<char[]> g_genericShadersArena = nullptr;
 	static std::unique_ptr<DX12::Shaders::GenericShader[]> g_genericShaderViews = nullptr;
-	constexpr DX12::Shaders::ShaderSpecs k_genericShaderSpecs[] = 
+	constexpr DX12::Shaders::Specs k_genericShaderSpecs[] = 
 	{
 		{L"FullscreenTri", L"FullscreenTri", DX12::Shaders::Stage::Vertex, DX12::Shaders::GenericShader::Type::FullscreenTri_VS},
 		{L"FillColor", L"FillColor", DX12::Shaders::Stage::Pixel, DX12::Shaders::GenericShader::Type::FillColor_PS},
@@ -128,7 +130,7 @@ namespace
 	};
 	static_assert(_countof(k_genericShaderSpecs) == (int)DX12::Shaders::GenericShader::Type::Count, "Missing file specification of at least one generic shader.");
 
-	static std::unordered_map<const wchar_t* ,DX12::Shaders::Shader> g_shaders;
+	static std::unordered_map<std::wstring, std::weak_ptr<DX12::Shaders::Shader>> g_shaders;
 
 	unsigned long long int CompileAndSaveGenericShaders() 
 	{
@@ -201,20 +203,68 @@ namespace
 
 		CRITICAL_ASSERT(offset == shaderHeapSize, "Converting heap to objects led to incorrect final offset.")
 	}
+
+	const bool SafeReleaseShader(const wchar_t* name)
+	{
+		std::lock_guard lock(::g_shaderMutex);
+
+		auto it = ::g_shaders.find(name);
+		if (it == ::g_shaders.end())
+			return false;
+
+		CRITICAL_ASSERT(
+			it->second.expired(),
+			"Truing to delete a shader with legitimate references. %ls.",
+			name);
+
+		::g_shaders.erase(it);
+		return true;
+	}
+}
+
+DX12::Shaders::Shader::Shader(const DX12::Shaders::Specs& specs)
+{
+	std::filesystem::path precompiledPath = ::Compiler::k_precompiledShaderPrefix;
+	precompiledPath.append(specs._filename);
+	precompiledPath += ::Compiler::k_shaderBinaryExtension;
+
+	_name = specs._filename;
+
+#ifdef _FORCE_NONGENERIC_SHADER_COMPILATION
+	Utils::System::TryDeleteFile(precompiledPath);
+#else
+	if (Utils::System::FileExists(precompiledPath)) [[likely]]
+	{
+		Utils::System::LoadFile(precompiledPath, _byteCode, _size);
+		return;
+	}
+#endif
+
+	Microsoft::WRL::ComPtr<IDxcBlob> blob = ::Compiler::CompileShader(specs);
+	_size = blob->GetBufferSize();
+	_byteCode = new char[_size];
+	memcpy(_byteCode, blob->GetBufferPointer(), _size);
+
+	Utils::System::SaveFile(precompiledPath, _byteCode, _size);
+
+	return;
 }
 
 DX12::Shaders::Shader::~Shader()
 {
 	DEBUG_DESTRUCTOR_BODY(Shader)
-
-	_size = 0;
-	delete[] _byteCode;
+	::SafeReleaseShader(_name.c_str());
+	Utils::SafeDeferredRenderThreadReleaseViaLambda([data = _byteCode]() 
+		{ 
+			delete[] data;
+		});
 }
 
 DX12::Shaders::Shader::Shader(Shader&& other) noexcept
 {
 	_size = std::exchange(other._size, 0);
 	_byteCode = std::exchange(other._byteCode, nullptr);
+	_name = std::exchange(other._name, nullptr);
 }
 
 DX12::Shaders::Shader& DX12::Shaders::Shader::operator=(Shader&& other)
@@ -223,6 +273,7 @@ DX12::Shaders::Shader& DX12::Shaders::Shader::operator=(Shader&& other)
 
 	std::swap(_size, other._size);
 	std::swap(_byteCode, other._byteCode);
+	std::swap(_name, other._name);
 
 	return *this;
 }
@@ -235,13 +286,15 @@ D3D12_SHADER_BYTECODE DX12::Shaders::ShaderView::AsDX12Bytecode() const
 	return out;
 }
 
-void DX12::Shaders::WarmUp()
+void DX12::ShaderSpace::WarmUp()
 {
-	DX12::Shaders::GetGenericShader(DX12::Shaders::GenericShader::Type::FullscreenTri_VS);
+	DX12::ShaderSpace::GetGenericShader(DX12::Shaders::GenericShader::Type::FullscreenTri_VS);
 }
 
-void DX12::Shaders::Release()
+void DX12::ShaderSpace::Release()
 {
+	std::lock_guard lock(::g_shaderMutex);
+
 	::g_genericShaderViews.reset();
 	::g_genericShadersArena.reset();
 	::g_shaders.clear();
@@ -250,7 +303,7 @@ void DX12::Shaders::Release()
 	::Compiler::g_DXCInlcudeHandler.Reset();
 }
 
-D3D12_SHADER_BYTECODE DX12::Shaders::GetGenericShader(DX12::Shaders::GenericShader::Type type)
+D3D12_SHADER_BYTECODE DX12::ShaderSpace::GetGenericShader(DX12::Shaders::GenericShader::Type type)
 {
 	if (g_genericShaderViews) [[likely]]
 	{
@@ -263,61 +316,17 @@ D3D12_SHADER_BYTECODE DX12::Shaders::GetGenericShader(DX12::Shaders::GenericShad
 
 	::PreloadGenericShaders();
 
-	return DX12::Shaders::GetGenericShader(type);
+	return DX12::ShaderSpace::GetGenericShader(type);
 }
 
-const DX12::Shaders::ShaderView DX12::Shaders::LoadOrCompile(const DX12::Shaders::ShaderSpecs& specs)
+std::shared_ptr<DX12::Shaders::Shader> DX12::ShaderSpace::GetOrLoad(const DX12::Shaders::Specs& specs)
 {
-	DX12::Shaders::TryReleaseShader(specs);
-	DX12::Shaders::Shader& out = ::g_shaders[specs._filename];
-	std::filesystem::path precompiledPath = ::Compiler::k_precompiledShaderPrefix;
-	precompiledPath.append(specs._filename);
-	precompiledPath += ::Compiler::k_shaderBinaryExtension;
+	std::lock_guard lock(::g_shaderMutex);
 
-#ifdef _FORCE_NONGENERIC_SHADER_COMPILATION
-	Utils::System::TryDeleteFile(precompiledPath);
-#else
-	if (Utils::System::FileExists(precompiledPath)) [[likely]]
-	{
-		Utils::System::LoadFile(precompiledPath, out._byteCode, out._size);
-		return out.CreateView();
-	}
-#endif
+	if (auto it = ::g_shaders.find(specs._filename); it != ::g_shaders.end() && !it->second.expired()) [[likely]]
+		return it->second.lock();
 
-	Microsoft::WRL::ComPtr<IDxcBlob> blob = ::Compiler::CompileShader(specs);
-	out._size = blob->GetBufferSize();
-	out._byteCode = new char[out._size];
-	memcpy(out._byteCode, blob->GetBufferPointer(), out._size);
-	
-	Utils::System::SaveFile(precompiledPath, out._byteCode, out._size);
-
-	return out.CreateView();
-}
-
-bool DX12::Shaders::TryReleaseShader(const DX12::Shaders::ShaderSpecs& specs)
-{
-	if (auto it = ::g_shaders.find(specs._filename); it != ::g_shaders.end())
-	{
-		::g_shaders.erase(it);
-		return true;
-	}
-
-	return false;
-}
-
-D3D12_SHADER_BYTECODE DX12::Shaders::GetShader(const DX12::Shaders::ShaderSpecs& specs)
-{
-	if (auto it = ::g_shaders.find(specs._filename); it != ::g_shaders.end()) [[likely]]
-		return it->second.AsDX12Bytecode();
-
-	DX12::Shaders::ShaderView view = DX12::Shaders::LoadOrCompile(specs);
-	return view.AsDX12Bytecode();
-}
-
-const DX12::Shaders::ShaderView DX12::Shaders::GetShaderView(const DX12::Shaders::ShaderSpecs& specs)
-{
-	if (auto it = ::g_shaders.find(specs._filename); it != ::g_shaders.end())
-		return it->second.CreateView();
-
-	return DX12::Shaders::LoadOrCompile(specs);
+	std::shared_ptr<DX12::Shaders::Shader> shader = std::make_shared<DX12::Shaders::Shader>(specs);
+	::g_shaders[specs._filename] = shader;
+	return shader;
 }

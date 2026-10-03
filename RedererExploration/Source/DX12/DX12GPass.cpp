@@ -94,8 +94,8 @@ ID3D12PipelineState* DX12::GPassSpace::GetPipelineState()
 		return ::g_GPassPipelineState.Get();
 
 	struct : public DX12::GPassSpace::PSOBase{
-		PipelineStream::SubVertexShader _vs{ DX12::Shaders::GetGenericShader(DX12::Shaders::GenericShader::Type::FullscreenTri_VS) };
-		PipelineStream::SubPixelShader _ps{DX12::Shaders::GetGenericShader(DX12::Shaders::GenericShader::Type::FillColor_PS) };
+		PipelineStream::SubVertexShader _vs{ DX12::ShaderSpace::GetGenericShader(DX12::Shaders::GenericShader::Type::FullscreenTri_VS) };
+		PipelineStream::SubPixelShader _ps{DX12::ShaderSpace::GetGenericShader(DX12::Shaders::GenericShader::Type::FillColor_PS) };
 	}stream;
 
 	::g_GPassPipelineState = DX12::Helpers::CreatePipelineState(&stream, sizeof(stream));

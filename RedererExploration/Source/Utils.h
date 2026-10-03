@@ -2,6 +2,7 @@
 
 #include <assert.h>
 #include <cstdio>
+#include <functional>
 
 #include <filesystem>
 
@@ -89,6 +90,7 @@ namespace UtilsImpl
 		void FileDelete(std::filesystem::path& path);
 	} // System
 
+	void SafeDeferredRenderThreadReleaseViaLambda(std::function<void()>&& releaseFunc);
 	float GetFps();
 } // UtilsImpl
 
@@ -157,6 +159,11 @@ namespace Utils
 			UtilsImpl::System::SaveFile(path, buffer, size);
 		}
 	} // System
+
+	inline void SafeDeferredRenderThreadReleaseViaLambda(std::function<void()>&& releaseFunc)
+	{
+		UtilsImpl::SafeDeferredRenderThreadReleaseViaLambda(std::move(releaseFunc));
+	}
 
 	inline float GetFPS() 
 	{

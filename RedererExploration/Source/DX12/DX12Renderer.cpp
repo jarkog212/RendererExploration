@@ -27,6 +27,7 @@ namespace
 		static int g_deferredResourceFreeingFlag = 0;
 		static_assert(sizeof(g_deferredResourceFreeingFlag) * sizeof(char) > DX12::CC::k_rendererWorkerFrameBuffers, "Flag bit-buffer needs to be wide enough for frame buffer count.");
 		static std::vector<IUnknown*> g_deferredCOMReleases[DX12::CC::k_rendererWorkerFrameBuffers];
+		static std::vector<std::function<void()>> g_deferredLambdaReleases[DX12::CC::k_rendererWorkerFrameBuffers];
 
 		static void FreePendingResources(const int currentFrame = DX12::CC::k_forAllFrames)
 		{
@@ -35,13 +36,18 @@ namespace
 
 			::DefferedFree::g_deferredResourceFreeingFlag &= ~(1ull << currentFrame);
 
-			DX12::GetDSVHeap()->ProcessPendingResourceFreeing(currentFrame);
-			DX12::GetRTVHeap()->ProcessPendingResourceFreeing(currentFrame);
-			DX12::GetSRVHeap()->ProcessPendingResourceFreeing(currentFrame);
-			DX12::GetUAVHeap()->ProcessPendingResourceFreeing(currentFrame);
-
 			static auto cleaner = [](const unsigned int frame)
 				{
+					for (auto& it : ::DefferedFree::g_deferredLambdaReleases[frame])
+						it();
+
+					::DefferedFree::g_deferredLambdaReleases[frame].clear();
+
+					DX12::GetDSVHeap()->ProcessPendingResourceFreeing(frame);
+					DX12::GetRTVHeap()->ProcessPendingResourceFreeing(frame);
+					DX12::GetSRVHeap()->ProcessPendingResourceFreeing(frame);
+					DX12::GetUAVHeap()->ProcessPendingResourceFreeing(frame);
+
 					std::vector<IUnknown*>& pendingCOMList = g_deferredCOMReleases[frame];
 					for (auto& comObj : pendingCOMList)
 						Utils::COM::SafeRelease(comObj);
@@ -130,6 +136,13 @@ void UtilsImpl::COM::DeferredRenderThreadRelease(IUnknown* resource)
 {
 	unsigned int currentFrame = DX12::GetMainRendererWorker()->GetCurrentFrame();
 	::DefferedFree::g_deferredCOMReleases[currentFrame].push_back(resource);
+	DX12::SetPendingResourceFreeingFlag();
+}
+
+void UtilsImpl::SafeDeferredRenderThreadReleaseViaLambda(std::function<void()>&& releaseFunction)
+{
+	unsigned int currentFrame = DX12::GetMainRendererWorker()->GetCurrentFrame();
+	::DefferedFree::g_deferredLambdaReleases[currentFrame].push_back(std::move(releaseFunction));
 	DX12::SetPendingResourceFreeingFlag();
 }
 
@@ -376,7 +389,7 @@ bool DX12::Initialize(HWND hwnd)
 	DX12::GetMainUploadCopyWorker();
 
 	::RenderGraph::WarmUp();
-	::DX12::Meshes::WarmUp();
+	::DX12::MeshSpace::WarmUp();
 
 	return true;
 }
@@ -437,7 +450,7 @@ void DX12::ReleaseAll()
 			DX12::GetMainRendererWorker()->Flush();
 
 			::RenderGraph::Release();
-			DX12::Shaders::Release();
+			DX12::ShaderSpace::Release();
 			
 			// Render Graph passes hold textures and stuff
 			::DefferedFree::FreePendingResources(DX12::CC::k_forAllFrames);
@@ -455,7 +468,7 @@ void DX12::ReleaseAll()
 			DX12::GetSRVHeap()->Release();
 			DX12::GetUAVHeap()->Release();
 
-			DX12::Meshes::Release();
+			DX12::MeshSpace::Release();
 
 			// Heap releases add to the deferred pile
 			::DefferedFree::FreePendingResources(DX12::CC::k_forAllFrames);

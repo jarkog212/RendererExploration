@@ -5,6 +5,10 @@
 namespace DX12
 {
 	class MandelbrotPass;
+	namespace Shaders
+	{
+		class Shader;
+	}
 
 	namespace MandelbrotSpace
 	{
@@ -13,6 +17,7 @@ namespace DX12
 
 		ID3D12RootSignature* GetRootSignature();
 		ID3D12PipelineState* GetPipelineState();
+		DX12::Shaders::Shader* GetMandelbrotPixelShader();
 
 		MandelbrotPass* GetMandelbrotPass();
 	}

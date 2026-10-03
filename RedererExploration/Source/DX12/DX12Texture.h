@@ -41,6 +41,7 @@ namespace DX12
 
 		ID3D12Resource* _resource = nullptr; // non-owning (deferred free) so RAW
 		DX12::DescriptorHandle _srvHandle = {};
+		std::wstring _name;
 	};
 }
 

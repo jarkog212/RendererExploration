@@ -7,7 +7,7 @@
 
 namespace DX12::Shaders
 {
-	enum class Stage 
+	enum class Stage
 	{
 		Vertex = 0,
 		Hull,
@@ -25,22 +25,10 @@ namespace DX12::Shaders
 	{
 		static constexpr unsigned int _k_headerSize = sizeof(unsigned long long int);
 
+		D3D12_SHADER_BYTECODE AsDX12Bytecode() const;
+
 		unsigned long long int _size = 0;
 		char* _byteCode = nullptr;
-
-		D3D12_SHADER_BYTECODE AsDX12Bytecode() const;
-	};
-
-	struct Shader : public ShaderView 
-	{
-		Shader() = default;
-		~Shader();
-		Shader(Shader&& other) noexcept;
-		Shader& operator=(Shader&& other);
-
-		NO_COPY(Shader);
-
-		const DX12::Shaders::ShaderView CreateView() const { return { _size, _byteCode }; };
 	};
 
 	struct GenericShader
@@ -58,7 +46,7 @@ namespace DX12::Shaders
 		DX12::Shaders::ShaderView _shader = {};
 	};
 
-	struct ShaderSpecs
+	struct Specs
 	{
 		const wchar_t* _filename;
 		const wchar_t* _function;
@@ -66,12 +54,26 @@ namespace DX12::Shaders
 		DX12::Shaders::GenericShader::Type _type;
 	};
 
+	struct Shader : public ShaderView
+	{
+		Shader(const DX12::Shaders::Specs& specs);
+		~Shader();
+		Shader(Shader&& other) noexcept;
+		Shader& operator=(Shader&& other);
+
+		NO_COPY(Shader);
+
+		const DX12::Shaders::ShaderView CreateView() const { return { _size, _byteCode }; };
+
+		std::wstring _name;
+	};
+}
+
+namespace DX12::ShaderSpace
+{
 	void WarmUp();
 	void Release();
 
 	D3D12_SHADER_BYTECODE GetGenericShader(DX12::Shaders::GenericShader::Type type);
-	const DX12::Shaders::ShaderView LoadOrCompile(const DX12::Shaders::ShaderSpecs& specs);
-	bool TryReleaseShader(const DX12::Shaders::ShaderSpecs& specs);
-	D3D12_SHADER_BYTECODE GetShader(const DX12::Shaders::ShaderSpecs& specs);
-	const DX12::Shaders::ShaderView GetShaderView(const DX12::Shaders::ShaderSpecs& specs);
+	std::shared_ptr<DX12::Shaders::Shader> GetOrLoad(const DX12::Shaders::Specs& specs);
 }

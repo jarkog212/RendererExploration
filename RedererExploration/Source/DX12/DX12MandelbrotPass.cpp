@@ -28,9 +28,10 @@ namespace
 
 	static Microsoft::WRL::ComPtr<ID3D12PipelineState> g_pipelineState = nullptr;
 
+	static std::shared_ptr<DX12::Shaders::Shader> g_mandelBrotPixelShader = nullptr;
 	static std::unique_ptr<DX12::MandelbrotPass> g_mandelbrotPass = nullptr;
 
-	constexpr DX12::Shaders::ShaderSpecs k_mandelbrotShaderSpecs{
+	constexpr DX12::Shaders::Specs k_mandelbrotShaderSpecs{
 		L"Mandelbrot",
 		L"Mandelbrot",
 		DX12::Shaders::Stage::Pixel,
@@ -42,6 +43,7 @@ void DX12::MandelbrotSpace::WarmUp()
 {
 	DX12::MandelbrotSpace::GetPipelineState();
 	DX12::MandelbrotSpace::GetMandelbrotPass();
+	DX12::MandelbrotSpace::GetMandelbrotPixelShader();
 }
 
 void DX12::MandelbrotSpace::Release()
@@ -49,6 +51,7 @@ void DX12::MandelbrotSpace::Release()
 	::RootSignature::g_instance.Reset();
 	::g_pipelineState.Reset();
 	::g_mandelbrotPass.reset();
+	::g_mandelBrotPixelShader.reset();
 }
 
 ID3D12RootSignature* DX12::MandelbrotSpace::GetRootSignature()
@@ -83,8 +86,8 @@ ID3D12PipelineState* DX12::MandelbrotSpace::GetPipelineState()
 	using namespace DX12::PipelineStream;
 	struct {
 		SubRootSignature _rs{ DX12::MandelbrotSpace::GetRootSignature() };
-		SubVertexShader _vs{ DX12::Shaders::GetGenericShader(DX12::Shaders::GenericShader::Type::FullscreenTri_VS) };
-		SubPixelShader _ps{ DX12::Shaders::GetShader(::k_mandelbrotShaderSpecs)};
+		SubVertexShader _vs{ DX12::ShaderSpace::GetGenericShader(DX12::Shaders::GenericShader::Type::FullscreenTri_VS) };
+		SubPixelShader _ps {DX12::MandelbrotSpace::GetMandelbrotPixelShader()->AsDX12Bytecode()};
 		SubPrimitiveTopology _primitiveTopoliogy{ D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE };
 		SubRenderTargetFormats _renderTargetFormats{};
 		SubRasterizer _rasterizer{ DX12::CC::Desc::Rasterizer::k_noCullTemplate };
@@ -108,6 +111,15 @@ DX12::MandelbrotPass* DX12::MandelbrotSpace::GetMandelbrotPass()
 
 	::g_mandelbrotPass = std::make_unique<DX12::MandelbrotPass>();
 	return ::g_mandelbrotPass.get();
+}
+
+DX12::Shaders::Shader* DX12::MandelbrotSpace::GetMandelbrotPixelShader()
+{
+	if (::g_mandelBrotPixelShader) [[likely]]
+		return ::g_mandelBrotPixelShader.get();
+
+	::g_mandelBrotPixelShader = DX12::ShaderSpace::GetOrLoad(::k_mandelbrotShaderSpecs);
+	return ::g_mandelBrotPixelShader.get();
 }
 
 DX12::MandelbrotPass::MandelbrotPass(MandelbrotPass&& other) noexcept :

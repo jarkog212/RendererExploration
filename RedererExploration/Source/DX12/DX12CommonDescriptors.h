@@ -235,6 +235,18 @@ namespace DX12::CC::Desc
 			D3D12_TEXTURE_LAYOUT_ROW_MAJOR,
 			D3D12_RESOURCE_FLAG_NONE
 		};
+
+		constexpr D3D12_SHADER_RESOURCE_VIEW_DESC k_StructuredSRVTemplate{
+			DXGI_FORMAT_UNKNOWN,
+			D3D12_SRV_DIMENSION_BUFFER,
+			D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING,
+			{.Buffer = D3D12_BUFFER_SRV{
+				0,		// FirstElement
+				1,		// NumElements
+				0,		// StructureByteStride
+				D3D12_BUFFER_SRV_FLAG_NONE
+			}}
+		};
 	} // namespace BufferResource
 
 	namespace TextureRaw

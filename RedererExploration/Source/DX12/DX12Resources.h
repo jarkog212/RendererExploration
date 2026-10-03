@@ -6,6 +6,16 @@
 
 namespace DX12
 {
+	namespace Materials
+	{
+		class Material;
+	}
+
+	namespace Meshes
+	{
+		class Mesh;
+	}
+
 	namespace PipelineStream
 	{
 		template<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type, typename T>
@@ -67,6 +77,8 @@ namespace DX12
 		DescriptorHandle& operator=(DescriptorHandle&& other) noexcept;
 
 		NO_COPY(DescriptorHandle);
+
+		DescriptorHandle* MoveToRawHeap() { return new DescriptorHandle(std::move(*this)); }
 
 		constexpr bool IsValid() const { return _cpu.ptr != 0; }
 		constexpr bool IsShaderVisible() const { return _gpu.ptr != 0; }
@@ -166,5 +178,9 @@ namespace DX12
 		bool _submitBarriers[2] = { true, false };
 	};
 
-
+	struct Geometry
+	{
+		std::shared_ptr<DX12::Meshes::Mesh> _mesh;
+		std::shared_ptr<DX12::Materials::Material> _material;
+	};
 }

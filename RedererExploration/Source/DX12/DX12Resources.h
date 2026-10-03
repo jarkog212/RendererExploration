@@ -4,6 +4,8 @@
 #include "DX12Core.h"
 #include "Utils.h"
 
+#include "Attributes.h"
+
 namespace DX12
 {
 	namespace Materials
@@ -182,5 +184,17 @@ namespace DX12
 	{
 		std::shared_ptr<DX12::Meshes::Mesh> _mesh;
 		std::shared_ptr<DX12::Materials::Material> _material;
+	};
+
+	struct ComplexGeometry 
+	{
+		std::vector<DX12::Geometry> _subGeometries;
+	};
+
+	struct StaticMesh : public Attrib::Holder<ComplexGeometry>,
+		public Attrib::Transform
+	{
+		DEBUG_DESTRUCTOR(StaticMesh);
+		std::vector<DX12::ComplexGeometry> _complexGeometryLods;
 	};
 }

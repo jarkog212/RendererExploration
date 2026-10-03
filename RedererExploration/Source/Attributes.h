@@ -29,7 +29,7 @@ namespace Attrib
 	{
 	public:
 
-		virtual ~Transform() { DEBUG_DESTRUCTOR_BODY(Transform); }
+		virtual DEBUG_DESTRUCTOR(Transform);
 
 		struct AttributeType
 		{
@@ -52,7 +52,7 @@ namespace Attrib
 	public:
 
 		Movable(Transform* self) { _transformToModify = self->GetValue(); }
-		virtual ~Movable() { DEBUG_DESTRUCTOR_BODY(Movable); }
+		virtual DEBUG_DESTRUCTOR(Movable);
 
 		inline void Reset()
 		{

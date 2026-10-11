@@ -32,47 +32,47 @@ namespace DX12::Meshes
     };
 
 #pragma pack(pop)
+    class WorldMatrixBuffer;
 
-    class WorldTransformBuffer
+    class WorldMatrixBufferAllocation
     {
     public:
 
-        class Allocation 
-        {
-        public:
+        static constexpr int _k_Inavlid = -1;
 
-            static constexpr int _k_Inavlid = -1;
+        WorldMatrixBufferAllocation(int index, DirectX::XMMATRIX& matrix, WorldMatrixBuffer& owner);
+        ~WorldMatrixBufferAllocation();
+        WorldMatrixBufferAllocation(WorldMatrixBufferAllocation&&) = default;
+        WorldMatrixBufferAllocation& operator=(WorldMatrixBufferAllocation&&) = default;
 
-            Allocation(int index, DirectX::XMMATRIX& matrix, WorldTransformBuffer& owner);
-            ~Allocation();
-            Allocation(Allocation&&) = default;
-            Allocation& operator=(Allocation&&) = default;
+        NO_COPY(WorldMatrixBufferAllocation);
 
-            NO_COPY(Allocation);
+        DirectX::XMMATRIX& GetTransformMatrix();
 
-            DirectX::XMMATRIX& GetTransformMatrix();
+    private:
 
-        private:
+        int _index = _k_Inavlid;
+        WorldMatrixBuffer* _worldTransformBufferOwner = nullptr;
+    };
 
-            DirectX::XMMATRIX* _transformationMatrix = nullptr;
-            int _index = _k_Inavlid;
-            WorldTransformBuffer* _worldTransformBufferOwner = nullptr;
-        };
+    class WorldMatrixBuffer
+    {
+    public:
 
-        WorldTransformBuffer();
-        DEBUG_DESTRUCTOR(WorldTransformBuffer);
-        WorldTransformBuffer(WorldTransformBuffer&&) = default;
-        WorldTransformBuffer& operator=(WorldTransformBuffer&&) = default;
+        WorldMatrixBuffer();
+        DEBUG_DESTRUCTOR(WorldMatrixBuffer);
+        WorldMatrixBuffer(WorldMatrixBuffer&&) = default;
+        WorldMatrixBuffer& operator=(WorldMatrixBuffer&&) = default;
 
-        NO_COPY(WorldTransformBuffer);
+        NO_COPY(WorldMatrixBuffer);
 
         int GetMatrixSRVIndex(int currentFrame);
         int GetIDSRVIndex(int currentFrame);
         void Sync(int currentFrame);
-        Allocation Allocate();
+        WorldMatrixBufferAllocation Allocate();
         void Release(int index);
         int GetInstanceCount() { return _upcomingSlot; }
-        DirectX::XMMATRIX& GetWorldTransformMatrix(int index);
+        DirectX::XMMATRIX& GetWorldTransformMatrix(int index) { return _stagingBuffer[index]; };
 
     private:
 
@@ -134,7 +134,7 @@ namespace DX12::Meshes
         NO_COPY(Mesh);
 
         const DX12::Meshes::MeshView CreateView() const { return { _meshTemplateBuffer, _positionView, _elementsView }; };
-        WorldTransformBuffer::Allocation ReserveTransformMatrix();
+        WorldMatrixBufferAllocation ReserveTransformMatrix();
         int GetInstanceWorldMatricesSRVIndex(int currentFrame) { _instancesWorldTransforms.GetMatrixSRVIndex(currentFrame); }
         int GetInstanceWorldMatrixIDsSRVIndex(int currentFrame) { _instancesWorldTransforms.GetIDSRVIndex(currentFrame); }
         int GetInstanceCount() { _instancesWorldTransforms.GetInstanceCount(); }
@@ -144,7 +144,7 @@ namespace DX12::Meshes
 
         int _totalSize = -1;
         std::wstring _name = nullptr;
-        WorldTransformBuffer _instancesWorldTransforms;
+        WorldMatrixBuffer _instancesWorldTransforms;
     };
 }
 
@@ -153,5 +153,5 @@ namespace DX12::MeshSpace
     void Release();
     void WarmUp();
 
-    std::shared_ptr<DX12::Meshes::Mesh> GetOrLoad(const wchar_t* name, void* stream, unsigned long long& consumedBytes);
+    std::shared_ptr<DX12::Meshes::Mesh> GetOrLoad(const wchar_t* name, void* stream, unsigned long long* consumedBytes);
 }

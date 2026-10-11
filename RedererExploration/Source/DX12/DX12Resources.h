@@ -2,7 +2,6 @@
 
 #include "DX12CommonConstants.h"
 #include "DX12Core.h"
-#include "DX12Attributes.h"
 
 #include "Utils.h"
 
@@ -176,37 +175,5 @@ namespace DX12
 		// true, false as we expect the current post pass resource
 		//   barriers and next pre pass resource barriers to be grouped usually.
 		bool _submitBarriers[2] = { true, false };
-	};
-
-	struct Geometry : public DX12::Attributes::Holder<Geometry>,
-		public DX12::Attributes::Transform
-	{
-		std::shared_ptr<DX12::Meshes::Mesh> _mesh;
-		std::shared_ptr<DX12::Materials::Material> _material;
-
-		
-	};
-
-	struct ComplexGeometry : public DX12::Attributes::Holder<ComplexGeometry>,
-		public DX12::Attributes::Transform,
-		public DX12::Attributes::IUpdatable
-	{
-		std::vector<DX12::Geometry> _subGeometries;
-
-		//DX12::Attributes::IUpdatable
-		void Update(float deltaTime) override {};
-		// end DX12::Attributes::IUpdatable
-	};
-
-	struct StaticMesh : public DX12::Attributes::Holder<StaticMesh>,
-		public DX12::Attributes::Transform,
-		public DX12::Attributes::IUpdatable
-	{
-		DEBUG_DESTRUCTOR(StaticMesh);
-		std::vector<DX12::ComplexGeometry> _complexGeometryLods;
-
-		//DX12::Attributes::IUpdatable
-		void Update(float deltaTime) override {};
-		// end DX12::Attributes::IUpdatable
 	};
 }

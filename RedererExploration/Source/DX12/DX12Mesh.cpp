@@ -30,16 +30,18 @@ namespace
 	}
 }
 
-DX12::Meshes::WorldTransformBuffer::Allocation::Allocation(int index, DirectX::XMMATRIX& matrix, WorldTransformBuffer& owner) :
+DX12::Meshes::WorldMatrixBufferAllocation::WorldMatrixBufferAllocation(int index, DirectX::XMMATRIX& matrix, WorldMatrixBuffer& owner) :
 	_index(index),
-	_transformationMatrix(&matrix),
 	_worldTransformBufferOwner(&owner)
 {
 }
 
-DX12::Meshes::WorldTransformBuffer::Allocation::~Allocation()
+DX12::Meshes::WorldMatrixBufferAllocation::~WorldMatrixBufferAllocation()
 {
-	DEBUG_DESTRUCTOR_BODY(Allocation);
+	DEBUG_DESTRUCTOR_BODY(WorldMatrixBufferAllocation);
+
+	if (_index == _k_Inavlid && !_worldTransformBufferOwner)
+		return;
 
 	Utils::SafeDeferredRenderThreadReleaseViaLambda([bufferOwner = _worldTransformBufferOwner, index = _index]()
 		{
@@ -47,19 +49,19 @@ DX12::Meshes::WorldTransformBuffer::Allocation::~Allocation()
 		});
 }
 
-DirectX::XMMATRIX& DX12::Meshes::WorldTransformBuffer::Allocation::GetTransformMatrix()
+DirectX::XMMATRIX& DX12::Meshes::WorldMatrixBufferAllocation::GetTransformMatrix()
 {
 	CRITICAL_ASSERT(_index != _k_Inavlid, "Trying to access invalid matrix.");
 	return _worldTransformBufferOwner->GetWorldTransformMatrix(_index);
 }
 
-DX12::Meshes::WorldTransformBuffer::WorldTransformBuffer()
+DX12::Meshes::WorldMatrixBuffer::WorldMatrixBuffer()
 {
 	ReserveBatch();
 	Sync(DX12::CC::k_forAllFrames);
 }
 
-int DX12::Meshes::WorldTransformBuffer::GetMatrixSRVIndex(int currentFrame)
+int DX12::Meshes::WorldMatrixBuffer::GetMatrixSRVIndex(int currentFrame)
 {
 	// Hail Mary just in time sync to GPU... should be done elsewhere
 	if (!_perFrameData[currentFrame]._srvHandleTransforms.IsValid())
@@ -68,7 +70,7 @@ int DX12::Meshes::WorldTransformBuffer::GetMatrixSRVIndex(int currentFrame)
 	return _perFrameData[currentFrame]._srvHandleTransforms._index;
 }
 
-int DX12::Meshes::WorldTransformBuffer::GetIDSRVIndex(int currentFrame)
+int DX12::Meshes::WorldMatrixBuffer::GetIDSRVIndex(int currentFrame)
 {
 	// Hail Mary just in time sync to GPU... should be done elsewhere
 	if (!_perFrameData[currentFrame]._srvHandleIds.IsValid())
@@ -77,7 +79,7 @@ int DX12::Meshes::WorldTransformBuffer::GetIDSRVIndex(int currentFrame)
 	return _perFrameData[currentFrame]._srvHandleIds._index;
 }
 
-void DX12::Meshes::WorldTransformBuffer::Sync(int currentFrame)
+void DX12::Meshes::WorldMatrixBuffer::Sync(int currentFrame)
 {
 	static constexpr int elementSize = sizeof(DirectX::XMMATRIX);
 	static constexpr int elementIdSize = sizeof(int);
@@ -134,7 +136,7 @@ void DX12::Meshes::WorldTransformBuffer::Sync(int currentFrame)
 	}
 }
 
-DX12::Meshes::WorldTransformBuffer::Allocation DX12::Meshes::WorldTransformBuffer::Allocate()
+DX12::Meshes::WorldMatrixBufferAllocation DX12::Meshes::WorldMatrixBuffer::Allocate()
 {
 	if (_upcomingSlot == _assignIndexQueue.size())
 		ReserveBatch();
@@ -148,10 +150,10 @@ DX12::Meshes::WorldTransformBuffer::Allocation DX12::Meshes::WorldTransformBuffe
 		_perFrameData[i]._dirtyIDs = true;
 
 	_assignedIndecesTracker[index] = _assignedIndeces.size() - 1;
-	return DX12::Meshes::WorldTransformBuffer::Allocation(index, _stagingBuffer[index], *this);
+	return DX12::Meshes::WorldMatrixBufferAllocation(index, _stagingBuffer[index], *this);
 }
 
-void DX12::Meshes::WorldTransformBuffer::Release(int index)
+void DX12::Meshes::WorldMatrixBuffer::Release(int index)
 {
 	int slot = _assignedIndecesTracker[index];
 	CRITICAL_ASSERT(slot != -1 && _assignedIndeces[slot] == index, "Releasing a slot which is wa released before (or is not correct. i.e. double-free)");
@@ -163,16 +165,11 @@ void DX12::Meshes::WorldTransformBuffer::Release(int index)
 		_perFrameData[i]._dirtyIDs = true;
 
 	_assignedIndecesTracker[replacement] = slot;
-	_assignedIndecesTracker[index] = DX12::Meshes::WorldTransformBuffer::Allocation::_k_Inavlid;
+	_assignedIndecesTracker[index] = DX12::Meshes::WorldMatrixBufferAllocation::_k_Inavlid;
 	_assignIndexQueue[--_upcomingSlot] = index;
 }
 
-DirectX::XMMATRIX& DX12::Meshes::WorldTransformBuffer::GetWorldTransformMatrix(int index)
-{
-	return _stagingBuffer[index];
-}
-
-void DX12::Meshes::WorldTransformBuffer::ReserveBatch()
+void DX12::Meshes::WorldMatrixBuffer::ReserveBatch()
 {
 	_stagingBuffer.resize(_stagingBuffer.size() + _k_batchAllocation);
 	_assignIndexQueue.resize(_assignIndexQueue.size() + _k_batchAllocation);
@@ -186,7 +183,7 @@ void DX12::Meshes::WorldTransformBuffer::ReserveBatch()
 		_perFrameData[i] = PerFrameData();
 }
 
-DX12::Meshes::WorldTransformBuffer::PerFrameData::~PerFrameData()
+DX12::Meshes::WorldMatrixBuffer::PerFrameData::~PerFrameData()
 {
 	Utils::COM::SafeDeferredRenderThreadRelease(_meshWorldTransforms);
 	Utils::COM::SafeDeferredRenderThreadRelease(_meshWorldTransformsIDs);
@@ -242,7 +239,7 @@ DX12::Meshes::Mesh::~Mesh()
 	Utils::COM::SafeDeferredRenderThreadRelease(_meshTemplateBuffer);
 }
 
-DX12::Meshes::WorldTransformBuffer::Allocation DX12::Meshes::Mesh::ReserveTransformMatrix()
+DX12::Meshes::WorldMatrixBufferAllocation DX12::Meshes::Mesh::ReserveTransformMatrix()
 {
 	return _instancesWorldTransforms.Allocate();
 }
@@ -257,10 +254,18 @@ void DX12::MeshSpace::Release()
 	::g_meshes.clear();
 }
 
-std::shared_ptr<DX12::Meshes::Mesh> DX12::MeshSpace::GetOrLoad(const wchar_t* name, void* stream, unsigned long long& consumedBytes)
+std::shared_ptr<DX12::Meshes::Mesh> DX12::MeshSpace::GetOrLoad(const wchar_t* name, void* stream, unsigned long long* consumedBytes)
 {
-	CRITICAL_ASSERT(stream, "Invalid mesh stream.");
 	CRITICAL_ASSERT(name, "Invalid Mesh name.");
+
+	if (!stream)
+	{
+		std::lock_guard lock(::g_meshMutex);
+		auto it = ::g_meshes.find(name);
+		CRITICAL_ASSERT(it != ::g_meshes.end() && !it->second.expired(), "Trying to get unloaded mesh without stream.")
+
+		return it->second.lock();
+	}
 
 	const char* byteStream = reinterpret_cast<const char*>(stream);
 	const DX12::Meshes::StreamHeader* header = reinterpret_cast<const DX12::Meshes::StreamHeader*>(stream);
@@ -269,11 +274,19 @@ std::shared_ptr<DX12::Meshes::Mesh> DX12::MeshSpace::GetOrLoad(const wchar_t* na
 		std::lock_guard lock(::g_meshMutex);
 
 		if (auto it = ::g_meshes.find(name); it != ::g_meshes.end() && !it->second.expired()) [[likely]]
+		{
+			if (consumedBytes)
+				*consumedBytes = 0;
+
 			return it->second.lock();
+		}
 
 		std::shared_ptr<DX12::Meshes::Mesh> mesh = std::make_shared<DX12::Meshes::Mesh>(name, byteStream, *header);
 		::g_meshes[name] = mesh;
-		consumedBytes = mesh->GetTotalSize();
+
+		if (consumedBytes)
+			*consumedBytes = mesh->GetTotalSize();
+
 		return mesh;
 	}
 }

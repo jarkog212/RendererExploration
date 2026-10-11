@@ -30,6 +30,8 @@ namespace DX12::Attributes
 	{
 	public:
 
+		static const int _k_versions = 3;
+
 		virtual DEBUG_DESTRUCTOR(Transform);
 
 		struct AttributeType
@@ -38,6 +40,7 @@ namespace DX12::Attributes
 			DirectX::XMVECTOR _forward{};
 			DirectX::XMVECTOR _up{};
 			DirectX::XMVECTOR _scale{};
+			int _version = 0;
 		};
 
 		AttributeType* GetValue() { return &_transform; };
@@ -45,10 +48,21 @@ namespace DX12::Attributes
 
 		virtual void PrecalculateWorld();
 
+		const DirectX::XMMATRIX& GetWorldMatrix() const { return _worldTransform; };
+		const int GetWorldMatrixVersion() const { return _thisWorldVersion; }
+
+		void AssignParent(const Transform& parent) { _parent = &parent; };
+
 	protected:
 
-		AttributeType _transform;
-		DirectX::XMMATRIX _worldTransform;
+		const Transform* _parent = nullptr;
+		AttributeType _transform{};
+		DirectX::XMMATRIX _localTransform{};
+		DirectX::XMMATRIX _worldTransform{};
+		int _thisWorldVersion = 0;
+
+		int _lastParentVersion = -1;
+		int _lastlocalVersion = -1;
 	};
 
 	class GPUMappedTransform : public Transform 
@@ -57,23 +71,22 @@ namespace DX12::Attributes
 
 		virtual DEBUG_DESTRUCTOR(GPUMappedTransform);
 
-		void LinkToGPUArena(void* Key);
-
 		// Transform
 		void PrecalculateWorld() override;
 		// end Transform
 
 	protected:
 
-		DirectX::XMMATRIX* _GPUArenaTransformOffset = nullptr;
-		void* _GPUArenaKey = nullptr;
+		virtual DirectX::XMMATRIX* GetTargetMatrix() = 0;
+
+		int _lastGPUVersion = -1;
 	};
 
 	class Movable
 	{
 	public:
 
-		Movable(Transform* self) { _transformToModify = self->GetValue(); }
+		Movable(Transform* self) : _transformToModify(self->GetValue()) {};
 		virtual DEBUG_DESTRUCTOR(Movable);
 
 		void Reset();

@@ -2,47 +2,67 @@
 
 void DX12::Attributes::Transform::PrecalculateWorld()
 {
-	// Z axis = forward (fall back to +Z if zero-length)
-	DirectX::XMVECTOR z = DirectX::XMVectorSetW(_transform._forward, 0.0f);
-	if (DirectX::XMVectorGetX(DirectX::XMVector3LengthSq(z)) < 1e-12f)
-		z = DirectX::XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
-	z = DirectX::XMVector3Normalize(z);
+	bool changed = false;
 
-	// X axis = right = up x forward (left-handed)
-	DirectX::XMVECTOR up = DirectX::XMVectorSetW(_transform._up, 0.0f);
-	DirectX::XMVECTOR x = DirectX::XMVector3Cross(up, z);
-
-	// Degenerate: up is zero-length or parallel to forward, so pick a fallback up
-	if (DirectX::XMVectorGetX(DirectX::XMVector3LengthSq(x)) < 1e-12f)
+	if (_transform._version != _lastlocalVersion)
 	{
-		up = (std::fabs(DirectX::XMVectorGetY(z)) < 0.999f)
-			? DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f)
-			: DirectX::XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
-		x = DirectX::XMVector3Cross(up, z);
+		// Z axis = forward (fall back to +Z if zero-length)
+		DirectX::XMVECTOR z = DirectX::XMVectorSetW(_transform._forward, 0.0f);
+		if (DirectX::XMVectorGetX(DirectX::XMVector3LengthSq(z)) < 1e-12f)
+			z = DirectX::XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
+		z = DirectX::XMVector3Normalize(z);
+
+		// X axis = right = up x forward (left-handed)
+		DirectX::XMVECTOR up = DirectX::XMVectorSetW(_transform._up, 0.0f);
+		DirectX::XMVECTOR x = DirectX::XMVector3Cross(up, z);
+
+		// Degenerate: up is zero-length or parallel to forward, so pick a fallback up
+		if (DirectX::XMVectorGetX(DirectX::XMVector3LengthSq(x)) < 1e-12f)
+		{
+			up = (std::fabs(DirectX::XMVectorGetY(z)) < 0.999f)
+				? DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f)
+				: DirectX::XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
+			x = DirectX::XMVector3Cross(up, z);
+		}
+		x = DirectX::XMVector3Normalize(x);
+
+		// Y axis = true up, re-orthogonalized (already unit length)
+		DirectX::XMVECTOR y = DirectX::XMVector3Cross(z, x);
+
+		// In row-vector convention the rows of the rotation matrix are the basis axes
+		DirectX::XMMATRIX rotation(x, y, z, DirectX::XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f));
+
+		DirectX::XMMATRIX scale = DirectX::XMMatrixScalingFromVector(a._scale);
+		DirectX::XMMATRIX translate = DirectX::XMMatrixTranslationFromVector(a._location);
+
+		_worldTransform = _localTransform = scale * rotation * translate;
+		_lastlocalVersion = _transform._version;
+		changed = true;
 	}
-	x = DirectX::XMVector3Normalize(x);
 
-	// Y axis = true up, re-orthogonalized (already unit length)
-	DirectX::XMVECTOR y = DirectX::XMVector3Cross(z, x);
+	if (_parent && _lastParentVersion != _parent->GetWorldMatrixVersion())
+	{
+		_worldTransform = _localTransform * _parent->GetWorldMatrix();
+		_lastParentVersion = _parent->GetWorldMatrixVersion();
+		changed = true;
+	}
 
-	// In row-vector convention the rows of the rotation matrix are the basis axes
-	DirectX::XMMATRIX rotation(x, y, z, DirectX::XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f));
-
-	DirectX::XMMATRIX scale = DirectX::XMMatrixScalingFromVector(a._scale);
-	DirectX::XMMATRIX translate = DirectX::XMMatrixTranslationFromVector(a._location);
-
-	return scale * rotation * translate;
-}
-
-void DX12::Attributes::GPUMappedTransform::LinkToGPUArena(void* Key)
-{
+	if (changed)
+		++_thisWorldVersion %= _k_versions;
 }
 
 void DX12::Attributes::GPUMappedTransform::PrecalculateWorld()
 {
 	DX12::Attributes::Transform::PrecalculateWorld();
 
+	if (_lastGPUVersion == _thisWorldVersion)
+		return;
 
+	if (DirectX::XMMATRIX* gpuMatrix = GetTargetMatrix())
+	{
+		*gpuMatrix = _worldTransform;
+		_lastGPUVersion = _thisWorldVersion;
+	}
 }
 
 void DX12::Attributes::Movable::Reset()
@@ -55,10 +75,14 @@ void DX12::Attributes::Movable::Reset()
 void DX12::Attributes::Movable::Apply()
 {
 	DX12::Attributes::Transform::AttributeType transform = *_transformToModify;
+	bool changed = false;
 
 	// world translate
 	if (_worldTranslate.m128_f32[0] || _worldTranslate.m128_f32[1] || _worldTranslate.m128_f32[2])
+	{
 		transform._location = DirectX::XMVectorAdd(transform._location, _worldTranslate);
+		changed = true;
+	}
 
 	// rotation
 	if (_rotate.x != 0.f || _rotate.y != 0.f || _rotate.z != 0.f)
@@ -67,6 +91,7 @@ void DX12::Attributes::Movable::Apply()
 		DirectX::XMVECTOR quat = DirectX::XMQuaternionRotationRollPitchYaw(_rotate.x, _rotate.y, _rotate.z);
 		transform._forward = DirectX::XMVector3Rotate(transform._forward, quat);
 		transform._up = DirectX::XMVector3Rotate(transform._up, quat);
+		changed = true;
 	}
 
 	if (const float right = _relativeTranslate.m128_f32[0]; right != 0.f)
@@ -76,6 +101,8 @@ void DX12::Attributes::Movable::Apply()
 			rightAxis,
 			{ right, right, right, 0 },
 			transform._location);
+
+		changed = true;
 	}
 
 	if (const float up = _relativeTranslate.m128_f32[1]; up != 0.f)
@@ -84,6 +111,8 @@ void DX12::Attributes::Movable::Apply()
 			transform._up,
 			{ up, up, up, 0 },
 			transform._location);
+
+		changed = true;
 	}
 
 	// relative translate
@@ -93,8 +122,15 @@ void DX12::Attributes::Movable::Apply()
 			transform._forward,
 			{ forward, forward, forward, 0 },
 			transform._location);
+
+		changed = true;
 	}
 
+	if (!changed)
+		return;
+
+	++transform._version;
+	transform._version %= DX12::Attributes::Transform::_k_versions;
 	*_transformToModify = transform;
 	Reset();
 }

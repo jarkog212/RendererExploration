@@ -35,7 +35,7 @@ namespace DX12::Materials
 
         virtual ID3D12PipelineState* GetPSO() const = 0;
         virtual unsigned int GetConstantBufferSRVIndex() const = 0;
-        virtual void AccummulateMaterialCommands(ID3D12GraphicsCommandList6* commandList) {};
+        virtual void AccummulateMaterialCommands(int currentFrame, ID3D12GraphicsCommandList6* commandList) {};
 
         DX12::Materials::Type GetType() { return _type; }
 
@@ -67,7 +67,7 @@ namespace DX12::MaterialLib
 
         ID3D12PipelineState* GetPSO() const final override;
         unsigned int GetConstantBufferSRVIndex() const final override;
-        void AccummulateMaterialCommands(ID3D12GraphicsCommandList6* commandList) final override;
+        void AccummulateMaterialCommands(int currentFrame, ID3D12GraphicsCommandList6* commandList) final override;
   
         static const DX12::Shaders::Specs& GetPixelShaderSpec();
         static const DX12::Shaders::Specs& GetVertexShaderSpec();

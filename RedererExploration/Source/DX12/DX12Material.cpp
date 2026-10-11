@@ -110,7 +110,7 @@ unsigned int DX12::MaterialLib::BasicMaterial::GetConstantBufferSRVIndex() const
 	return _structuredConstantBufferSRVHandle._index;
 }
 
-void DX12::MaterialLib::BasicMaterial::AccummulateMaterialCommands(ID3D12GraphicsCommandList6* commandList)
+void DX12::MaterialLib::BasicMaterial::AccummulateMaterialCommands(int currentFrame, ID3D12GraphicsCommandList6* commandList)
 {
 	//<Custom command HERE>
 }

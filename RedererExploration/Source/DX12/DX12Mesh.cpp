@@ -8,7 +8,6 @@
 
 namespace
 {
-	// the following vectors are expected to have parity (i.e. same size and correlating indeces)
 	std::unordered_map<std::wstring, std::weak_ptr<DX12::Meshes::Mesh>> g_meshes;
 
 	std::mutex g_meshMutex;

@@ -352,7 +352,7 @@ void DX12::GPassRT::AccummulatePassCommands(int currentFrame, ID3D12GraphicsComm
 
 		commandList->SetPipelineState(rawMaterial->GetPSO());
 		commandList->SetGraphicsRoot32BitConstant(::RootSignature::Params::MainMaterialBufferIndex, rawMaterial->GetConstantBufferSRVIndex(), 0);
-		rawMaterial->AccummulateMaterialCommands(commandList);
+		rawMaterial->AccummulateMaterialCommands(currentFrame, commandList);
 
 		const std::vector<std::weak_ptr<DX12::Meshes::Mesh>>& meshes = DX12::World::GetMesheshOfMaterial(rawMaterial->GetType());
 		for (int i = 0; i <= meshes.size(); i++)

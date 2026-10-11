@@ -37,6 +37,8 @@ namespace DX12::Materials
         virtual unsigned int GetConstantBufferSRVIndex() const = 0;
         virtual void AccummulateMaterialCommands(ID3D12GraphicsCommandList6* commandList) {};
 
+        DX12::Materials::Type GetType() { return _type; }
+
     protected:
 
         const DX12::Materials::Type _type = DX12::Materials::Type::Invalid;

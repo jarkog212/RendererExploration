@@ -16,7 +16,7 @@ namespace
     static HWND g_mainWindow = NULL;
     static bool g_running = true;
     static float g_fps = 0.f;
-
+    
     void Close(HWND hwnd)
     {
         if (::g_mainWindow == hwnd)

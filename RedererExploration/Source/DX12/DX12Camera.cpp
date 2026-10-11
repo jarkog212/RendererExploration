@@ -4,7 +4,7 @@
 
 void DX12::Projection::Camera::SetUp(DirectX::XMVECTOR& up)
 {
-	GetAttribute<Attrib::Transform>()->_up = up;
+	GetAttribute<DX12::Attributes::Transform>()->_up = up;
 	_dirty = true;
 }
 
@@ -48,7 +48,7 @@ void DX12::Projection::Camera::SetViewHeight(float viewHeight)
 
 void DX12::Projection::Camera::Update(float deltaTime)
 {
-	auto* transform = GetAttribute<Attrib::Transform>();
+	auto* transform = GetAttribute<DX12::Attributes::Transform>();
 	if (!transform)
 		return;
 

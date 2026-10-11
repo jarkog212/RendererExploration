@@ -129,7 +129,7 @@ void DX12::PostProcessPass::PrePassResourceBarriers()
 		D3D12_RESOURCE_BARRIER_FLAG_END_ONLY);
 }
 
-void DX12::PostProcessPass::AccummulatePassCommands(ID3D12GraphicsCommandList6* commandList)
+void DX12::PostProcessPass::AccummulatePassCommands(int currentFrame, ID3D12GraphicsCommandList6* commandList)
 {
 	CRITICAL_ASSERT(_renderSurface, "Cannot do post process pass without valid output surface.");
 	CRITICAL_ASSERT(_inputGPass, "Cannot do post process pass without valid GPass");

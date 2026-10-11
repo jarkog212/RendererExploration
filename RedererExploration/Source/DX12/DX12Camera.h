@@ -1,8 +1,6 @@
 #pragma once
 
-#include "Utils.h"
-#include "Attributes.h"
-#include "DirectXMath.h"
+#include "DX12Attributes.h"
 
 namespace DX12::Projection
 {
@@ -48,14 +46,18 @@ namespace DX12::Projection
 		10000.f // _farZ
 	};
 
-	class Camera : public Attrib::Holder<Camera>,
-		public Attrib::Transform,
-		public Attrib::Movable,
-		public Attrib::IUpdatable
+	class Camera : public DX12::Attributes::Holder<Camera>,
+		public DX12::Attributes::Transform,
+		public DX12::Attributes::Movable,
+		public DX12::Attributes::IUpdatable
 	{
 	public:
 
-		Camera(const CameraSpecs& specs) : Attrib::Movable((Attrib::Transform*)this), _specs(specs) { Update(0.f); };
+		Camera(const CameraSpecs& specs) : 
+			DX12::Attributes::Movable((DX12::Attributes::Transform*)this), 
+			_specs(specs)
+		{ Update(0.f); };
+		
 		DEBUG_DESTRUCTOR(Camera);
 
 		constexpr DirectX::XMMATRIX GetView() const { return _view; }
@@ -63,7 +65,7 @@ namespace DX12::Projection
 		constexpr DirectX::XMMATRIX GetInvProjection() const { return _invProjection; }
 		constexpr DirectX::XMMATRIX GetViewProjection() const { return _viewProjection; }
 		constexpr DirectX::XMMATRIX GetInvViewProjection() const { return _invViewProjection; }
-		const DirectX::XMVECTOR* GetUp() const { return &GetAttribute<Attrib::Transform>()->_up; };
+		const DirectX::XMVECTOR* GetUp() const { return &GetAttribute<DX12::Attributes::Transform>()->_up; };
 		constexpr float GetNearZ() const { return _specs._nearZ; }
 		constexpr float GetFarZ() const { return _specs._farZ; }
 		constexpr float GetFov() const { return _specs._fov; }
@@ -80,8 +82,9 @@ namespace DX12::Projection
 		void SetViewWidth(float viewWidth);
 		void SetViewHeight(float viewHeight);
 
-		// Attrib::IUpdatable
+		// DX12::Attributes::IUpdatable
 		void Update(float deltaTime) override;
+		// end DX12::Attributes::IUpdatable
 
 	private:
 

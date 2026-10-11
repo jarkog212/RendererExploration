@@ -1,5 +1,7 @@
 #pragma once
+
 #include "DX12Utils.h"
+#include "DX12Resources.h"
 
 namespace DX12::Meshes
 {
@@ -31,9 +33,79 @@ namespace DX12::Meshes
 
 #pragma pack(pop)
 
+    class WorldTransformBuffer
+    {
+    public:
+
+        class Allocation 
+        {
+        public:
+
+            static constexpr int _k_Inavlid = -1;
+
+            Allocation(int index, DirectX::XMMATRIX& matrix, WorldTransformBuffer& owner);
+            ~Allocation();
+            Allocation(Allocation&&) = default;
+            Allocation& operator=(Allocation&&) = default;
+
+            NO_COPY(Allocation);
+
+            DirectX::XMMATRIX& GetTransformMatrix();
+
+        private:
+
+            DirectX::XMMATRIX* _transformationMatrix = nullptr;
+            int _index = _k_Inavlid;
+            WorldTransformBuffer* _worldTransformBufferOwner = nullptr;
+        };
+
+        WorldTransformBuffer();
+        DEBUG_DESTRUCTOR(WorldTransformBuffer);
+        WorldTransformBuffer(WorldTransformBuffer&&) = default;
+        WorldTransformBuffer& operator=(WorldTransformBuffer&&) = default;
+
+        NO_COPY(WorldTransformBuffer);
+
+        int GetMatrixSRVIndex(int currentFrame);
+        int GetIDSRVIndex(int currentFrame);
+        void Sync(int currentFrame);
+        Allocation Allocate();
+        void Release(int index);
+        int GetInstanceCount() { return _upcomingSlot; }
+        DirectX::XMMATRIX& GetWorldTransformMatrix(int index);
+
+    private:
+
+        void ReserveBatch();
+
+        static constexpr unsigned int _k_batchAllocation = 64;
+
+        struct PerFrameData{
+
+            PerFrameData() = default;
+            ~PerFrameData();
+            PerFrameData(PerFrameData&&) = default;
+            PerFrameData& operator=(PerFrameData&&) = default;
+
+            NO_COPY(PerFrameData);
+
+            ID3D12Resource* _meshWorldTransforms = nullptr; // non-owning - deferred release
+            DX12::DescriptorHandle _srvHandleTransforms = {};
+            ID3D12Resource* _meshWorldTransformsIDs = nullptr; // non-owning - deferred release
+            DX12::DescriptorHandle _srvHandleIds = {};
+            bool _dirtyIDs = true;
+        }_perFrameData[DX12::CC::k_rendererWorkerFrameBuffers];
+
+        std::vector<DirectX::XMMATRIX> _stagingBuffer;
+        std::vector<int> _assignIndexQueue;
+        std::vector<int> _assignedIndeces;
+        std::vector<int> _assignedIndecesTracker;
+        int _upcomingSlot = 0;
+    };
+
     struct MeshView
     {
-        ID3D12Resource* _resource = nullptr;
+        ID3D12Resource* _meshTemplateBuffer = nullptr; // non-owning - deferred release
 
         struct PositionView
         {
@@ -50,8 +122,10 @@ namespace DX12::Meshes
         }_elementsView;
     };
 
-    struct Mesh : public MeshView
+    class Mesh : public MeshView
     {
+    public:
+
         Mesh(const wchar_t* name, const char* byteStream, const DX12::Meshes::StreamHeader& header);
         ~Mesh();
         Mesh(Mesh&&) = default;
@@ -59,10 +133,18 @@ namespace DX12::Meshes
 
         NO_COPY(Mesh);
 
-        const DX12::Meshes::MeshView CreateView() const { return { _resource, _positionView, _elementsView }; };
+        const DX12::Meshes::MeshView CreateView() const { return { _meshTemplateBuffer, _positionView, _elementsView }; };
+        WorldTransformBuffer::Allocation ReserveTransformMatrix();
+        int GetInstanceWorldMatricesSRVIndex(int currentFrame) { _instancesWorldTransforms.GetMatrixSRVIndex(currentFrame); }
+        int GetInstanceWorldMatrixIDsSRVIndex(int currentFrame) { _instancesWorldTransforms.GetIDSRVIndex(currentFrame); }
+        int GetInstanceCount() { _instancesWorldTransforms.GetInstanceCount(); }
+        int GetTotalSize() { return _totalSize; }
+
+    private:
 
         int _totalSize = -1;
         std::wstring _name = nullptr;
+        WorldTransformBuffer _instancesWorldTransforms;
     };
 }
 

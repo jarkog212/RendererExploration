@@ -62,7 +62,7 @@ namespace DX12
 		NO_COPY(DepthPass);
 
 		void PrePassResourceBarriers() final override;
-		void AccummulatePassCommands(ID3D12GraphicsCommandList6* commandList) final override;
+		void AccummulatePassCommands(int currentFrame, ID3D12GraphicsCommandList6* commandList) final override;
 		void PostPassResourceBarriers() final override;
 
 		const DX12::DepthBufferTexture* GetDepthBuffer() const { return &_depthBuffer; }
@@ -90,7 +90,7 @@ namespace DX12
 		NO_COPY(GPassRT);
 
 		void PrePassResourceBarriers() final override;
-		void AccummulatePassCommands(ID3D12GraphicsCommandList6* commandList) final override;
+		void AccummulatePassCommands(int currentFrame, ID3D12GraphicsCommandList6* commandList) final override;
 		void PostPassResourceBarriers() final override;
 
 		void LinkDepthPass(const DX12::DepthPass* pass) { _linkToDepthPass = pass; }

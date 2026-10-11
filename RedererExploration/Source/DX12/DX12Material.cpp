@@ -96,19 +96,8 @@ DX12::MaterialLib::BasicMaterial::~BasicMaterial()
 {
 	DEBUG_DESTRUCTOR_BODY(BasicMaterial);
 	::SafeReleaseMaterial(_type);
-	Utils::SafeDeferredRenderThreadReleaseViaLambda(
-		[
-			constStructuredBuffer = _constStructuredBuffer,
-			pso = _pipelineStateObject,
-			handle = _structuredConstantBufferSRVHandle.MoveToRawHeap()
-		]
-		() mutable
-		{
-			Utils::COM::SafeRelease(constStructuredBuffer);
-			Utils::COM::SafeRelease(pso);
-			delete handle;
-		}
-);
+	Utils::COM::SafeDeferredRenderThreadRelease(_pipelineStateObject);
+	Utils::COM::SafeDeferredRenderThreadRelease(_constStructuredBuffer);
 }
 
 ID3D12PipelineState* DX12::MaterialLib::BasicMaterial::GetPSO() const

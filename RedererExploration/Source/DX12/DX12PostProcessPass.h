@@ -30,7 +30,7 @@ namespace DX12
 		NO_COPY(PostProcessPass);
 
 		void PrePassResourceBarriers() final override;
-		void AccummulatePassCommands(ID3D12GraphicsCommandList6* commandList) final override;
+		void AccummulatePassCommands(int currentFrame, ID3D12GraphicsCommandList6* commandList) final override;
 		void PostPassResourceBarriers() final override;
 
 		void LinkRenderSurface(DX12::RenderSurface& surface) { _renderSurface = &surface; }

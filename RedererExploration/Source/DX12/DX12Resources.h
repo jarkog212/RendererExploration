@@ -2,9 +2,9 @@
 
 #include "DX12CommonConstants.h"
 #include "DX12Core.h"
-#include "Utils.h"
+#include "DX12Attributes.h"
 
-#include "Attributes.h"
+#include "Utils.h"
 
 namespace DX12
 {
@@ -79,8 +79,6 @@ namespace DX12
 		DescriptorHandle& operator=(DescriptorHandle&& other) noexcept;
 
 		NO_COPY(DescriptorHandle);
-
-		DescriptorHandle* MoveToRawHeap() { return new DescriptorHandle(std::move(*this)); }
 
 		constexpr bool IsValid() const { return _cpu.ptr != 0; }
 		constexpr bool IsShaderVisible() const { return _gpu.ptr != 0; }
@@ -160,13 +158,13 @@ namespace DX12
 
 		RenderPassBase* SetNext(RenderPassBase& pass) { _next = &pass; return _next; };
 		void UnsetNext() { _next = nullptr; };
-		void AccummulateCommands(ID3D12GraphicsCommandList6* commandList);
+		void AccummulateCommands(int currentFrame, ID3D12GraphicsCommandList6* commandList);
 		void SetAutoBarrierSubmits(bool prePass, bool postPass) { _submitBarriers[0] = prePass; _submitBarriers[1] = postPass; };
 
 	protected:
 
 		virtual void PrePassResourceBarriers() = 0;
-		virtual void AccummulatePassCommands(ID3D12GraphicsCommandList6* commandList) = 0;
+		virtual void AccummulatePassCommands(int currentFrame, ID3D12GraphicsCommandList6* commandList) = 0;
 		virtual void PostPassResourceBarriers() = 0;
 
 		const char* _name = "";
@@ -180,21 +178,35 @@ namespace DX12
 		bool _submitBarriers[2] = { true, false };
 	};
 
-	struct Geometry
+	struct Geometry : public DX12::Attributes::Holder<Geometry>,
+		public DX12::Attributes::Transform
 	{
 		std::shared_ptr<DX12::Meshes::Mesh> _mesh;
 		std::shared_ptr<DX12::Materials::Material> _material;
+
+		
 	};
 
-	struct ComplexGeometry 
+	struct ComplexGeometry : public DX12::Attributes::Holder<ComplexGeometry>,
+		public DX12::Attributes::Transform,
+		public DX12::Attributes::IUpdatable
 	{
 		std::vector<DX12::Geometry> _subGeometries;
+
+		//DX12::Attributes::IUpdatable
+		void Update(float deltaTime) override {};
+		// end DX12::Attributes::IUpdatable
 	};
 
-	struct StaticMesh : public Attrib::Holder<ComplexGeometry>,
-		public Attrib::Transform
+	struct StaticMesh : public DX12::Attributes::Holder<StaticMesh>,
+		public DX12::Attributes::Transform,
+		public DX12::Attributes::IUpdatable
 	{
 		DEBUG_DESTRUCTOR(StaticMesh);
 		std::vector<DX12::ComplexGeometry> _complexGeometryLods;
+
+		//DX12::Attributes::IUpdatable
+		void Update(float deltaTime) override {};
+		// end DX12::Attributes::IUpdatable
 	};
 }

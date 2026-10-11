@@ -93,7 +93,7 @@ constexpr void DX12::RootParameter::AsDescriptor(unsigned int shaderRegister, un
 	Descriptor.Flags = flags;
 }
 
-void DX12::RenderPassBase::AccummulateCommands(ID3D12GraphicsCommandList6* commandList)
+void DX12::RenderPassBase::AccummulateCommands(int currentFrame, ID3D12GraphicsCommandList6* commandList)
 {
 	CRITICAL_ASSERT(commandList, "Cannot render the pass without a valid command list.");
 
@@ -101,12 +101,12 @@ void DX12::RenderPassBase::AccummulateCommands(ID3D12GraphicsCommandList6* comma
 	if (_submitBarriers[0])
 		DX12::SubmitPendingBarriers(commandList);
 
-	AccummulatePassCommands(commandList);
+	AccummulatePassCommands(currentFrame, commandList);
 
 	PostPassResourceBarriers();
 	if (_submitBarriers[1])
 		DX12::SubmitPendingBarriers(commandList);
 
 	if (_next)
-		_next->AccummulateCommands(commandList);
+		_next->AccummulateCommands(currentFrame, commandList);
 }

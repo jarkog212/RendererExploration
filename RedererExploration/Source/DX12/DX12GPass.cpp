@@ -1,7 +1,10 @@
 #include "DX12GPass.h"
 #include "DX12Renderer.h"
 #include "DX12Shaders.h"
+#include "DX12World.h"
 #include "DX12Utils.h"
+#include "DX12Mesh.h"
+#include "DX12Material.h"
 
 #include "DX12DescriptorHeap.h"
 
@@ -16,7 +19,10 @@ namespace
 		static Microsoft::WRL::ComPtr<ID3D12RootSignature> g_instance = nullptr;
 		enum Params : unsigned int
 		{
-			Constants,
+			FrameNumber,
+			MainMaterialBufferIndex,
+			InstanceWorldMatrixBufferIndex,
+			InstanceWorldMatrixIndecesIndex,
 			SrvDescriptorTable,
 
 			Count
@@ -66,13 +72,19 @@ ID3D12RootSignature* DX12::GPassSpace::GetRootSignature()
 		return ::RootSignature::g_instance.Get();
 
 	DX12::RootParameter params[::RootSignature::Params::Count]{};
-	params[::RootSignature::Params::Constants].AsConstants(1, D3D12_SHADER_VISIBILITY_PIXEL, 0);
-	
+	params[::RootSignature::Params::FrameNumber].AsConstants(1, D3D12_SHADER_VISIBILITY_ALL, 0);
+
+	params[::RootSignature::Params::MainMaterialBufferIndex].AsConstants(1, D3D12_SHADER_VISIBILITY_ALL, 0);
+
+	params[::RootSignature::Params::InstanceWorldMatrixBufferIndex].AsConstants(1, D3D12_SHADER_VISIBILITY_VERTEX, 0);
+
+	params[::RootSignature::Params::InstanceWorldMatrixIndecesIndex].AsConstants(1, D3D12_SHADER_VISIBILITY_VERTEX, 0);
+
 	DX12::DescriptorRange srvDescriptors = DX12::GetSRVHeap()->AsDescriptorRange();
 	srvDescriptors.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE;
 	srvDescriptors.BaseShaderRegister = 0;
 	srvDescriptors.RegisterSpace = 0;
-	params[::RootSignature::Params::SrvDescriptorTable].AsDescriptorTable(D3D12_SHADER_VISIBILITY_PIXEL, &srvDescriptors, 1);
+	params[::RootSignature::Params::SrvDescriptorTable].AsDescriptorTable(D3D12_SHADER_VISIBILITY_ALL, &srvDescriptors, 1);
 
 	D3D12_ROOT_SIGNATURE_DESC1 desc = DX12::CC::Desc::RootSignature::k_vertexPixelTemplate;
 	desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
@@ -189,7 +201,7 @@ void DX12::DepthPass::PrePassResourceBarriers()
 	DX12::PendingTransitionResourceBarrier(_depthBuffer.GetResource(), ::k_depthReadOnly, k_depthWriteOnly);
 }
 
-void DX12::DepthPass::AccummulatePassCommands(ID3D12GraphicsCommandList6* commandList)
+void DX12::DepthPass::AccummulatePassCommands(int currentFrame, ID3D12GraphicsCommandList6* commandList)
 {
 	const D3D12_CPU_DESCRIPTOR_HANDLE dsv = _depthBuffer.GetDSVCpuHandle();
 	commandList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 0.f, 0, 0, nullptr);
@@ -198,8 +210,43 @@ void DX12::DepthPass::AccummulatePassCommands(ID3D12GraphicsCommandList6* comman
 	commandList->SetGraphicsRootSignature(DX12::GPassSpace::GetRootSignature());
 	commandList->SetPipelineState(DX12::GPassSpace::GetPipelineState());
 
-	// Further pass code here sending input to input assembler and then drawing the scene
+	commandList->IASetPrimitiveTopology(D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
+	static unsigned int call = 0;
+	commandList->SetGraphicsRoot32BitConstant(::RootSignature::Params::FrameNumber, ++call, 0);
+
+	const std::vector<std::weak_ptr<DX12::Meshes::Mesh>>& meshes = DX12::World::GetAllMeshes();
+	for (int i = 0; i <= meshes.size(); i++)
+	{
+		const auto& mesh = meshes[i];
+		if (mesh.expired())
+			continue;
+
+		std::shared_ptr<DX12::Meshes::Mesh> lockedMesh = mesh.lock();
+		DX12::Meshes::Mesh* rawMesh = lockedMesh.get();
+
+		D3D12_VERTEX_BUFFER_VIEW vertexBuffers[1] =
+		{
+			rawMesh->_positionView._positionView
+		};
+
+		const int indexCount = rawMesh->_positionView._positionView.SizeInBytes / rawMesh->_positionView._positionView.StrideInBytes;
+
+		commandList->SetGraphicsRoot32BitConstant(
+			::RootSignature::Params::InstanceWorldMatrixBufferIndex,
+			rawMesh->GetInstanceWorldMatricesSRVIndex(currentFrame),
+			0);
+
+		commandList->SetGraphicsRoot32BitConstant(
+			::RootSignature::Params::InstanceWorldMatrixIndecesIndex,
+			rawMesh->GetInstanceWorldMatrixIDsSRVIndex(currentFrame),
+			0);
+
+		commandList->IASetPrimitiveTopology(rawMesh->_elementsView._topology);
+		commandList->IASetVertexBuffers(0, _countof(vertexBuffers), vertexBuffers);
+		commandList->IASetIndexBuffer(&rawMesh->_positionView._indexView);
+		commandList->DrawIndexedInstanced(indexCount, rawMesh->GetInstanceCount(), 0, 0, 0);
+	}
 }
 
 void DX12::DepthPass::PostPassResourceBarriers()
@@ -281,7 +328,7 @@ void DX12::GPassRT::PrePassResourceBarriers()
 		D3D12_RESOURCE_STATE_RENDER_TARGET);
 }
 
-void DX12::GPassRT::AccummulatePassCommands(ID3D12GraphicsCommandList6* commandList)
+void DX12::GPassRT::AccummulatePassCommands(int currentFrame, ID3D12GraphicsCommandList6* commandList)
 {
 	CRITICAL_ASSERT(_linkToDepthPass, "Cannot render without a valid depth pass.")
 
@@ -292,10 +339,55 @@ void DX12::GPassRT::AccummulatePassCommands(ID3D12GraphicsCommandList6* commandL
 	commandList->OMSetRenderTargets(1, &rtv, false, &dsv);
 	
 	static unsigned int call = 0;
-	commandList->SetGraphicsRoot32BitConstant(::RootSignature::Params::Constants, ++call, 0);
+	commandList->SetGraphicsRoot32BitConstant(::RootSignature::Params::FrameNumber, ++call, 0);
 
-	commandList->IASetPrimitiveTopology(D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	commandList->DrawInstanced(3, 1, 0, 0);
+	const std::vector<std::weak_ptr<DX12::Materials::Material>>& worldMaterials = DX12::World::GetAllMaterials();
+	for (const auto& material : worldMaterials)
+	{
+		if (material.expired())
+			continue;
+
+		std::shared_ptr<DX12::Materials::Material> lockedMaterial = material.lock();
+		DX12::Materials::Material* rawMaterial = lockedMaterial.get();
+
+		commandList->SetPipelineState(rawMaterial->GetPSO());
+		commandList->SetGraphicsRoot32BitConstant(::RootSignature::Params::MainMaterialBufferIndex, rawMaterial->GetConstantBufferSRVIndex(), 0);
+		rawMaterial->AccummulateMaterialCommands(commandList);
+
+		const std::vector<std::weak_ptr<DX12::Meshes::Mesh>>& meshes = DX12::World::GetMesheshOfMaterial(rawMaterial->GetType());
+		for (int i = 0; i <= meshes.size(); i++)
+		{
+			const auto& mesh = meshes[i];
+			if (mesh.expired())
+				continue;
+
+			std::shared_ptr<DX12::Meshes::Mesh> lockedMesh = mesh.lock();
+			DX12::Meshes::Mesh* rawMesh = lockedMesh.get();
+			
+			D3D12_VERTEX_BUFFER_VIEW vertexBuffers[2] =
+			{
+				rawMesh->_positionView._positionView,
+				rawMesh->_elementsView._vertexView
+			};
+
+			const int indexCount = rawMesh->_positionView._positionView.SizeInBytes / rawMesh->_positionView._positionView.StrideInBytes;
+
+			commandList->SetGraphicsRoot32BitConstant(
+				::RootSignature::Params::InstanceWorldMatrixBufferIndex,
+				rawMesh->GetInstanceWorldMatricesSRVIndex(currentFrame),
+				0);
+
+			commandList->SetGraphicsRoot32BitConstant(
+				::RootSignature::Params::InstanceWorldMatrixIndecesIndex,
+				rawMesh->GetInstanceWorldMatrixIDsSRVIndex(currentFrame),
+				0);
+
+			commandList->IASetPrimitiveTopology(rawMesh->_elementsView._topology);
+			commandList->IASetVertexBuffers(0, _countof(vertexBuffers), vertexBuffers);
+			commandList->IASetIndexBuffer(&rawMesh->_positionView._indexView);
+			commandList->DrawIndexedInstanced(indexCount, rawMesh->GetInstanceCount(), 0, 0, 0);
+		}
+	}
 }
 
 void DX12::GPassRT::PostPassResourceBarriers()

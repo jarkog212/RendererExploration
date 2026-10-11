@@ -139,6 +139,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="RedererExploration.cpp" />
+    <ClCompile Include="Source\DX12\DX12Attributes.cpp" />
     <ClCompile Include="Source\DX12\DX12Camera.cpp" />
     <ClCompile Include="Source\DX12\DX12Material.cpp" />
     <ClCompile Include="Source\DX12\DX12Mesh.cpp" />
@@ -155,12 +156,13 @@
     <ClCompile Include="Source\DX12\DX12Shaders.cpp" />
     <ClCompile Include="Source\DX12\DX12Texture.cpp" />
     <ClCompile Include="Source\DX12\DX12UploadRequest.cpp" />
+    <ClCompile Include="Source\DX12\DX12World.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Source\Attributes.h" />
+    <ClInclude Include="Source\DX12\DX12Attributes.h" />
     <ClInclude Include="Source\DX12\DX12Camera.h" />
     <ClInclude Include="Source\DX12\DX12CommonConstants.h" />
     <ClInclude Include="Source\DX12\DX12CommonDescriptors.h" />
@@ -180,6 +182,7 @@
     <ClInclude Include="Source\DX12\DX12Texture.h" />
     <ClInclude Include="Source\DX12\DX12UploadRequest.h" />
     <ClInclude Include="Source\DX12\DX12Utils.h" />
+    <ClInclude Include="Source\DX12\DX12World.h" />
     <ClInclude Include="Source\Utils.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

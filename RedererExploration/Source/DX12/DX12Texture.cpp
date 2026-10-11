@@ -150,24 +150,13 @@ DX12::Texture::~Texture()
 {
 	DEBUG_DESTRUCTOR_BODY(Texture)
 
-	if (_name.empty())
+	if (!_name.empty())
 	{
-		Utils::COM::SafeDeferredRenderThreadRelease(_resource);
-		return;
+		// name means it has been read from a file and may be referenced else where
+		::SafeReleaseTexture(_name.c_str());
 	}
-	
-	// name means it has been read from a file and may be referenced else where
-	::SafeReleaseTexture(_name.c_str());
-	Utils::SafeDeferredRenderThreadReleaseViaLambda(
-		[
-			resource = _resource,
-			handle = _srvHandle.MoveToRawHeap()
-		]
-		() mutable
-		{
-			Utils::COM::SafeRelease(resource);
-			delete handle;
-		});
+
+	Utils::COM::SafeDeferredRenderThreadRelease(_resource);
 }
 
 DX12::Texture::Texture(Texture&& other) noexcept :

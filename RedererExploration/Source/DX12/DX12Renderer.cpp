@@ -407,7 +407,7 @@ void DX12::Render(DX12::RendererWorker& rendererWorker)
 	// MOVING COM POINTER RELEASES IS SIMPLE ENOUGH: MOVE THEIR PENDING RELASE MANAGEMENT INTO THE RENDERER WORKER OBJECT.
 	// MOVING HEAP RELEASES REQUIRES A BIT MORE WORK IN HEAPS TO SOMEHOW LET THEM KNOW HANDLES BEING USED BY WHICH WORKER.
 	static DX12::RendererWorker* mainCommand = DX12::GetMainRendererWorker();
-	CRITICAL_ASSERT(&rendererWorker == mainCommand, "You're about to start freeing resources which may be protected. Currently only ONE (Main) render command is supported.");
+	CRITICAL_ASSERT(&rendererWorker == mainCommand, "You're about to start freeing resources which may be protected. Currently only ONE (Main) render worker is supported.");
 #endif
 
 	const unsigned int currentFrame = rendererWorker.GetCurrentFrame();
@@ -425,7 +425,7 @@ void DX12::Render(DX12::RendererWorker& rendererWorker)
 		D3D12_RESOURCE_STATE_RENDER_TARGET,
 		D3D12_RESOURCE_BARRIER_FLAG_BEGIN_ONLY);
 
-	::RenderGraph::GetHead()->AccummulateCommands(commandList);
+	::RenderGraph::GetHead()->AccummulateCommands(currentFrame, commandList);
 
 	DX12::PendingTransitionResourceBarrier(
 		surface->GetBackbuffer(),

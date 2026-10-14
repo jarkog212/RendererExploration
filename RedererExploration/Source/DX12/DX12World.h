@@ -28,6 +28,10 @@ public:
 
 	NO_COPY(Geometry);
 
+	std::weak_ptr<DX12::Meshes::Mesh> GetWeakMesh() const{ return _mesh; }
+	std::weak_ptr<DX12::Materials::Material> GetWeakMaterial() const { return _material; }
+	DX12::Materials::Type GetMaterialType() const { return _material->GetType(); }
+
 protected:
 
 	// GPUMappedTransform
@@ -51,6 +55,8 @@ public:
 
 	NO_COPY(ComplexGeometry);
 
+	const std::vector<DX12::World::Geometry>& GetSimpleGeometries() const { return _subGeometries; }
+
 protected:
 
 	std::vector<DX12::World::Geometry> _subGeometries;
@@ -69,6 +75,8 @@ public:
 
 	NO_COPY(LODGeometry);
 
+	const DX12::World::ComplexGeometry* GetGeometry(size_t index) const;
+
 protected:
 
 	std::vector<DX12::World::ComplexGeometry> _complexGeometryLods;
@@ -83,16 +91,16 @@ protected:
 namespace DX12::WorldSpace
 {
 	const std::vector<std::weak_ptr<DX12::Materials::Material>>& GetAllMaterials();
-	const std::vector<std::weak_ptr<DX12::Meshes::Mesh>>* GetMeshesOfMaterial(const DX12::Materials::Type material);
-	const std::vector<std::weak_ptr<DX12::Meshes::Mesh>>& GetAllMeshes();
+	const std::vector<std::weak_ptr<DX12::Meshes::Mesh>>* GetMeshTemplatesOfMaterial(const DX12::Materials::Type material);
+	const std::vector<std::weak_ptr<DX12::Meshes::Mesh>>& GetAllMeshTemplates();
 
 	void WarmUp(const std::vector<DX12::Materials::Type>& materialList, const std::vector<std::string>& meshes);
 	void ReleaseAll();
 
-	std::weak_ptr<DX12::World::Geometry> AddObject(DX12::World::Geometry&& object);
-	std::weak_ptr<DX12::World::ComplexGeometry> AddObject(DX12::World::ComplexGeometry&& object);
-	std::weak_ptr<DX12::World::LODGeometry> AddObject(DX12::World::LODGeometry&& object);
-	void RemoveObject(std::weak_ptr<DX12::World::Geometry>&& object);
-	void RemoveObject(std::weak_ptr<DX12::World::ComplexGeometry>&& object);
-	void RemoveObject(std::weak_ptr<DX12::World::LODGeometry>&& object);
+	DX12::World::Geometry* AddObject(DX12::World::Geometry&& object);
+	DX12::World::ComplexGeometry* AddObject(DX12::World::ComplexGeometry&& object);
+	DX12::World::LODGeometry* AddObject(DX12::World::LODGeometry&& object);
+	void RemoveObject(DX12::World::Geometry*& object);
+	void RemoveObject(DX12::World::ComplexGeometry*& object);
+	void RemoveObject(DX12::World::LODGeometry*& object);
 }

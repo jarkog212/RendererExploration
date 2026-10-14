@@ -70,15 +70,18 @@ namespace DX12::Meshes
         int GetIDSRVIndex(int currentFrame);
         void Sync(int currentFrame);
         WorldMatrixBufferAllocation Allocate();
-        void Release(int index);
+        void Free(int index);
         int GetInstanceCount() { return _upcomingSlot; }
         DirectX::XMMATRIX& GetWorldTransformMatrix(int index) { return _stagingBuffer[index]; };
 
     private:
 
+        void InitialReserveBatch();
+
         void ReserveBatch();
 
         static constexpr unsigned int _k_batchAllocation = 64;
+        static constexpr unsigned int _k_batchAllocationFactor = 2;
 
         struct PerFrameData{
 

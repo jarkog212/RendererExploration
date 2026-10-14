@@ -215,7 +215,7 @@ void DX12::DepthPass::AccummulatePassCommands(int currentFrame, ID3D12GraphicsCo
 	static unsigned int call = 0;
 	commandList->SetGraphicsRoot32BitConstant(::RootSignature::Params::FrameNumber, ++call, 0);
 
-	const std::vector<std::weak_ptr<DX12::Meshes::Mesh>>& meshes = DX12::WorldSpace::GetAllMeshes();
+	const std::vector<std::weak_ptr<DX12::Meshes::Mesh>>& meshes = DX12::WorldSpace::GetAllMeshTemplates();
 	for (int i = 0; i <= meshes.size(); i++)
 	{
 		const auto& mesh = meshes[i];
@@ -354,7 +354,7 @@ void DX12::GPassRT::AccummulatePassCommands(int currentFrame, ID3D12GraphicsComm
 		commandList->SetGraphicsRoot32BitConstant(::RootSignature::Params::MainMaterialBufferIndex, rawMaterial->GetConstantBufferSRVIndex(), 0);
 		rawMaterial->AccummulateMaterialCommands(currentFrame, commandList);
 
-		const std::vector<std::weak_ptr<DX12::Meshes::Mesh>>& meshes = *DX12::WorldSpace::GetMeshesOfMaterial(rawMaterial->GetType());
+		const std::vector<std::weak_ptr<DX12::Meshes::Mesh>>& meshes = *DX12::WorldSpace::GetMeshTemplatesOfMaterial(rawMaterial->GetType());
 		for (int i = 0; i <= meshes.size(); i++)
 		{
 			const auto& mesh = meshes[i];

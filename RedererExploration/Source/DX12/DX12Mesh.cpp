@@ -45,7 +45,7 @@ DX12::Meshes::WorldMatrixBufferAllocation::~WorldMatrixBufferAllocation()
 
 	Utils::SafeDeferredRenderThreadReleaseViaLambda([bufferOwner = _worldTransformBufferOwner, index = _index]()
 		{
-			bufferOwner->Release(index);
+			bufferOwner->Free(index);
 		});
 }
 
@@ -57,7 +57,7 @@ DirectX::XMMATRIX& DX12::Meshes::WorldMatrixBufferAllocation::GetTransformMatrix
 
 DX12::Meshes::WorldMatrixBuffer::WorldMatrixBuffer()
 {
-	ReserveBatch();
+	InitialReserveBatch();
 	Sync(DX12::CC::k_forAllFrames);
 }
 
@@ -105,7 +105,7 @@ void DX12::Meshes::WorldMatrixBuffer::Sync(int currentFrame)
 
 			if (data._dirtyIDs)
 			{
-				if (data._meshWorldTransformsIDs)
+				if (!data._meshWorldTransformsIDs)
 				{
 					data._meshWorldTransformsIDs = DX12::UploadDataToNewGPUBuffer(_assignedIndeces.data(), _assignedIndeces.size() * elementIdSize);
 
@@ -153,7 +153,7 @@ DX12::Meshes::WorldMatrixBufferAllocation DX12::Meshes::WorldMatrixBuffer::Alloc
 	return DX12::Meshes::WorldMatrixBufferAllocation(index, _stagingBuffer[index], *this);
 }
 
-void DX12::Meshes::WorldMatrixBuffer::Release(int index)
+void DX12::Meshes::WorldMatrixBuffer::Free(int index)
 {
 	int slot = _assignedIndecesTracker[index];
 	CRITICAL_ASSERT(slot != -1 && _assignedIndeces[slot] == index, "Releasing a slot which is wa released before (or is not correct. i.e. double-free)");
@@ -169,12 +169,26 @@ void DX12::Meshes::WorldMatrixBuffer::Release(int index)
 	_assignIndexQueue[--_upcomingSlot] = index;
 }
 
+void DX12::Meshes::WorldMatrixBuffer::InitialReserveBatch()
+{
+	_stagingBuffer.resize(_k_batchAllocation);
+	_assignIndexQueue.resize(_k_batchAllocation);
+	_assignedIndeces.reserve(_k_batchAllocation);
+	_assignedIndecesTracker.resize(_k_batchAllocation, DX12::Meshes::WorldMatrixBufferAllocation::_k_Inavlid);
+
+	for (int i = _upcomingSlot; i < _assignIndexQueue.size(); i++)
+		_assignIndexQueue[i] = i;
+
+	for (int i = 0; i <= DX12::CC::k_rendererWorkerFrameBuffers; i++)
+		_perFrameData[i] = PerFrameData();
+}
+
 void DX12::Meshes::WorldMatrixBuffer::ReserveBatch()
 {
-	_stagingBuffer.resize(_stagingBuffer.size() + _k_batchAllocation);
-	_assignIndexQueue.resize(_assignIndexQueue.size() + _k_batchAllocation);
-	_assignedIndeces.reserve(_assignedIndeces.size() + _k_batchAllocation);
-	_assignedIndecesTracker.resize(_assignedIndeces.size() + _k_batchAllocation, -1);
+	_stagingBuffer.resize(_stagingBuffer.size() * _k_batchAllocationFactor);
+	_assignIndexQueue.resize(_assignIndexQueue.size() * _k_batchAllocationFactor);
+	_assignedIndeces.reserve(_assignedIndeces.size() * _k_batchAllocationFactor);
+	_assignedIndecesTracker.resize(_assignedIndeces.size() * _k_batchAllocationFactor, DX12::Meshes::WorldMatrixBufferAllocation::_k_Inavlid);
 	
 	for (int i = _upcomingSlot; i < _assignIndexQueue.size(); i++)
 		_assignIndexQueue[i] = i;
